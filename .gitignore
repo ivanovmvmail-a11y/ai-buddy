@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 *.cer
+!backend/certs/russian_trusted_root_ca.cer
 *.pem
 
 # python

@@ -28,8 +28,7 @@ npm run dev
 ## Подключение GigaChat
 1. [developers.sber.ru/studio](https://developers.sber.ru/studio) → создать проект GigaChat API → скопировать **Authorization Key**.
 2. В `backend/.env`: `LLM_PROVIDER=gigachat`, `GIGACHAT_CREDENTIALS=<ключ>`.
-3. Сертификат Минцифры (без него будет ошибка SSL): скачать `russian_trusted_root_ca.cer` с [gosuslugi.ru/crt](https://www.gosuslugi.ru/crt) и указать путь в `GIGACHAT_CA_BUNDLE_FILE`.
-   Временный вариант для локальной проверки: `GIGACHAT_VERIFY_SSL=false`.
+3. Сертификат Минцифры уже лежит в репозитории (`backend/certs/russian_trusted_root_ca.cer`, источник — [gosuslugi.ru/crt](https://www.gosuslugi.ru/crt)) и подключается автоматически. Ничего делать не нужно.
 
 ## Структура
 ```
