@@ -18,4 +18,4 @@
 ## 2026-11-08 — сертификат GigaChat (claude/gigachat-cert)
 - Сделано: корневой сертификат Минцифры в backend/certs/ (публичный, коммитится), GigaChat-адаптер подхватывает его автоматически — проверка SSL включена. Supabase-проект ai-buddy создан, pgvector включён. GigaChat проверен с локальной машины.
 - Дальше: ждём ТЗ.
-- Что важно знать Codex: Supabase URL/ключ и ключ GigaChat — в backend/.env, получи их у Виктора лично. pgvector уже включён (схема extensions).
+- Что важно знать Codex: Supabase URL/ключ и ключ GigaChat — в backend/.env, получи их у Миши лично. pgvector уже включён (схема extensions).
