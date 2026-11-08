@@ -1,0 +1,25 @@
+# секреты
+.env
+.env.*
+!.env.example
+*.cer
+*.pem
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# node
+node_modules/
+.next/
+out/
+
+# ide / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# claude local
+.claude/settings.local.json
