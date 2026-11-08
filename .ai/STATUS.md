@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | 1 | Каркас проекта (backend + frontend + правила) | Claude | main (init) | готово | — | стартовый коммит |
 | 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | todo | | ждём ТЗ |
-| 3 | Деплой Vercel + Render + UptimeRobot | Claude + Виктор | claude/deploy | todo | | проверить GigaChat с Render |
+| 3 | Деплой Vercel + Render + UptimeRobot | Claude + Миша | claude/deploy | todo | | проверить GigaChat с Render |
 
 ## Блокеры
 _нет_

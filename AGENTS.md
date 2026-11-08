@@ -6,7 +6,7 @@
 ## Кто есть кто
 | Агент | Чей | Зона ответственности (папки) |
 |---|---|---|
-| **Claude Code** | Виктор | `frontend/`, `backend/app/agent/` (промпты, логика агента), `backend/app/llm/`, `docs/API.md`, `docs/SPEC.md` |
+| **Claude Code** | Миша | `frontend/`, `backend/app/agent/` (промпты, логика агента), `backend/app/llm/`, `docs/API.md`, `docs/SPEC.md` |
 | **Codex** | тиммейт | `backend/app/rag/` (RAG, эмбеддинги, поиск), `backend/app/mcp_server/` (MCP-сервер, моки корпоративных сервисов), `backend/app/db/` и `supabase/migrations/` (схема БД, миграции) |
 | Люди | команда | ревьюят и мержат PR, принимают продуктовые решения |
 
