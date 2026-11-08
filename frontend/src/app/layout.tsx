@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+// Шрифт хранится в проекте (npm-пакет), а не грузится с Google Fonts:
+// сборка работает без интернета (Codex cloud) и не зависит от доступности Google.
+import "@fontsource-variable/inter";
 import "./globals.css";
-
-const inter = Inter({ variable: "--font-inter", subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
   title: "AI-buddy",
@@ -14,7 +14,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body className={`${inter.variable} antialiased`}>{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
