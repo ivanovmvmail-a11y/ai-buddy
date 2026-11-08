@@ -1,28 +1,96 @@
-# Настройка для тиммейта (Codex)
+# Настройка для тиммейта с Codex
 
-## 1. Установить
-- [Git](https://git-scm.com), [Node.js LTS](https://nodejs.org), [uv](https://docs.astral.sh/uv/), [VS Code](https://code.visualstudio.com)
-- В VS Code: расширение **Codex** (OpenAI), войти своим аккаунтом ChatGPT.
+Почти всё сделает сам Codex. От тебя нужно 4 простых действия.
 
-## 2. Получить проект
-Принять приглашение в репозиторий (придёт на почту GitHub), затем:
-```bash
-git clone https://github.com/<владелец>/ai-buddy.git
-cd ai-buddy
+---
+
+## Шаг 1. Установить Codex (≈5 минут, это делаешь ты)
+
+1. Скачай и установи **VS Code**: https://code.visualstudio.com → большая синяя кнопка **Download**. Устанавливай с настройками по умолчанию (жми «Далее»).
+2. Открой VS Code. Слева на панели нажми на значок **из четырёх квадратиков** (Extensions / Расширения).
+3. В поиске напиши **Codex** и найди расширение от **OpenAI** («Codex – OpenAI's coding agent»). Нажми **Install**.
+4. Слева появится значок Codex. Нажми на него, затем **Sign in with ChatGPT** и войди своим аккаунтом ChatGPT.
+5. В VS Code выбери в меню **Файл → Открыть папку** (File → Open Folder). Создай на Рабочем столе пустую папку `hackathon` и выбери её.
+
+## Шаг 2. Дать Codex права (это делаешь ты)
+
+В окне чата Codex под полем ввода есть переключатель режима. Выбери **Agent (full access)**.
+Если такого режима нет, выбери **Agent**. Тогда Codex будет спрашивать разрешение на каждое действие, и ты нажимаешь **Approve / Разрешить**.
+
+> Codex будет устанавливать программы. Иногда Windows покажет окно «Разрешить этому приложению вносить изменения?», нажимай **Да**.
+
+## Шаг 3. Отправить Codex сообщение (это делаешь ты)
+
+Скопируй **весь текст в рамке ниже** и отправь его в чат Codex. Дальше просто следуй тому, что он говорит.
+
 ```
-Запуск — см. README. Файл `backend/.env` с ключами передаём лично, **не через репозиторий**.
+Привет! Я не программист, поэтому делай всё сам и объясняй мне простыми словами на русском.
+Когда мне нужно что-то сделать руками (войти в аккаунт, нажать кнопку, вставить ключ), говори
+по шагам: где нажать и что именно.
 
-## 3. Автоматическое ревью PR от Codex (рекомендуется)
-[chatgpt.com/codex](https://chatgpt.com/codex) → Settings → Code review → подключить GitHub и включить ревью для репозитория `ai-buddy`.
-Тогда Codex сам оставляет ревью к каждому PR (в том числе к PR от Claude).
+Задача: подготовить мой компьютер к командной работе над проектом AI-buddy (хакатон Авито).
+Репозиторий: https://github.com/ivanovmvmail-a11y/ai-buddy (владелец — Виктор).
 
-## 4. Первое сообщение Codex (скопировать целиком)
+Сделай по порядку:
+
+1. Определи мою операционную систему. Проверь, установлены ли git, Node.js (LTS), uv (менеджер
+   Python от Astral) и GitHub CLI (gh). Установи то, чего нет. На Windows используй winget
+   (например: winget install --id Git.Git -e; OpenJS.NodeJS.LTS; astral-sh.uv; GitHub.cli),
+   на macOS — Homebrew. После установки перезапусти терминал или обнови PATH и проверь версии.
+
+2. Вход в GitHub. Если у меня нет аккаунта GitHub, скажи мне зарегистрироваться на github.com
+   и подожди. Затем запусти `gh auth login --web --git-protocol https --hostname github.com`
+   и объясни мне: какой код скопировать, куда его вставить, что нажать в браузере.
+   Настрой git: имя = мой логин GitHub, email = мой скрытый адрес GitHub
+   (<id>+<login>@users.noreply.github.com, id и login возьми из `gh api user`).
+   Настрой это только для этого репозитория (git config без --global), уже после клонирования.
+
+3. Скажи мне попросить Виктора добавить мой логин GitHub в репозиторий и подожди, пока я
+   скажу «добавили». Потом прими приглашение сам:
+   `gh api user/repository_invitations` → `gh api -X PATCH user/repository_invitations/<id>`.
+
+4. Склонируй репозиторий в текущую папку VS Code: `gh repo clone ivanovmvmail-a11y/ai-buddy .`
+   (если папка не пустая — в подпапку ai-buddy, и скажи мне открыть её через Файл → Открыть папку).
+
+5. Настрой проект:
+   - `cd backend && uv sync`
+   - `cd frontend && npm install`
+   - скопируй backend/.env.example в backend/.env и frontend/.env.example в frontend/.env.local.
+   Ключи (GigaChat, Supabase) мне передаст Виктор лично. Скажи мне открыть backend/.env и
+   вставить их в строки LLM_PROVIDER=gigachat, GIGACHAT_CREDENTIALS=, SUPABASE_URL=,
+   SUPABASE_SERVICE_KEY=, затем нажать Ctrl+S. Сами ключи мне в чат не присылай и не проси
+   меня их присылать. Никогда не коммить файлы .env.
+
+6. Проверь, что всё работает: запусти backend (`uv run fastapi dev app/main.py` в папке backend),
+   проверь http://localhost:8000/health, запусти frontend (`npm run dev` в папке frontend) и
+   попроси меня открыть http://localhost:3000 и задать вопрос в чате. Потом останови серверы.
+
+7. Прочитай AGENTS.md, .ai/STATUS.md, .ai/claude-log.md, .ai/codex-log.md, .ai/HANDOFF.md,
+   docs/SPEC.md и docs/API.md. Коротко расскажи мне простыми словами: как устроен проект,
+   за что отвечаешь ты (Codex), за что отвечает Claude и какие правила мы соблюдаем.
+   Главное: ты работаешь только в своей зоне, каждая задача — отдельная ветка codex/<задача>,
+   в main никогда не пушишь, после задачи обновляешь .ai/codex-log.md и .ai/STATUS.md и
+   открываешь Pull Request через `gh pr create`.
+
+В конце дай мне короткий итог: что установлено, что работает, что осталось сделать мне.
 ```
-Ты — Codex в командном проекте AI-buddy (хакатон Авито). Сначала прочитай AGENTS.md, .ai/STATUS.md,
-.ai/claude-log.md, .ai/codex-log.md, .ai/HANDOFF.md, docs/SPEC.md и docs/API.md.
-Твоя зона: backend/app/rag/ (RAG и поиск по документам), backend/app/mcp_server/ (MCP-сервер с моками
-корпоративных сервисов), backend/app/db/ и схема БД Supabase. В чужие папки не лезь — пиши в HANDOFF.md.
-Каждая задача — отдельная ветка codex/<задача> от свежего main. В main не пушь. После задачи обнови
-.ai/codex-log.md и .ai/STATUS.md и открой Pull Request по шаблону. Секреты только в .env.
-Скажи, что понял, и предложи, с какой задачи из STATUS.md начать.
+
+## Шаг 4. Включить автоматическое ревью от Codex (≈2 минуты, по желанию)
+
+Тогда Codex сам будет проверять каждый Pull Request в репозитории, в том числе от Claude.
+
+1. Открой https://chatgpt.com/codex и войди тем же аккаунтом.
+2. Найди **Settings** (Настройки) → **Code review**.
+3. Подключи GitHub, если попросит, и включи ревью для репозитория **ai-buddy**.
+
+Если что-то непонятно, просто спроси Codex: «Помоги включить Code review для репозитория ai-buddy на chatgpt.com/codex».
+
+---
+
+## Как работать дальше (каждый раз)
+
+Отправь Codex сообщение:
+```
+Начинаем работу. Сделай git checkout main и git pull, прочитай .ai/STATUS.md, .ai/HANDOFF.md
+и журналы агентов. Скажи, какая задача сейчас моя, и предложи план.
 ```
