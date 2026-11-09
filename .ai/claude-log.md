@@ -9,6 +9,12 @@
 - Что важно знать Codex:
 ```
 
+## 2026-11-09 — переход backend на Flask (claude/flask)
+- Сделано: FastAPI → Flask (+ flask-cors). Контракт /health и /chat не изменился. Async-код (LLM, RAG, MCP) выполняется в одном фоновом event loop — `app/async_runner.py` (иначе клиенты GigaChat/OpenAI падают с «Event loop is closed» со второго запроса). Первые тесты: `backend/tests/test_api.py` (pytest + pytest-cov), 7 тестов, покрытие app 74%. Проверено вживую: фронт ↔ бэк ↔ GigaChat, несколько сообщений подряд.
+- Дальше: Docker (docker compose: backend + frontend + Postgres с pgvector), тесты LLM-провайдеров, SPEC по ТЗ.
+- Вопросы/блокеры: команда запуска на Render (задача деплоя) — `gunicorn`/`flask run`, решить при деплое.
+- Что важно знать Codex: async-функции (retrieve, MCP) остаются async, контракт `retrieve` не менялся. Из синхронного кода вызывать через `app.async_runner.run(coro)`, не через `asyncio.run()`. Тесты — `backend/tests/`, запуск `uv run pytest --cov=app`.
+
 ## 2026-11-08 — каркас проекта (main, init)
 - Сделано: правила (AGENTS.md, CLAUDE.md, .ai/), docs, backend FastAPI (/health, /chat, LLM-адаптер GigaChat + echo), frontend Next.js со страницей чата.
 - Дальше: ждём ТЗ → /jmo-workflow:interview → docs/SPEC.md; деплой.

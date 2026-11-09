@@ -14,7 +14,7 @@
 cd backend
 cp .env.example .env        # и заполнить ключи
 uv sync
-uv run fastapi dev app/main.py
+uv run flask --app app.main run --debug --port 8000
 
 # 2. Frontend (http://localhost:3000) — в другом терминале
 cd frontend
@@ -33,7 +33,8 @@ npm run dev
 ## Структура
 ```
 backend/app/
-  main.py         FastAPI: /health, /chat
+  main.py         Flask: /health, /chat
+  async_runner.py общий event loop для async-кода (LLM, RAG, MCP)
   agent/          логика агента, промпты           (Claude)
   llm/            провайдеры LLM: gigachat|openai|echo (Claude)
   rag/            поиск по документам команды      (Codex)
@@ -47,3 +48,4 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 ## Проверка
 - `GET http://localhost:8000/health` → `{"status":"ok", ...}`
 - На http://localhost:3000 отправить сообщение — приходит ответ.
+- Тесты backend: `cd backend && uv run pytest --cov=app --cov-report=term-missing`

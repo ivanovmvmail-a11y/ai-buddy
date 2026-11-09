@@ -37,7 +37,7 @@
 - Ветка Codex должна начинаться с `codex/`.
 
 ## Стек
-- Backend: Python 3.12, FastAPI, uv (`backend/`).
+- Backend: Python 3.12, Flask, uv (`backend/`). Async-код (LLM, RAG, MCP) запускать через `app.async_runner.run()`, не через `asyncio.run()`.
 - Frontend: Next.js (App Router) + TypeScript + Tailwind (`frontend/`).
 - БД: Supabase (PostgreSQL + pgvector).
 - LLM: GigaChat по умолчанию, провайдер переключается через `LLM_PROVIDER` в `.env` (см. `backend/app/llm/`).
@@ -46,7 +46,8 @@
 ## Команды
 ```bash
 # backend
-cd backend && uv sync && uv run fastapi dev app/main.py   # http://localhost:8000/health
+cd backend && uv sync && uv run flask --app app.main run --debug --port 8000   # http://localhost:8000/health
+cd backend && uv run pytest --cov=app                                          # тесты + покрытие
 # frontend
 cd frontend && npm install && npm run dev                 # http://localhost:3000
 ```
