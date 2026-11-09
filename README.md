@@ -63,6 +63,8 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 ```
 
 ## Проверка
+Каждый PR автоматически проверяет GitHub Actions (`.github/workflows/ci.yml`): тесты и покрытие backend (отчёт — артефакт `coverage-backend`), линтер и сборка frontend, запуск всего проекта через `docker compose up`.
+
 - `GET http://localhost:8000/health` → `{"status":"ok", ...}`
 - На http://localhost:3000 отправить сообщение — приходит ответ.
 - Тесты backend: `cd backend && uv run pytest --cov=app --cov-report=term-missing`

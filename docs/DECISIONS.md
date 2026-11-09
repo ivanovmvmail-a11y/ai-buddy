@@ -15,3 +15,4 @@
 | 2026-11-10 | Основной запуск — `docker compose up` (backend + frontend + PostgreSQL/pgvector); Vercel/Render — бонус | ТЗ: прототип должен запускаться экспертами по инструкции, иначе 0 баллов; Docker есть в инфраструктуре Авито | Миша |
 | 2026-11-10 | Backend в Docker — gunicorn (1 процесс, 8 потоков) | Продакшн-сервер для Flask; один процесс, чтобы был один общий event loop для LLM-клиентов | Claude |
 | 2026-11-10 | База в Docker — образ `pgvector/pgvector:pg17`, доступ из кода по `DATABASE_URL` (прямое SQL-подключение) | Код одинаково работает с локальной базой и с Supabase; Supabase REST/клиент в Docker недоступен | Claude |
+| 2026-11-10 | CI на GitHub Actions: тесты + покрытие backend, линтер + сборка frontend, `docker compose up` на чистой машине | Docker нельзя проверить на ПК Миши (выключена виртуализация в BIOS); CI/CD есть в инфраструктуре Авито (ТЗ); жюри видит, что проект запускается | Миша |

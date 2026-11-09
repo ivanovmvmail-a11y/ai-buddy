@@ -11,6 +11,7 @@
 
 ## 2026-11-10 — Docker (claude/docker)
 - Сделано: `docker-compose.yml` (db PostgreSQL+pgvector, backend на gunicorn, frontend Next.js standalone), Dockerfile для backend и frontend, демо-режим без ключей (echo), `DATABASE_URL` в конфиге, README «Запуск через Docker». Починил: `frontend/.env.example` не попадал в git.
+- CI (с разрешения Миши): `.github/workflows/ci.yml` — backend-тесты + покрытие, frontend lint + build, docker compose up с проверкой /health, /chat, сайта и pgvector. Docker проверяется на GitHub, т.к. на ПК Миши выключен SVM в BIOS (нет проводной клавиатуры).
 - Проверено: `uv sync --frozen --no-dev`, pytest (7 passed), `npm run build` со standalone. **Не проверено**: сам `docker compose up` — на компьютере Миши нет Docker Desktop.
 - Дальше: проверить compose после установки Docker; инструменты агента (проверка прав перед каждым вызовом + черновик → подтверждение); шаблон SDD.
 - Что важно знать Codex: см. HANDOFF от 2026-11-10 — база через `DATABASE_URL`, миграции должны работать на чистом PostgreSQL.
