@@ -5,9 +5,10 @@
 | # | Задача | Владелец | Ветка | Статус | PR | Заметки |
 |---|---|---|---|---|---|---|
 | 1 | Каркас проекта (backend + frontend + правила) | Claude | main (init) | готово | — | стартовый коммит |
-| 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | todo | | ждём ТЗ |
-| 3 | Деплой Vercel + Render + UptimeRobot | Claude + Миша | claude/deploy | todo | | проверить GigaChat с Render |
-| 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | на ревью | | по ТЗ: стек Авито Go / Python+Flask |
+| 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | todo | | ТЗ есть; интервью с командой 11.11 |
+| 3 | Деплой Vercel + Render + UptimeRobot (бонус к Docker) | Claude + Миша | claude/deploy | todo | | проверить GigaChat с Render |
+| 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | готово | #7 | по ТЗ: стек Авито Go / Python+Flask |
+| 5 | Docker: запуск одной командой | Claude | claude/docker | на ревью | | compose не проверен: нет Docker Desktop |
 
 ## Блокеры
 _нет_

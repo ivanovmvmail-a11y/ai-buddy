@@ -9,6 +9,12 @@
 - Что важно знать Codex:
 ```
 
+## 2026-11-10 — Docker (claude/docker)
+- Сделано: `docker-compose.yml` (db PostgreSQL+pgvector, backend на gunicorn, frontend Next.js standalone), Dockerfile для backend и frontend, демо-режим без ключей (echo), `DATABASE_URL` в конфиге, README «Запуск через Docker». Починил: `frontend/.env.example` не попадал в git.
+- Проверено: `uv sync --frozen --no-dev`, pytest (7 passed), `npm run build` со standalone. **Не проверено**: сам `docker compose up` — на компьютере Миши нет Docker Desktop.
+- Дальше: проверить compose после установки Docker; инструменты агента (проверка прав перед каждым вызовом + черновик → подтверждение); шаблон SDD.
+- Что важно знать Codex: см. HANDOFF от 2026-11-10 — база через `DATABASE_URL`, миграции должны работать на чистом PostgreSQL.
+
 ## 2026-11-09 — переход backend на Flask (claude/flask)
 - Сделано: FastAPI → Flask (+ flask-cors). Контракт /health и /chat не изменился. Async-код (LLM, RAG, MCP) выполняется в одном фоновом event loop — `app/async_runner.py` (иначе клиенты GigaChat/OpenAI падают с «Event loop is closed» со второго запроса). Первые тесты: `backend/tests/test_api.py` (pytest + pytest-cov), 7 тестов, покрытие app 74%. Проверено вживую: фронт ↔ бэк ↔ GigaChat, несколько сообщений подряд.
 - Дальше: Docker (docker compose: backend + frontend + Postgres с pgvector), тесты LLM-провайдеров, SPEC по ТЗ.

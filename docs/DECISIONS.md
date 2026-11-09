@@ -12,3 +12,6 @@
 | 2026-11-08 | Codex работает в облаке (chatgpt.com/codex), без ключей; миграции БД пишет файлами, применяет Claude | Тиммейту не нужно ничего устанавливать, секреты не уходят в облако | команда |
 | 2026-11-08 | Шрифт Inter из npm (@fontsource-variable/inter) вместо Google Fonts | Сборка без интернета (Codex cloud) и без зависимости от Google на защите | Claude |
 | 2026-11-09 | Backend: FastAPI → Flask (Python) | В ТЗ стек Авито: Go, Python с Flask; переход дешёвый, пока бэкенд — каркас. Async-код (LLM/RAG/MCP) крутится в одном фоновом event loop (`app/async_runner.py`) | Миша |
+| 2026-11-10 | Основной запуск — `docker compose up` (backend + frontend + PostgreSQL/pgvector); Vercel/Render — бонус | ТЗ: прототип должен запускаться экспертами по инструкции, иначе 0 баллов; Docker есть в инфраструктуре Авито | Миша |
+| 2026-11-10 | Backend в Docker — gunicorn (1 процесс, 8 потоков) | Продакшн-сервер для Flask; один процесс, чтобы был один общий event loop для LLM-клиентов | Claude |
+| 2026-11-10 | База в Docker — образ `pgvector/pgvector:pg17`, доступ из кода по `DATABASE_URL` (прямое SQL-подключение) | Код одинаково работает с локальной базой и с Supabase; Supabase REST/клиент в Docker недоступен | Claude |

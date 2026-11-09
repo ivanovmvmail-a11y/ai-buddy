@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Самодостаточная сборка для Docker (frontend/Dockerfile). На Vercel не мешает.
+  output: "standalone",
 };
 
 export default nextConfig;

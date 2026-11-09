@@ -5,7 +5,24 @@
 
 **Правила работы для людей и ИИ — в [AGENTS.md](AGENTS.md).** Доска задач — [.ai/STATUS.md](.ai/STATUS.md).
 
-## Запуск за 2 минуты
+## Запуск через Docker (основной способ)
+
+Нужен только [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+docker compose up --build
+```
+
+- сайт — http://localhost:3000
+- backend — http://localhost:8000/health
+- база PostgreSQL + pgvector — `localhost:5432`, тестовые учётные данные `buddy` / `buddy`, база `ai_buddy`
+
+**Без ключей** всё запускается в демо-режиме: вместо нейросети отвечает заглушка `echo`.
+Чтобы подключить нейросеть: `cp backend/.env.example backend/.env`, указать `LLM_PROVIDER` и ключ (см. «Подключение GigaChat»), перезапустить `docker compose up --build`.
+
+Остановить: `docker compose down`. Стереть базу и начать с нуля: `docker compose down -v`.
+
+## Запуск для разработки (без Docker)
 
 Нужны: [Git](https://git-scm.com), [Node.js LTS](https://nodejs.org), [uv](https://docs.astral.sh/uv/).
 
