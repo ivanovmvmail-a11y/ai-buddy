@@ -9,6 +9,10 @@
 - Что важно знать Codex:
 ```
 
+## 2026-11-10 — шаблон SDD (claude/sdd-template)
+- Сделано: `docs/specs/README.md` (процесс, нумерация), `_template.md`, первая спецификация `001-agent-tools.md` (механика инструментов, 10 критериев приёмки с трассировкой на автотесты из PR «[API] Инструменты агента»).
+- Дальше: спецификации сценариев `1xx` после интервью.
+
 ## 2026-11-09 — переход backend на Flask (claude/flask)
 - Сделано: FastAPI → Flask (+ flask-cors). Контракт /health и /chat не изменился. Async-код (LLM, RAG, MCP) выполняется в одном фоновом event loop — `app/async_runner.py` (иначе клиенты GigaChat/OpenAI падают с «Event loop is closed» со второго запроса). Первые тесты: `backend/tests/test_api.py` (pytest + pytest-cov), 7 тестов, покрытие app 74%. Проверено вживую: фронт ↔ бэк ↔ GigaChat, несколько сообщений подряд.
 - Дальше: Docker (docker compose: backend + frontend + Postgres с pgvector), тесты LLM-провайдеров, SPEC по ТЗ.

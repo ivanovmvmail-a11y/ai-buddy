@@ -7,7 +7,8 @@
 | 1 | Каркас проекта (backend + frontend + правила) | Claude | main (init) | готово | — | стартовый коммит |
 | 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | todo | | ждём ТЗ |
 | 3 | Деплой Vercel + Render + UptimeRobot | Claude + Миша | claude/deploy | todo | | проверить GigaChat с Render |
-| 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | на ревью | | по ТЗ: стек Авито Go / Python+Flask |
+| 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | готово | #7 | по ТЗ: стек Авито Go / Python+Flask |
+| 7 | Шаблон SDD-спецификаций + 001-agent-tools | Claude | claude/sdd-template | на ревью | | мержить после PR инструментов агента |
 
 ## Блокеры
 _нет_
