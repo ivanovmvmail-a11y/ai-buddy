@@ -1,4 +1,5 @@
 """HTTP API AI-buddy (Flask). Контракт — docs/API.md."""
+import logging
 from typing import Literal
 
 from flask import Flask, g, jsonify, request
@@ -13,6 +14,7 @@ from app.config import settings
 from app.llm import Message
 
 USER_HEADER = "X-User-Id"
+log = logging.getLogger("ai_buddy.api")
 
 
 class ChatMessageIn(BaseModel):
@@ -80,8 +82,10 @@ def create_app() -> Flask:
         history = [Message(role=m.role, content=m.content) for m in req.messages if m.role != "system"]
         try:
             result = async_runner.run(service.agent.answer(history, g.user))
-        except Exception as exc:  # для прототипа отдаём фронту понятную ошибку
-            return jsonify(detail=f"Ошибка LLM: {exc}"), 502
+        except Exception:
+            # детали — только в лог сервера; пользователю — общее сообщение без внутренностей
+            log.exception("chat failed user=%s", g.user.id)
+            return jsonify(detail="Помощник временно недоступен. Попробуйте ещё раз через минуту."), 502
         return ChatResponse(
             reply=result.reply,
             sources=[Source(**s) for s in result.sources],
