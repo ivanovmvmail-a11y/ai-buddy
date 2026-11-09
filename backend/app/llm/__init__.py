@@ -3,9 +3,9 @@ from functools import lru_cache
 
 from app.config import settings
 
-from .base import LLMProvider, Message
+from .base import LLMProvider, LLMReply, Message, ToolCall, ToolSpec
 
-__all__ = ["LLMProvider", "Message", "get_llm"]
+__all__ = ["LLMProvider", "LLMReply", "Message", "ToolCall", "ToolSpec", "get_llm"]
 
 
 @lru_cache
