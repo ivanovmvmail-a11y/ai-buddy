@@ -24,3 +24,9 @@ Thumbs.db
 
 # claude local
 .claude/settings.local.json
+
+# тесты и покрытие
+.coverage
+.pytest_cache/
+htmlcov/
+coverage.xml
