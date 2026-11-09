@@ -59,7 +59,9 @@ def test_chat_llm_error_returns_502(client, use_llm):
     use_llm(RuntimeError("нет связи"))
     res = ask(client, "x")
     assert res.status_code == 502
-    assert "нет связи" in res.get_json()["detail"]
+    detail = res.get_json()["detail"]
+    assert "недоступен" in detail
+    assert "нет связи" not in detail  # внутренние детали ошибки не утекают пользователю
 
 
 def test_cors_allows_frontend_and_user_header(client):
