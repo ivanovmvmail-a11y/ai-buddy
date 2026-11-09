@@ -9,6 +9,11 @@
 - Что важно знать Codex:
 ```
 
+## 2026-11-10 — инструменты агента (claude/agent-tools) [API]
+- Сделано: LLM-слой с вызовом инструментов (GigaChat functions, OpenAI tools; проверено вживую на GigaChat). Агент в цикле (до 5 шагов). Права проверяются перед каждым вызовом (роль + доступ к данным), недоступные инструменты модели не показываются. Write-инструменты → черновик → `POST /actions/{id}/confirm` (повторная проверка прав) → результат сохраняется. Роли-имитация: стажёр, наставник, руководитель, HR BP, куратор; пользователь по заголовку `X-User-Id`. Демо-инструменты: профиль, профиль стажёра, напоминание. Тесты: 41, покрытие backend 99%.
+- Дальше: хранилище действий в PostgreSQL (сейчас в памяти); продуктовые инструменты после интервью; карточка черновика на фронте (после Q&A по фронтенду).
+- Что важно знать Codex: HANDOFF от 2026-11-10 «инструменты агента».
+
 ## 2026-11-10 — Docker (claude/docker)
 - Сделано: `docker-compose.yml` (db PostgreSQL+pgvector, backend на gunicorn, frontend Next.js standalone), Dockerfile для backend и frontend, демо-режим без ключей (echo), `DATABASE_URL` в конфиге, README «Запуск через Docker». Починил: `frontend/.env.example` не попадал в git.
 - CI (с разрешения Миши): `.github/workflows/ci.yml` — backend-тесты + покрытие, frontend lint + build, docker compose up с проверкой /health, /chat, сайта и pgvector. Docker проверяется на GitHub, т.к. на ПК Миши выключен SVM в BIOS (нет проводной клавиатуры).
