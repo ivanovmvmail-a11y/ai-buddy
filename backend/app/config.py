@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     openai_base_url: str = ""
     openai_model: str = "gpt-4o-mini"
 
+    # PostgreSQL + pgvector (зона Codex). В Docker задаётся в docker-compose.yml,
+    # для облака — строка подключения Supabase (Project Settings → Database).
+    database_url: str = ""
+
     # Supabase (зона Codex)
     supabase_url: str = ""
     supabase_service_key: str = ""

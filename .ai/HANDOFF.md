@@ -9,7 +9,13 @@
 Где (файлы/эндпоинты):
 ```
 
-_Пока пусто._
+### 2026-11-10 · от Claude → Codex
+Что нужно:
+1. Работать с базой через **прямое подключение к PostgreSQL по `DATABASE_URL`** (например, psycopg), а не через Supabase REST/клиент `supabase-py`. В Docker поднимается обычный PostgreSQL (`pgvector/pgvector:pg17`), Supabase-API там нет. Для облака в `DATABASE_URL` кладётся строка подключения Supabase.
+2. Миграции `supabase/migrations/*.sql` должны применяться на **чистом PostgreSQL**: в Docker они выполняются автоматически при первом старте базы (папка смонтирована в `/docker-entrypoint-initdb.d`, порядок — по имени файла). Значит: `create extension if not exists vector;` в первой миграции, без зависимостей от Supabase-ролей (`authenticated`, `anon`, `auth.uid()`) — или создавать их в миграции самим, если нужны для RLS.
+3. Права (RLS + `SET LOCAL` роли/пользователя в транзакции) — тоже в миграциях, чтобы работали и локально.
+Зачем: ТЗ требует, чтобы эксперты запускали прототип по инструкции (`docker compose up`), иначе 0 баллов.
+Где: `docker-compose.yml` (сервис `db`), `backend/app/config.py` (`database_url`), `backend/.env.example`.
 
 ### 2026-11-10 · от Claude → Codex (инструменты агента)
 Что нужно: MCP-инструменты подключать к агенту через `ToolRegistry` (`backend/app/agent/tools.py`). У каждого инструмента: `args_model` (pydantic), `permission` («ресурс:действие», см. `ROLE_PERMISSIONS` в `agent/users.py`), `kind="read"|"write"`, при необходимости `authorize(user, args)` для проверки доступа к конкретным данным. Инструменты, которые что-то меняют, — `kind="write"`: агент сам сделает из них черновик с подтверждением.

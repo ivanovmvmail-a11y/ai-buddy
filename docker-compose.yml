@@ -1,0 +1,58 @@
+# AI-buddy целиком одной командой:  docker compose up --build
+#   сайт     http://localhost:3000
+#   backend  http://localhost:8000/health
+#   база     PostgreSQL + pgvector, localhost:5432 (тестовые учётные данные ниже)
+#
+# Без backend/.env всё работает в демо-режиме (LLM-заглушка echo, ключи не нужны).
+# Чтобы подключить нейросеть — заполните backend/.env по образцу backend/.env.example.
+name: ai-buddy
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      # тестовые учётные данные только для локальной базы в Docker
+      POSTGRES_USER: buddy
+      POSTGRES_PASSWORD: buddy
+      POSTGRES_DB: ai_buddy
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # SQL-миграции применяются автоматически при ПЕРВОМ создании базы (по алфавиту).
+      # Пересоздать базу с нуля: docker compose down -v
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buddy -d ai_buddy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # в Docker backend всегда ходит в локальную базу, даже если в .env указан Supabase
+      DATABASE_URL: postgresql://buddy:buddy@db:5432/ai_buddy
+      FRONTEND_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db-data:
