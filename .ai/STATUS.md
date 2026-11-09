@@ -10,6 +10,7 @@
 | 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | готово | #7 | по ТЗ: стек Авито Go / Python+Flask |
 | 5 | Docker: запуск одной командой | Claude | claude/docker | на ревью | #8 | Docker и тесты проверяет CI на GitHub (локально нет SVM в BIOS) |
 | 6 | Инструменты агента: права + черновик→подтверждение [API] | Claude | claude/agent-tools | готово | #9 | |
+| 7 | Шаблон SDD-спецификаций + 001-agent-tools | Claude | claude/sdd-template | готово | #10 | |
 
 ## Блокеры
 _нет_
