@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
 
-from app.agent.users import Role
+from app.agent.users import Role, User
 
 Stage = Literal["week1", "week2", "month1", "month2", "after3m"]
 OwnerRole = Literal["intern", "mentor", "lead"]
@@ -16,6 +16,18 @@ RequestStatus = Literal["created", "pending_approval", "granted", "rejected"]
 
 class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+
+class SystemActor(BaseModel):
+    """Внутренний субъект, не пользователь/роль агента и не входная HTTP-модель."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    id: Literal["system"] = "system"
+    role: Literal["system"] = "system"
+    team: Literal["system"] = "system"
+    name: str = "Система демо"
+
+
+Actor = User | SystemActor
 
 
 class PlanItem(Model):
@@ -114,7 +126,7 @@ class InternState(Model):
 class Event(Model):
     ts: datetime
     user_id: str
-    role: Role
+    role: Role | Literal["system"]
     team: str
     type: str
     payload: dict[str, JsonValue]

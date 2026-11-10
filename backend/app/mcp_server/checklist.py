@@ -1,32 +1,35 @@
 """План, следующий шаг, лестница и фактическая сводка недели."""
 from app.agent.users import Role, User
-from pydantic import TypeAdapter
 
 from . import events, storage
-from ._domain import STAGES, WORK_STAGES, item_view, nonempty, owner_id, positive, require_intern, timestamp
+from ._domain import STAGES, WORK_STAGES, item_status, item_view, nonempty, owner_id, positive, require_intern, timestamp
+from ._system import SYSTEM_ACTOR
 from .errors import Conflict, Forbidden, NotFound
 from .models import ItemStatus, NextStep, OnboardingData, Plan, PlanItem, StageInfo
 
 
 def _change_status(data: OnboardingData, actor: User, item: PlanItem, status: ItemStatus,
-                  reason: str | None = None, waiting_for: str | None = None):
+                  reason: str | None = None, waiting_for: str | None = None, *, day: int | None = None):
+    day = data.interns[item.intern_id].current_day if day is None else positive.validate_python(day)
     old = item.status
     item.status = status
     item.status_reason = reason
     item.waiting_for = waiting_for if status == "waiting" else None
     item.waiting_days = 0 if status == "waiting" else None
-    item.updated_at = timestamp(data, item.intern_id)
+    item.updated_at = timestamp(data, item.intern_id, day)
     item.updated_by = actor.id
     events._record(data, actor, "plan_item_status_changed", {
         "intern_id": item.intern_id, "item_id": item.id, "title": item.title,
-        "from": old, "to": status, "reason": reason, "day": data.interns[item.intern_id].current_day,
+        "from": old, "to": status, "reason": reason, "day": day, "waiting_for": item.waiting_for,
     })
     if status == "done":
         for reminder in data.reminders.values():
             if reminder.plan_item_id == item.id and reminder.status != "done":
                 reminder.status = "done"
                 reminder.snooze_until_day = None
-                events._record(data, actor, "reminder_completed", {"intern_id": item.intern_id, "reminder_id": reminder.id})
+                events._record(data, SYSTEM_ACTOR, "reminder_completed", {
+                    "intern_id": item.intern_id, "reminder_id": reminder.id, "day": day,
+                })
 
 
 def _build_plan(data: OnboardingData, actor: User, intern_id: str) -> Plan:
@@ -73,7 +76,7 @@ async def set_item_status(actor: User, item_id: str, status: ItemStatus, reason:
         returning = actor.role == Role.MENTOR and target.mentor_id == actor.id and item.owner_role == "intern"
         if not is_owner and not returning:
             raise Forbidden()
-        status = TypeAdapter(ItemStatus).validate_python(status)
+        status = item_status.validate_python(status)
         if returning and not is_owner:
             if item.status != "done" or status != "in_progress":
                 raise Conflict()
@@ -91,14 +94,32 @@ async def weekly_summary(actor: User, intern_id: str, week: int) -> dict:
         require_intern(data, actor, intern_id)
         week = positive.validate_python(week)
         start, end = (week - 1) * 7 + 1, week * 7
+        cutoff = min(end, data.interns[intern_id].current_day)
         facts = [event for event in data.events if event.payload.get("intern_id") == intern_id
-                 and start <= event.payload.get("day", 0) <= end]
-        closed = {event.payload["item_id"]: event.payload for event in facts
-                  if event.type == "plan_item_status_changed" and event.payload.get("to") == "done"}
+                 and event.payload.get("day", 0) <= cutoff]
+        # Сортируем по виртуальному дню; внутри дня порядок событий задаёт журнал.
+        # Seed может добавлять исторические события не в календарном порядке.
+        facts.sort(key=lambda event: event.payload.get("day", 0))
+        last = {event.payload["item_id"]: event for event in facts
+                if event.type == "plan_item_status_changed"}
+        closed, carry = [], []
+        for item in data.items.values():
+            if item.intern_id != intern_id or item.stage not in WORK_STAGES or (item.stage == "week2" and week < 2):
+                continue
+            event = last.get(item.id)
+            historical = item.model_copy(update={
+                "status": event.payload["to"] if event else "not_started",
+                "status_reason": event.payload.get("reason") if event else None,
+                "waiting_for": event.payload.get("waiting_for") if event else None,
+                "updated_at": event.ts if event else timestamp(data, intern_id, 1),
+                "updated_by": event.user_id if event else None,
+            }, deep=True)
+            if historical.status != "done":
+                carry.append(item_view(data, historical, cutoff))
+            elif event is not None and start <= event.payload["day"]:
+                closed.append(event.payload)
         granted = {event.payload["request_id"]: event.payload for event in facts
-                   if event.type == "access_request_decided" and event.payload.get("status") == "granted"}
-        carry = [item_view(data, item) for item in data.items.values() if item.intern_id == intern_id
-                 and item.stage in WORK_STAGES and item.status != "done"
-                 and (item.stage == "week1" or week >= 2)]
-        return {"intern_id": intern_id, "week": week, "closed": list(closed.values()),
+                   if event.type == "access_request_decided" and event.payload.get("status") == "granted"
+                   and start <= event.payload["day"]}
+        return {"intern_id": intern_id, "week": week, "closed": closed,
                 "access_granted": list(granted.values()), "carry_over": carry}

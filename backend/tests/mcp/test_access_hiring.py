@@ -23,7 +23,8 @@ def test_auto_request_updates_plan_and_records_facts(store, snapshot):
     data = snapshot()
     assert data.items[request.plan_item_id].status == "done"
     assert [event.type for event in data.events[-3:]] == ["access_request_created", "access_request_decided", "plan_item_status_changed"]
-    assert all(event.user_id == ANYA.id and event.role == ANYA.role and event.team == ANYA.team for event in data.events[-3:])
+    assert data.events[-3].user_id == ANYA.id and data.events[-1].user_id == ANYA.id
+    assert data.events[-2].user_id == "system" and data.events[-2].role == "system"
     assert run(checklist.get_plan(ANYA, ANYA.id)).next_step.item.resource_id == "bitbucket-platform"
 
 

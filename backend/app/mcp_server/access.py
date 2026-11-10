@@ -1,10 +1,9 @@
 """Имитация выдачи доступов: автоматическая либо с решением наставника."""
-from pydantic import StrictBool, TypeAdapter
-
 from app.agent.users import Role, User
 
 from . import checklist, events, storage
-from ._domain import can_read_private, intern, known_actor, nonempty, timestamp
+from ._domain import access_level, can_read_private, intern, known_actor, nonempty, strict_bool, timestamp
+from ._system import SYSTEM_ACTOR
 from .errors import Conflict, Forbidden, NotFound
 from .models import AccessLevel, AccessRequest, AccessResource
 
@@ -27,7 +26,7 @@ async def create_request(actor: User, resource_id: str, level: AccessLevel, just
         resource = data.resources.get(resource_id)
         if resource is None or resource.team not in {None, target.team}:
             raise NotFound()
-        level = TypeAdapter(AccessLevel).validate_python(level)
+        level = access_level.validate_python(level)
         justification = nonempty.validate_python(justification)
         if any(request.intern_id == actor.id and request.resource_id == resource_id
                and request.status != "rejected" for request in data.requests.values()):
@@ -50,7 +49,7 @@ async def create_request(actor: User, resource_id: str, level: AccessLevel, just
                    "status": request.status, "day": request.created_day}
         events._record(data, actor, "access_request_created", payload)
         if request.status == "granted":
-            events._record(data, actor, "access_request_decided", {**payload, "approver": "auto"})
+            events._record(data, SYSTEM_ACTOR, "access_request_decided", {**payload, "approver": "auto"})
         if item:
             checklist._change_status(data, actor, item, "done" if request.status == "granted" else "waiting",
                                     waiting_for=approver_id)
@@ -78,7 +77,7 @@ async def decide_request(actor: User, request_id: str, approve: bool, reason: st
             raise Forbidden()
         if request.status != "pending_approval":
             raise Conflict()
-        approve = TypeAdapter(StrictBool).validate_python(approve)
+        approve = strict_bool.validate_python(approve)
         reason = None if approve else nonempty.validate_python(reason)
         request.status = "granted" if approve else "rejected"
         request.reject_reason = reason
@@ -90,8 +89,9 @@ async def decide_request(actor: User, request_id: str, approve: bool, reason: st
         for reminder in data.reminders.values():
             if reminder.request_id == request.id and reminder.status != "done":
                 reminder.status, reminder.snooze_until_day = "done", None
-                events._record(data, actor, "reminder_completed", {
+                events._record(data, SYSTEM_ACTOR, "reminder_completed", {
                     "intern_id": request.intern_id, "reminder_id": reminder.id,
+                    "day": data.interns[request.intern_id].current_day,
                 })
         if request.plan_item_id:
             checklist._change_status(data, actor, data.items[request.plan_item_id],

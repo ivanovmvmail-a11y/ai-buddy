@@ -2,17 +2,21 @@
 from datetime import datetime, time, timedelta, timezone
 from typing import Annotated
 
-from pydantic import Field, StringConstraints, TypeAdapter
+from pydantic import Field, StrictBool, StringConstraints, TypeAdapter
 
-from app.agent.users import DEMO_USERS, Role, User
+from app.agent.users import DEMO_USERS, Role, User, can_view_intern
 
 from .errors import NotFound
-from .models import OnboardingData, PlanItem
+from .models import AccessLevel, ItemStatus, OnboardingData, PlanItem, SkillLevel
 
 WORK_STAGES = ("week1", "week2")
 STAGES = (*WORK_STAGES, "month1", "month2", "after3m")
 nonempty = TypeAdapter(Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)])
 positive = TypeAdapter(Annotated[int, Field(ge=1, strict=True)])
+item_status = TypeAdapter(ItemStatus)
+access_level = TypeAdapter(AccessLevel)
+skill_level = TypeAdapter(SkillLevel)
+strict_bool = TypeAdapter(StrictBool)
 
 
 def known_actor(actor: User):
@@ -28,18 +32,12 @@ def intern(data: OnboardingData, intern_id: str) -> User:
 
 
 def can_read_plan(actor: User, target: User) -> bool:
-    return (
-        (actor.role == Role.INTERN and actor.id == target.id)
-        or (actor.role == Role.MENTOR and target.mentor_id == actor.id)
-        or (actor.role == Role.LEAD and target.team == actor.team)
-        or actor.role == Role.CURATOR
-    )
+    # Ограничение видимости сервиса + общая проверка связи пользователя со стажёром.
+    return actor.role in {Role.INTERN, Role.MENTOR, Role.LEAD, Role.CURATOR} and can_view_intern(actor, target)
 
 
 def can_read_private(actor: User, target: User) -> bool:
-    return (actor.role == Role.INTERN and actor.id == target.id) or (
-        actor.role == Role.MENTOR and target.mentor_id == actor.id
-    )
+    return actor.role in {Role.INTERN, Role.MENTOR} and can_view_intern(actor, target)
 
 
 def require_intern(data: OnboardingData, actor: User, intern_id: str, *, private=False) -> User:
@@ -57,12 +55,13 @@ def timestamp(data: OnboardingData, intern_id: str, day: int | None = None) -> d
     return datetime.combine(date, time(12), tzinfo=timezone.utc)
 
 
-def item_view(data: OnboardingData, item: PlanItem) -> PlanItem:
+def item_view(data: OnboardingData, item: PlanItem, day: int | None = None) -> PlanItem:
     state = data.interns[item.intern_id]
+    current_day = state.current_day if day is None else day
     updated_day = (item.updated_at.date() - state.start_date).days + 1
     return item.model_copy(update={
-        "overdue": item.status != "done" and item.due_day is not None and state.current_day > item.due_day,
-        "waiting_days": max(0, state.current_day - updated_day) if item.status == "waiting" else None,
+        "overdue": item.status != "done" and item.due_day is not None and current_day > item.due_day,
+        "waiting_days": max(0, current_day - updated_day) if item.status == "waiting" else None,
     }, deep=True)
 
 

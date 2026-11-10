@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from app import async_runner
 from app.agent.users import DEMO_USERS
 from app.mcp_server import access, checklist, clock, events, hiring, storage
-from app.mcp_server._system import system_call
+from app.mcp_server._system import SYSTEM_ACTOR
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
 from app.mcp_server.models import OnboardingData
 from app.mcp_server.seed import load_seed
@@ -20,10 +20,7 @@ MARIA = DEMO_USERS["mentor-maria"]
 
 
 def tick(day=None):
-    async def invoke():
-        with system_call():
-            return await clock.cron_tick(ANYA, day)
-    return run(invoke())
+    return run(clock.cron_tick(SYSTEM_ACTOR, day))
 
 
 def test_pending_reminder_once_and_snooze_reuses_same_object(store, snapshot):
@@ -55,8 +52,10 @@ def test_reminders_created_at_two_days_and_sent_to_item_owner(store, edit, snaps
     created = tick()
     assert not any(reminder.request_id == "REQ-1001" for reminder in created)
     assert any(reminder.plan_item_id == "ivan.w1.channels" and reminder.user_id == MARIA.id for reminder in created)
-    # В день 7 заявке два дня, но по тому же пункту уже может быть напоминание о сроке.
+    assert not any(reminder.plan_item_id == "ivan.w1.team-space" for reminder in created)
+    # В день 7 заявке два дня: появляется именно напоминание о согласовании.
     run(clock.advance_day(IVAN, IVAN.id))
+    assert any(reminder.request_id == "REQ-1001" for reminder in snapshot().reminders.values())
     assert len({reminder.plan_item_id for reminder in snapshot().reminders.values()}) == len(snapshot().reminders)
 
 
@@ -99,17 +98,16 @@ def test_clock_and_reminder_invalid_inputs_do_not_mutate(store, snapshot):
     assert snapshot() == before
 
 
-def test_system_events_fields_filter_and_context_does_not_leak(store):
+def test_system_events_fields_filter_and_actor_is_explicit(store):
     async def exercise():
-        with system_call():
-            event = await events.log_event(ANYA, "test_event", {"intern_id": ANYA.id, "day": 2, "nested": {"values": [1, True, None]}})
-            assert event.user_id == ANYA.id and event.team == ANYA.team and event.role == ANYA.role
-            assert event.ts.tzinfo is not None
-            result = await events.list_events(ANYA, ANYA.id, "test_event")
-            assert result == [event]
-            assert await events.list_events(ANYA, IVAN.id, "test_event") == []
-            with pytest.raises(ValidationError):
-                await events.log_event(ANYA, " ", {})
+        event = await events.log_event(SYSTEM_ACTOR, "test_event", {"intern_id": ANYA.id, "day": 2, "nested": {"values": [1, True, None]}})
+        assert event.user_id == "system" and event.team == "system" and event.role == "system"
+        assert event.ts.tzinfo is not None
+        result = await events.list_events(SYSTEM_ACTOR, ANYA.id, "test_event")
+        assert result == [event]
+        assert await events.list_events(SYSTEM_ACTOR, IVAN.id, "test_event") == []
+        with pytest.raises(ValidationError):
+            await events.log_event(SYSTEM_ACTOR, " ", {})
         with pytest.raises(Forbidden):
             await events.list_events(ANYA)
     run(exercise())
@@ -159,7 +157,8 @@ def test_store_factory_cached_and_warns_without_touching_database(monkeypatch, c
 @pytest.mark.parametrize("args", [[], ["--reset"]])
 def test_seed_cli_explicitly_reports_memory_only(store, capsys, args):
     main(args)
-    assert "process-local memory" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert ("process-local memory only" if args else "T1 validation only") in output
 
 
 def test_public_service_contracts_are_async_and_actor_first():

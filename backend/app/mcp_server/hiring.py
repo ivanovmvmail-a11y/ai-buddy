@@ -1,10 +1,8 @@
 """Карта навыков: стажёр читает свою, изменяет только его наставник."""
-from pydantic import TypeAdapter
-
 from app.agent.users import Role, User
 
 from . import events, storage
-from ._domain import nonempty, require_intern, timestamp
+from ._domain import nonempty, require_intern, skill_level, timestamp
 from .errors import Forbidden, NotFound
 from .models import SkillLevel, SkillProfile
 
@@ -26,7 +24,7 @@ async def set_skill_level(actor: User, intern_id: str, topic: str, level: SkillL
         if profile is None:
             raise NotFound()
         topic = nonempty.validate_python(topic)
-        level = TypeAdapter(SkillLevel).validate_python(level)
+        level = skill_level.validate_python(level)
         if profile.skills.get(topic) != level:
             previous = profile.skills.get(topic)
             profile.skills[topic] = level

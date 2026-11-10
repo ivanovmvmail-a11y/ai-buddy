@@ -1,21 +1,12 @@
-"""Внутренний контекст системных задач; не инструмент/аргумент пользовательского API."""
-from contextlib import contextmanager
-from contextvars import ContextVar
+"""Единственный системный субъект; не десериализуется из пользовательского JSON."""
 
 from .errors import Forbidden
+from .models import Actor, SystemActor
 
-_system = ContextVar("onboarding_system", default=False)
-
-
-@contextmanager
-def system_call():
-    token = _system.set(True)
-    try:
-        yield
-    finally:
-        _system.reset(token)
+SYSTEM_ACTOR = SystemActor()
 
 
-def require_system():
-    if not _system.get():
+def require_system(actor: Actor):
+    # Только внутренний singleton; одинаковый id/role в JSON не даёт системных прав.
+    if actor is not SYSTEM_ACTOR:
         raise Forbidden("Операция доступна только системе")
