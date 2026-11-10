@@ -259,18 +259,20 @@ def test_migration_on_clean_postgres_closes_default_public_grants(onboarding_dsn
                     owner.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated")
                 owner.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO PUBLIC")
                 owner.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO PUBLIC")
-                owner.execute(MIGRATION.read_text())
+                owner.execute(MIGRATION.read_text(encoding="utf-8"))
                 owner.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(reader)))
                 for _, table, *_ in TABLES:
                     owner.execute(sql.SQL("GRANT SELECT ON {} TO {}").format(sql.Identifier("public", table), sql.Identifier(reader)))
                     if api_roles:
                         for role in ("anon", "authenticated"):
                             assert owner.execute("SELECT has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE,DELETE')", (role, f"public.{table}")).fetchone() == (False,)
+                            sequence = owner.execute("SELECT pg_get_serial_sequence(%s, 'seq')", (f"public.{table}",)).fetchone()[0]
+                            assert owner.execute("SELECT has_sequence_privilege(%s,%s,'USAGE,SELECT,UPDATE')", (role, sequence)).fetchone() == (False,)
                 if api_roles:
                     for role in ("anon", "authenticated"):
                         assert owner.execute("SELECT has_table_privilege(%s,'public.events','SELECT,INSERT')", (role,)).fetchone() == (False,)
                         assert owner.execute("SELECT has_sequence_privilege(%s,'public.events_id_seq','USAGE,SELECT,UPDATE')", (role,)).fetchone() == (False,)
-                owner.execute("INSERT INTO intern_state VALUES ('intern-private', '2026-11-10', 2)")
+                owner.execute("INSERT INTO intern_state (intern_id, start_date, current_day) VALUES ('intern-private', '2026-11-10', 2)")
                 with owner.transaction():
                     owner.execute(sql.SQL("SET LOCAL ROLE {}").format(sql.Identifier(reader)))
                     assert owner.execute("SELECT count(*) FROM intern_state").fetchone() == (0,)

@@ -3,11 +3,13 @@
 BEGIN;
 
 CREATE TABLE public.intern_state (
+    seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     intern_id text PRIMARY KEY,
     start_date date NOT NULL,
     current_day integer NOT NULL CHECK (current_day >= 1)
 );
 CREATE TABLE public.access_resources (
+    seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     id text PRIMARY KEY,
     title text NOT NULL,
     kind text NOT NULL CHECK (kind IN ('base', 'team_space')),
@@ -16,6 +18,7 @@ CREATE TABLE public.access_resources (
     fields jsonb NOT NULL CHECK (jsonb_typeof(fields) = 'array')
 );
 CREATE TABLE public.plan_items (
+    seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     id text PRIMARY KEY,
     intern_id text NOT NULL REFERENCES public.intern_state(intern_id),
     stage text NOT NULL CHECK (stage IN ('week1','week2','month1','month2','after3m')),
@@ -36,6 +39,7 @@ CREATE TABLE public.plan_items (
 );
 CREATE INDEX plan_items_intern_idx ON public.plan_items(intern_id, stage, "order");
 CREATE TABLE public.access_requests (
+    seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     id text PRIMARY KEY,
     intern_id text NOT NULL REFERENCES public.intern_state(intern_id),
     resource_id text NOT NULL REFERENCES public.access_resources(id),
@@ -52,6 +56,7 @@ CREATE TABLE public.access_requests (
 CREATE UNIQUE INDEX access_requests_one_active ON public.access_requests(intern_id, resource_id)
     WHERE status <> 'rejected';
 CREATE TABLE public.skill_profiles (
+    seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     intern_id text PRIMARY KEY REFERENCES public.intern_state(intern_id),
     skills jsonb NOT NULL CHECK (jsonb_typeof(skills) = 'object'),
     strengths jsonb NOT NULL CHECK (jsonb_typeof(strengths) = 'array'),
@@ -60,6 +65,7 @@ CREATE TABLE public.skill_profiles (
     updated_at timestamptz NOT NULL
 );
 CREATE TABLE public.reminders (
+    seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     id text PRIMARY KEY,
     user_id text NOT NULL,
     plan_item_id text UNIQUE REFERENCES public.plan_items(id),
@@ -87,22 +93,21 @@ DO $$
 DECLARE
     table_name text;
     api_role text;
+    sequence_name text;
 BEGIN
     FOREACH table_name IN ARRAY ARRAY['intern_state','access_resources','plan_items','access_requests','skill_profiles','reminders','events'] LOOP
         EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', table_name);
         EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC', table_name);
+        sequence_name := pg_get_serial_sequence(format('public.%I', table_name), CASE WHEN table_name = 'events' THEN 'id' ELSE 'seq' END);
+        EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM PUBLIC', sequence_name);
         FOREACH api_role IN ARRAY ARRAY['anon','authenticated'] LOOP
             IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
                 EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', table_name, api_role);
+                EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM %I', sequence_name, api_role);
             END IF;
         END LOOP;
     END LOOP;
-    REVOKE ALL ON SEQUENCE public.events_id_seq FROM PUBLIC;
-    FOREACH api_role IN ARRAY ARRAY['anon','authenticated'] LOOP
-        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
-            EXECUTE format('REVOKE ALL ON SEQUENCE public.events_id_seq FROM %I', api_role);
-        END IF;
-    END LOOP;
+
 END;
 $$;
 COMMIT;

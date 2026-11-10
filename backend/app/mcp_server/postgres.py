@@ -51,9 +51,10 @@ class PostgresStore:
     async def _load(self, connection, *, include_events):
         data = OnboardingData()
         for field, table, model, key in TABLES:
-            cursor = await connection.execute(sql.SQL("SELECT * FROM {} ORDER BY {}").format(
-                sql.Identifier("public", table), sql.Identifier(key)))
+            cursor = await connection.execute(sql.SQL("SELECT * FROM {} ORDER BY seq").format(
+                sql.Identifier("public", table)))
             for row in await cursor.fetchall():
+                row.pop("seq")  # Порядок хранения — не часть публичной модели.
                 if model is PlanItem:
                     row["waiting_days"] = 0 if row["status"] == "waiting" else None
                 record = model.model_validate(row)
@@ -126,6 +127,8 @@ class PostgresStore:
             data = await self._load(connection, include_events=include_events)
             count = len(data.events)
             yield data
+            if include_events and len(data.events) != count:
+                raise RuntimeError("Historical reads must not append events")
             await self._insert_events(connection, data.events[count:])
 
     async def initialize(self, data, *, reset=False):

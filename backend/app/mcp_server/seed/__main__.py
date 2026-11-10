@@ -3,9 +3,10 @@ import argparse
 
 from app.agent.users import DEFAULT_USER_ID, DEMO_USERS
 from app.async_runner import run
+from psycopg.errors import UndefinedTable
 
-from . import load_seed, reset_demo
-from .. import storage
+from . import load_seed
+from .. import events, storage
 
 
 def main(argv=None):
@@ -19,17 +20,27 @@ def main(argv=None):
         print(f"Seed validated: {len(seed.interns)} interns, {len(seed.items)} items; validation only, no server or database was populated")
         return
     store = storage.get_store()
+    if isinstance(store, storage.DemoStore):
+        # CLI сообщает правду о результате БД; fallback предназначен для сервера.
+        store = store.primary
 
     async def seed_store():
         try:
+            seed = load_seed()
             if args.reset:
-                await reset_demo(DEMO_USERS[DEFAULT_USER_ID])
-            else:
-                await store.initialize(load_seed())
+                events._record(seed, DEMO_USERS[DEFAULT_USER_ID], "demo_reset", {})
+            await store.initialize(seed, reset=args.reset)
         finally:
             await store.close()
 
-    run(seed_store())
+    try:
+        run(seed_store())
+    except Exception as error:
+        if isinstance(error, UndefinedTable):
+            storage.log.warning(storage.MISSING_SCHEMA_WARNING)
+        else:
+            storage.log.warning("Seed онбординга не выполнен (%s); сервер может продолжить в демо-режиме.", type(error).__name__)
+        raise SystemExit(1) from None
     print(f"Onboarding seed {'reset' if args.reset else 'initialized (existing data preserved)'} via {type(store).__name__}")
 
 

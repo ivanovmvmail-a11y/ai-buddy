@@ -1,5 +1,4 @@
 import pytest
-import os
 from pathlib import Path
 import subprocess
 import time
@@ -21,17 +20,18 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("store", backends, indirect=True)
 
 
+def docker_command(*args):
+    # Docker CLI сам выбирает endpoint, TLS и context из окружения/конфига пользователя.
+    return subprocess.run(["docker", *args], capture_output=True, text=True,
+                          check=True, timeout=60).stdout.strip()
+
+
 @pytest.fixture(scope="session")
 def onboarding_dsn(request):
     if not request.config.getoption("--mcp-postgres"):
         pytest.skip("Use --mcp-postgres with a cached local pgvector/pgvector:pg17 image")
-    environment = {key: value for key, value in os.environ.items() if key not in {
-        "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH",
-    }}
     name = f"ai-buddy-onboarding-tests-{uuid4().hex[:12]}"
-    def docker(*args):
-        return subprocess.run(["docker", "--host=unix:///var/run/docker.sock", *args], env=environment,
-                              capture_output=True, text=True, check=True, timeout=60).stdout.strip()
+    docker = docker_command
     docker("run", "--detach", "--rm", "--pull=never", "--name", name,
            "-e", "POSTGRES_USER=onboarding_test", "-e", "POSTGRES_PASSWORD=onboarding-test-only",
            "-p", "127.0.0.1::5432", "pgvector/pgvector:pg17")

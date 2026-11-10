@@ -154,8 +154,9 @@ def test_store_factory_cached_and_selects_backend_without_connecting(monkeypatch
         storage.get_store.cache_clear()
         monkeypatch.setattr(settings, "database_url", "postgresql://must-not-connect.invalid/db")
         postgres = storage.get_store()
-        assert isinstance(postgres, PostgresStore) and storage.get_store() is postgres
-        assert postgres._pool is None
+        assert isinstance(postgres, storage.DemoStore) and storage.get_store() is postgres
+        assert isinstance(postgres.primary, PostgresStore)
+        assert postgres.primary._pool is None
     finally:
         storage.get_store.cache_clear()
 

@@ -28,6 +28,9 @@ class _ReadMap(Mapping):
     def __len__(self):
         return len(self._source)
 
+    def __contains__(self, key):
+        return key in self._source
+
 
 class _ReadEvents(Sequence):
     def __init__(self, source):
@@ -91,7 +94,8 @@ class InMemoryStore:
             if not include_events:
                 self._data.events.extend(view.events)
             else:
-                assert len(view.events) == count, "Historical reads must not append events"
+                if len(view.events) != count:
+                    raise RuntimeError("Historical reads must not append events")
 
     async def initialize(self, data: OnboardingData, *, reset: bool = False) -> None:
         async with self._lock:
@@ -108,6 +112,74 @@ def get_store() -> OnboardingStore:
 
     if settings.database_url:
         from .postgres import PostgresStore
-        return PostgresStore(settings.database_url)
+        return DemoStore(PostgresStore(settings.database_url))
     log.warning("Onboarding uses process-local memory; data is lost on restart without DATABASE_URL")
     return InMemoryStore(load_seed())
+
+
+MISSING_SCHEMA_WARNING = (
+    "Таблицы онбординга не найдены: примените миграцию онбординга; "
+    "для пересоздания локальной демо-базы — docker compose down -v (удаляет данные тома)."
+)
+
+
+class DemoStore:
+    """Ленивая инициализация PostgreSQL с постоянным запасным режимом на процесс.
+
+    Исключения из тела сервисной операции не перехватываются и запись не повторяется.
+    CLI использует primary напрямую, чтобы сбой --reset БД не выдавался за успех.
+    """
+    def __init__(self, primary: OnboardingStore):
+        self.primary = primary
+        self._store = primary
+        self._ready = False
+        self._lock = asyncio.Lock()
+
+    async def _initialize(self, data, *, reset=False):
+        from psycopg.errors import UndefinedTable
+
+        try:
+            await self.primary.initialize(data, reset=reset)
+        except Exception as error:
+            if isinstance(error, UndefinedTable):
+                log.warning("%s Используется InMemoryStore: прогресс потеряется после перезапуска.", MISSING_SCHEMA_WARNING)
+            else:
+                # Только класс ошибки: текст драйвера может содержать реквизиты подключения.
+                log.warning("Не удалось подготовить PostgreSQL онбординга (%s). Используется InMemoryStore: прогресс потеряется после перезапуска.", type(error).__name__)
+            try:
+                await self.primary.close()
+            except Exception as close_error:
+                log.warning("Не удалось закрыть пул онбординга (%s).", type(close_error).__name__)
+            from .seed import load_seed
+            self._store = InMemoryStore(load_seed())
+        self._ready = True
+
+    async def _backend(self):
+        if not self._ready:
+            async with self._lock:
+                if not self._ready:
+                    from .seed import load_seed
+                    await self._initialize(load_seed())
+        return self._store
+
+    @asynccontextmanager
+    async def transaction(self, *, include_events=True, copy_on_commit=True):
+        backend = await self._backend()
+        async with backend.transaction(include_events=include_events, copy_on_commit=copy_on_commit) as data:
+            yield data
+
+    @asynccontextmanager
+    async def read(self, *, include_events=False):
+        backend = await self._backend()
+        async with backend.read(include_events=include_events) as data:
+            yield data
+
+    async def initialize(self, data, *, reset=False):
+        async with self._lock:
+            if not self._ready:
+                await self._initialize(data, reset=reset)
+            else:
+                await self._store.initialize(data, reset=reset)
+
+    async def close(self):
+        await self._store.close()
