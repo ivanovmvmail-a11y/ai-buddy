@@ -11,7 +11,7 @@ def chunk_markdown(text: str, max_chars: int = 1200, overlap: int = 150) -> list
         end = min(start + max_chars, len(text))
         if end < len(text):
             # Предпочитаем границу абзаца/строки/слова во второй половине окна.
-            for separator in ("\n\n", "\n", " "):
+            for separator in ("\n\n", "\n", " ", "\t"):
                 boundary = text.rfind(separator, start + max_chars // 2, end)
                 if boundary > start:
                     end = boundary
@@ -21,5 +21,19 @@ def chunk_markdown(text: str, max_chars: int = 1200, overlap: int = 150) -> list
             chunks.append(content)
         if end == len(text):
             break
-        start = max(start + 1, end - overlap)
+        next_start = max(start + 1, end - overlap)
+        if not text[next_start - 1].isspace() and not text[next_start].isspace():
+            left = next_start
+            while left > start and not text[left - 1].isspace():
+                left -= 1
+            right = next_start
+            while right < end and not text[right].isspace():
+                right += 1
+            boundaries = [left] if left > start else []
+            if text[right].isspace():
+                boundaries.append(right)
+            if boundaries:
+                next_start = min(boundaries, key=lambda position: abs(position - next_start))
+            # Слово длиннее окна всё же приходится делить, иначе нет продвижения.
+        start = next_start
     return chunks

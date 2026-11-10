@@ -17,7 +17,7 @@ def read_document(path: Path, source_id: str) -> Document:
     team обязателен: только явное `team: null` делает документ общим.
     Неизвестные/повторные поля запрещены, чтобы опечатка не расширила доступ.
     """
-    lines = path.read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
     if not lines or lines[0] != "---" or "---" not in lines[1:]:
         raise ValueError(f"{path.name}: metadata block is required")
     end = lines.index("---", 1)

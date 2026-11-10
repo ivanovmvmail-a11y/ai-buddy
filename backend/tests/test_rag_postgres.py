@@ -1,5 +1,6 @@
 """SQL и транзакции адаптера: поддельный psycopg, без сервера и сети."""
-from unittest.mock import AsyncMock
+import asyncio
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -39,7 +40,8 @@ class FakeConnection:
         self.calls = []
         self.rows = []
         self.fail_insert = False
-        self.committed = self.rolled_back = self.closed = False
+        self.committed = self.rolled_back = False
+        self.returned = 0
 
     async def __aenter__(self):
         return self
@@ -47,7 +49,7 @@ class FakeConnection:
     async def __aexit__(self, exc_type, *args):
         self.committed = exc_type is None
         self.rolled_back = exc_type is not None
-        self.closed = True
+        self.returned += 1
 
     async def execute(self, sql, params=None):
         self.calls.append((sql, params))
@@ -60,9 +62,13 @@ class FakeConnection:
 @pytest.fixture
 def database(monkeypatch):
     connection = FakeConnection()
-    connect = AsyncMock(return_value=connection)
-    monkeypatch.setattr("app.rag.postgres.psycopg.AsyncConnection.connect", connect)
-    return PostgresDocumentStore("postgresql://example.invalid/demo"), connection, connect
+    pool = Mock()
+    pool.open = AsyncMock()
+    pool.close = AsyncMock()
+    pool.connection.return_value = connection
+    factory = Mock(return_value=pool)
+    monkeypatch.setattr("app.rag.postgres.AsyncConnectionPool", factory)
+    return PostgresDocumentStore("postgresql://example.invalid/demo"), connection, factory
 
 
 def vector():
@@ -70,14 +76,15 @@ def vector():
 
 
 def test_upsert_replaces_chunks_in_one_transaction(database):
-    store, connection, connect = database
+    store, connection, factory = database
     document = Document("stable", "Title", "Body", "Авито Доставка", "https://example.invalid/doc")
     embedding = vector()
     run(store.upsert(document, [Chunk("first", embedding), Chunk("second", embedding)]))
-    assert connection.committed and connection.closed and not connection.rolled_back
-    connect.assert_awaited_once()
-    assert connect.call_args.args == (store.database_url,)
-    assert connect.call_args.kwargs["connect_timeout"] == 5
+    assert connection.committed and connection.returned == 1 and not connection.rolled_back
+    factory.assert_called_once()
+    assert factory.call_args.args == (store.database_url,)
+    assert factory.call_args.kwargs["kwargs"]["connect_timeout"] == 5
+    assert factory.call_args.kwargs["open"] is False
     assert connection.calls[0] == ("SET LOCAL search_path = public, extensions", None)
     sql, params = connection.calls[1]
     assert "ON CONFLICT (source_id) DO UPDATE" in sql
@@ -89,12 +96,12 @@ def test_upsert_replaces_chunks_in_one_transaction(database):
     assert all(row[3].startswith("[") and len(row[3][1:-1].split(",")) == 1024 for row in rows)
 
 
-def test_chunk_write_failure_rolls_back_and_closes(database):
+def test_chunk_write_failure_rolls_back_and_returns_connection(database):
     store, connection, _ = database
     connection.fail_insert = True
     with pytest.raises(RuntimeError, match="chunk insert failed"):
         run(store.upsert(Document("source", "title", "body"), [Chunk("body", vector())]))
-    assert connection.rolled_back and connection.closed and not connection.committed
+    assert connection.rolled_back and connection.returned == 1 and not connection.committed
 
 
 def test_search_filters_before_limit_and_binds_team(database):
@@ -109,17 +116,47 @@ def test_search_filters_before_limit_and_binds_team(database):
     assert "<=> %s::vector" in sql
     assert team not in sql
     assert params[0] == team and params[2] == 4
-    assert connection.committed and connection.closed
+    assert connection.committed and connection.returned == 1
 
 
-def test_no_connection_for_invalid_vectors_or_nonpositive_k(database):
-    store, connection, connect = database
-    assert run(store.search([], "team", 0)) == []
+def test_no_pool_for_invalid_vectors(database):
+    store, connection, factory = database
     with pytest.raises(ValueError):
         run(store.search([float("inf")] * 1024, "team", 4))
     with pytest.raises(ValueError):
         run(store.upsert(Document("id", "title", "body"), [Chunk("body", [1.0])]))
-    connect.assert_not_awaited()
+    factory.assert_not_called()
+
+
+def test_pool_is_lazy_reused_and_opened_on_shared_loop(database):
+    store, connection, factory = database
+    factory.assert_not_called()
+    loops = []
+
+    async def opened():
+        loops.append(asyncio.get_running_loop())
+
+    factory.return_value.open.side_effect = opened
+
+    async def requests():
+        await asyncio.gather(*(store.search(vector_data, "team", 4) for _ in range(3)))
+        await store.upsert(Document("id", "title", "body"), [Chunk("body", vector_data)])
+        return asyncio.get_running_loop()
+
+    vector_data = vector()
+    loop = run(requests())
+    factory.assert_called_once()
+    assert loops == [loop] * 4
+    assert connection.returned == 4
+    run(store.close())
+    factory.return_value.close.assert_awaited_once()
+    assert store._pool is None
+
+
+def test_close_unused_store_does_not_create_pool(database):
+    store, _, factory = database
+    run(store.close())
+    factory.assert_not_called()
 
 
 def test_database_url_is_required():

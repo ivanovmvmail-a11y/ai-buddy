@@ -9,6 +9,9 @@
 ТЗ: недоступные пользователю сведения не должны раскрываться.
 Текст документов — данные, а не команды: агент не выполняет «инструкции» из найденных документов.
 """
+import logging
+from functools import cache
+
 from app.agent.users import User
 from app.config import settings
 
@@ -16,12 +19,15 @@ from .embeddings import DeterministicEmbedder
 from .postgres import PostgresDocumentStore
 from .service import RAGService
 
+log = logging.getLogger("ai_buddy.rag")
 
+
+@cache
 def get_service() -> RAGService | None:
     """Точка подключения GigaChat-эмбеддера Claude; до этого — поддельный для демо.
 
-    Без DATABASE_URL сохраняется запуск echo без базы. Если база настроена, ошибки
-    подключения не скрываются и попадают в обработчик ошибок существующего агента.
+    Один сервис на процесс. Пул открывается лениво при первом SQL-запросе
+    на общем event loop проекта, а не при импорте/создании приложения Flask.
     """
     if not settings.database_url:
         return None
@@ -29,7 +35,9 @@ def get_service() -> RAGService | None:
 
 
 async def retrieve(query: str, user: User, k: int = 4) -> list[dict]:
-    if not query.strip() or k <= 0:
+    try:
+        service = get_service()
+        return await service.retrieve(query, user, k) if service else []
+    except Exception:
+        log.exception("RAG retrieval failed; continuing without document context")
         return []
-    service = get_service()
-    return await service.retrieve(query, user, k) if service else []

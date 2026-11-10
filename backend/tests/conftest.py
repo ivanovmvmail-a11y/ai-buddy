@@ -3,7 +3,7 @@ import asyncio
 
 import pytest
 
-from app import main
+from app import main, rag
 from app.agent import service
 from app.config import settings
 from app.llm import LLMReply, ToolCall, get_llm
@@ -70,3 +70,11 @@ def as_user(user_id):
 def no_configured_database(monkeypatch):
     """Даже при локальном .env обычный набор тестов не подключается к живой БД."""
     monkeypatch.setattr(settings, "database_url", "")
+    clear_cache = rag.get_service.cache_clear
+    clear_cache()
+    yield
+    clear_cache()
+
+
+def pytest_addoption(parser):
+    parser.addoption("--rag-postgres", action="store_true", help="Test migration/pool on a disposable local Docker PostgreSQL")

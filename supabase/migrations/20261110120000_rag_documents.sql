@@ -1,8 +1,9 @@
--- Совместимо с чистым PostgreSQL + pgvector; роли Supabase не используются.
+-- Совместимо с чистым PostgreSQL + pgvector; роли Supabase не обязательны.
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS vector;
--- У уже созданного расширения в Supabase схема может быть extensions.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+-- Сохраняем совместимость с уже установленным расширением в public.
 SET LOCAL search_path = public, extensions;
 
 CREATE TABLE public.rag_documents (
@@ -38,6 +39,23 @@ CREATE POLICY rag_chunks_read ON public.rag_chunks FOR SELECT
         WHERE d.id = document_id
           AND (d.team IS NULL OR d.team = nullif(current_setting('app.rag_team', true), ''))
     ));
+
+-- Общие документы доступны через backend, а не через публичный REST API.
+-- Убираем также возможные унаследованные default privileges Supabase.
+REVOKE ALL ON TABLE public.rag_documents, public.rag_chunks FROM PUBLIC;
+REVOKE ALL ON SEQUENCE public.rag_documents_id_seq, public.rag_chunks_id_seq FROM PUBLIC;
+DO $$
+DECLARE
+    api_role text;
+BEGIN
+    FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+            EXECUTE format('REVOKE ALL ON TABLE public.rag_documents, public.rag_chunks FROM %I', api_role);
+            EXECUTE format('REVOKE ALL ON SEQUENCE public.rag_documents_id_seq, public.rag_chunks_id_seq FROM %I', api_role);
+        END IF;
+    END LOOP;
+END;
+$$;
 
 -- Загрузчик — владелец таблиц. Для отдельного читателя DBA выдаёт SELECT;
 -- без контекста команды RLS даёт ему только общие документы, запись запрещена.

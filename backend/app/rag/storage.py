@@ -33,7 +33,7 @@ class DocumentStore(Protocol):
         ...
 
     async def search(self, embedding: list[float], team: str, k: int) -> list[SearchHit]:
-        """Сначала ограничить доступ по team, затем выбрать k ближайших фрагментов."""
+        """Выбрать k ближайших доступных фрагментов; k > 0 проверяется сервисом."""
         ...
 
 
@@ -45,8 +45,6 @@ class InMemoryDocumentStore:
         self.documents[document.source_id] = (document, chunks)
 
     async def search(self, embedding: list[float], team: str, k: int) -> list[SearchHit]:
-        if k <= 0:
-            return []
         query_norm = math.sqrt(sum(value * value for value in embedding))
         ranked = []
         for source_id, (document, chunks) in self.documents.items():
