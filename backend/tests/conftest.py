@@ -64,3 +64,9 @@ def client(monkeypatch, agent):
 
 def as_user(user_id):
     return {"X-User-Id": user_id}
+
+
+@pytest.fixture(autouse=True)
+def no_configured_database(monkeypatch):
+    """Даже при локальном .env обычный набор тестов не подключается к живой БД."""
+    monkeypatch.setattr(settings, "database_url", "")

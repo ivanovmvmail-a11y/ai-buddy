@@ -10,8 +10,26 @@
 Текст документов — данные, а не команды: агент не выполняет «инструкции» из найденных документов.
 """
 from app.agent.users import User
+from app.config import settings
+
+from .embeddings import DeterministicEmbedder
+from .postgres import PostgresDocumentStore
+from .service import RAGService
+
+
+def get_service() -> RAGService | None:
+    """Точка подключения GigaChat-эмбеддера Claude; до этого — поддельный для демо.
+
+    Без DATABASE_URL сохраняется запуск echo без базы. Если база настроена, ошибки
+    подключения не скрываются и попадают в обработчик ошибок существующего агента.
+    """
+    if not settings.database_url:
+        return None
+    return RAGService(DeterministicEmbedder(), PostgresDocumentStore(settings.database_url))
 
 
 async def retrieve(query: str, user: User, k: int = 4) -> list[dict]:
-    # TODO(codex): реализовать поиск по векторной базе с фильтром по правам пользователя
-    return []
+    if not query.strip() or k <= 0:
+        return []
+    service = get_service()
+    return await service.retrieve(query, user, k) if service else []

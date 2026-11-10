@@ -1,0 +1,67 @@
+"""Прямое async-подключение psycopg; Supabase REST и специальные роли не нужны."""
+import psycopg
+from psycopg.rows import dict_row
+
+from .embeddings import validate_embedding
+from .storage import Chunk, Document, SearchHit
+
+
+def _vector_literal(embedding: list[float]) -> str:
+    validate_embedding(embedding)
+    return "[" + ",".join(str(float(value)) for value in embedding) + "]"
+
+
+class PostgresDocumentStore:
+    def __init__(self, database_url: str) -> None:
+        if not database_url:
+            raise ValueError("DATABASE_URL is required")
+        self.database_url = database_url
+
+    async def _connect(self) -> psycopg.AsyncConnection:
+        return await psycopg.AsyncConnection.connect(
+            self.database_url, connect_timeout=5, row_factory=dict_row,
+        )
+
+    async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
+        vectors = [_vector_literal(chunk.embedding) for chunk in chunks]
+        async with await self._connect() as connection:
+            # pgvector в чистом PostgreSQL — public, в существующем Supabase — extensions.
+            await connection.execute("SET LOCAL search_path = public, extensions")
+            cursor = await connection.execute(
+                """INSERT INTO public.rag_documents (source_id, title, url, content, team)
+                   VALUES (%s, %s, %s, %s, %s)
+                   ON CONFLICT (source_id) DO UPDATE SET
+                       title = EXCLUDED.title, url = EXCLUDED.url,
+                       content = EXCLUDED.content, team = EXCLUDED.team
+                   RETURNING id""",
+                (document.source_id, document.title, document.url, document.content, document.team),
+            )
+            document_id = (await cursor.fetchone())["id"]
+            await connection.execute("DELETE FROM public.rag_chunks WHERE document_id = %s", (document_id,))
+            async with connection.cursor() as cursor:
+                await cursor.executemany(
+                    """INSERT INTO public.rag_chunks (document_id, chunk_index, content, embedding)
+                       VALUES (%s, %s, %s, %s::vector)""",
+                    [(document_id, index, chunk.content, vector)
+                     for index, (chunk, vector) in enumerate(zip(chunks, vectors, strict=True))],
+                )
+        # Контекст connection коммитит всё вместе либо откатывает при исключении.
+
+    async def search(self, embedding: list[float], team: str, k: int) -> list[SearchHit]:
+        if k <= 0:
+            return []
+        vector = _vector_literal(embedding)
+        async with await self._connect() as connection:
+            await connection.execute("SET LOCAL search_path = public, extensions")
+            # set_config(..., true) эквивалентен SET LOCAL, значение параметризовано.
+            await connection.execute("SELECT set_config('app.rag_team', %s, true)", (team,))
+            cursor = await connection.execute(
+                """SELECT d.title, c.content, d.url, d.team
+                   FROM public.rag_chunks AS c
+                   JOIN public.rag_documents AS d ON d.id = c.document_id
+                   WHERE d.team IS NULL OR d.team = %s
+                   ORDER BY c.embedding <=> %s::vector, d.source_id, c.chunk_index
+                   LIMIT %s""",
+                (team, vector, k),
+            )
+            return [SearchHit(**row) for row in await cursor.fetchall()]
