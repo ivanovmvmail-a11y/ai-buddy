@@ -1,83 +1,115 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { ChatMessage, sendChat } from "@/lib/api";
-
-const GREETING: ChatMessage = {
-  role: "assistant",
-  content: "Привет! Я AI-buddy — помогу освоиться в команде. Спроси что угодно о процессах, инструментах или первых задачах.",
-};
+import { useEffect, useState } from "react";
+import { ChatPanel } from "@/components/ChatPanel";
+import { PlanPanel } from "@/components/PlanPanel";
+import { actionFor, draftFor, explain, greeting, msgId, useChat, type BotAction } from "@/lib/chat";
+import { DEMO_USERS, ROLE_TITLES } from "@/lib/mock-data";
+import { findUser, remindersFor } from "@/lib/plan-logic";
+import { useDemo } from "@/lib/store";
+import type { PlanItem } from "@/lib/types";
 
 export default function Home() {
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const userId = useDemo((s) => s.userId);
+  const setUser = useDemo((s) => s.setUser);
+  const actor = findUser(userId)!;
+  const [tab, setTab] = useState<"plan" | "chat">("plan");
+  const resetChat = useChat((s) => s.reset);
+  const push = useChat((s) => s.push);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+    resetChat([greeting(useDemo.getState(), actor)]);
+    // приветствие — при каждом входе под другим пользователем
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || loading) return;
-    const next: ChatMessage[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
-    setInput("");
-    setError(null);
-    setLoading(true);
-    try {
-      // приветствие не отправляем в LLM
-      const { reply } = await sendChat(next.slice(1));
-      setMessages([...next, { role: "assistant", content: reply }]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Неизвестная ошибка");
-    } finally {
-      setLoading(false);
+  function onExplain(item: PlanItem) {
+    push({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` }, explain(useDemo.getState(), item));
+    setTab("chat");
+  }
+
+  function onDo(item: PlanItem) {
+    push({ id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}` }, draftFor(item, actor));
+    setTab("chat");
+  }
+
+  function onAction(a: BotAction) {
+    const item = useDemo.getState().items.find((i) => i.id === a.itemId);
+    if (!item) return;
+    if (a.kind === "do") onDo(item);
+    else onExplain(item);
+  }
+
+  function nextDay() {
+    useDemo.getState().nextDay();
+    const state = useDemo.getState();
+    const reminders = remindersFor(state, actor);
+    for (const r of reminders) {
+      const item = state.items.find((i) => i.id === r.plan_item_id);
+      push({
+        id: msgId(), role: "assistant", kind: "text", scripted: true, content: `🔔 ${r.text}`,
+        action: item && item.status !== "waiting" ? actionFor(item) : undefined,
+      });
+      state.dismissReminder(r.id); // одно напоминание на пункт — без повторов
     }
+    if (!reminders.length) push({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Новый день. Зависших пунктов нет." });
+  }
+
+  function reset() {
+    useDemo.getState().reset();
+    resetChat([greeting(useDemo.getState(), actor)]);
   }
 
   return (
-    <main className="mx-auto flex h-dvh max-w-2xl flex-col px-4">
-      <header className="flex items-center gap-2 border-b border-black/10 py-4 dark:border-white/10">
-        <span className="grid size-8 place-items-center rounded-full bg-[#00aaff] text-sm font-bold text-white">AI</span>
-        <h1 className="text-lg font-semibold">AI-buddy</h1>
+    <div className="flex h-dvh flex-col">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-black/10 px-4 py-2.5 dark:border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="grid size-8 place-items-center rounded-full bg-[#00aaff] text-sm font-bold text-white">AI</span>
+          <h1 className="text-lg font-semibold">AI-buddy</h1>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-black/55 dark:text-white/55">Войти как</span>
+          <select
+            value={userId}
+            onChange={(e) => setUser(e.target.value)}
+            className="rounded-lg border border-black/15 bg-transparent px-2 py-1 dark:border-white/20"
+          >
+            {DEMO_USERS.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name} — {ROLE_TITLES[u.role]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="ml-auto flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
+          <span className="text-black/45 dark:text-white/45">Демо-панель</span>
+          <button onClick={nextDay} className="rounded-md bg-black/5 px-2 py-1 hover:bg-black/10 dark:bg-white/10">Следующий день</button>
+          <button onClick={reset} className="rounded-md px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10">Сброс</button>
+        </div>
       </header>
 
-      <div className="flex-1 space-y-3 overflow-y-auto py-4">
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-            <div
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-[15px] leading-relaxed ${
-                m.role === "user" ? "bg-[#00aaff] text-white" : "bg-black/5 dark:bg-white/10"
-              }`}
-            >
-              {m.content}
-            </div>
-          </div>
+      <div className="flex border-b border-black/10 md:hidden dark:border-white/10" role="tablist">
+        {(["plan", "chat"] as const).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={`flex-1 py-2 text-sm font-medium ${tab === t ? "border-b-2 border-[#00aaff]" : "text-black/50 dark:text-white/50"}`}
+          >
+            {t === "plan" ? "План" : "Чат"}
+          </button>
         ))}
-        {loading && <div className="text-sm opacity-60">AI-buddy печатает…</div>}
-        {error && <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</div>}
-        <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={onSubmit} className="flex gap-2 border-t border-black/10 py-3 dark:border-white/10">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Напиши вопрос…"
-          className="min-w-0 flex-1 rounded-xl border border-black/15 bg-transparent px-4 py-3 text-base outline-none focus:border-[#00aaff] dark:border-white/20"
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded-xl bg-[#00aaff] px-5 font-medium text-white disabled:opacity-40"
-        >
-          Отправить
-        </button>
-      </form>
-    </main>
+      <main className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className={`min-h-0 overflow-y-auto border-black/10 md:block md:border-r dark:border-white/10 ${tab === "plan" ? "block" : "hidden"}`}>
+          <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} />
+        </div>
+        <div className={`min-h-0 md:block ${tab === "chat" ? "block" : "hidden"}`}>
+          <ChatPanel actor={actor} onAction={onAction} />
+        </div>
+      </main>
+    </div>
   );
 }
