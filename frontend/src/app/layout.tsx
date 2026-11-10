@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "./globals.css";
 // Панель замечаний по интерфейсу для разработки (agentation): только в `npm run dev`, в сборку для экспертов не попадает.
 import { Agentation } from "agentation";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "AI-buddy",
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ru">
       <body className="antialiased">
-        {children}
+        <Providers>{children}</Providers>
         {process.env.NODE_ENV === "development" && <Agentation endpoint="http://localhost:4747" />}
       </body>
     </html>

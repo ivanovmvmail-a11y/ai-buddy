@@ -122,6 +122,7 @@ def test_access_request_full_path(client):
 def test_reject_needs_reason(client):
     req = get(client, "/access/requests", "mentor-maria").get_json()["requests"]
     pending = next(r for r in req if r["status"] == "pending_approval")
+    assert pending["resource_title"].startswith("Bitbucket")
     assert post(client, f"/access/requests/{pending['id']}/decide", {"approve": False}, "mentor-maria").status_code == 422
     res = post(client, f"/access/requests/{pending['id']}/decide",
                {"approve": False, "reason": "Сначала песочница"}, "mentor-maria")

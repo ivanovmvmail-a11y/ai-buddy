@@ -1,19 +1,42 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { sendChat, type ChatMessage } from "@/lib/api";
-import { msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
-import { RESOURCES } from "@/lib/mock-data";
-import { findUser } from "@/lib/plan-logic";
-import { useDemo } from "@/lib/store";
-import type { DemoUser } from "@/lib/types";
+import { api, type ChatMessage } from "@/lib/api";
+import { approverText, msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
+import { useRefresh, useResources } from "@/lib/queries";
+import { findUser } from "@/lib/users";
+import type { AccessRequest, DemoUser } from "@/lib/types";
 
 type Props = { actor: DemoUser; onAction: (a: BotAction) => void };
 
-const LEVELS = { read: "чтение", edit: "редактирование", admin: "администрирование" } as const;
+const LEVELS: Record<string, string> = { read: "чтение", edit: "редактирование", admin: "администрирование" };
+
+/** Отправить вопрос модели. Используется и полем ввода, и кнопками «Объяснить» / подсказками. */
+export async function askBot(actor: DemoUser, text: string) {
+  const chat = useChat.getState();
+  if (!text.trim() || chat.busy) return;
+  chat.push({ id: msgId(), role: "user", kind: "text", content: text.trim() });
+  chat.setBusy(true);
+  const history: ChatMessage[] = useChat
+    .getState()
+    .messages.filter((m) => m.kind === "text" && !m.scripted)
+    .map((m) => ({ role: m.role, content: m.content }));
+  try {
+    const res = await api.chat(actor.id, history);
+    chat.push({ id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources.map((s) => s.title) });
+    for (const action of res.actions) {
+      chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action });
+    }
+  } catch (err) {
+    chat.push({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message, retry: text.trim() });
+  } finally {
+    chat.setBusy(false);
+  }
+}
 
 export function ChatPanel({ actor, onAction }: Props) {
-  const { messages, busy, push, update, setBusy } = useChat();
+  const messages = useChat((s) => s.messages);
+  const busy = useChat((s) => s.busy);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -22,40 +45,18 @@ export function ChatPanel({ actor, onAction }: Props) {
     bottomRef.current?.scrollIntoView?.({ behavior: calm ? "auto" : "smooth" });
   }, [messages, busy]);
 
-  async function ask(text: string) {
-    if (!text.trim() || busy) return;
-    const userMsg: Msg = { id: msgId(), role: "user", kind: "text", content: text.trim() };
-    push(userMsg);
-    setBusy(true);
-    const history: ChatMessage[] = [...useChat.getState().messages]
-      .filter((m) => m.kind === "text" && !m.scripted)
-      .map((m) => ({ role: m.role, content: m.content }));
-    try {
-      const res = await sendChat(history, actor.id);
-      push({ id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources?.map((s) => s.title) });
-    } catch (err) {
-      push({
-        id: msgId(), role: "assistant", kind: "error",
-        content: err instanceof Error && err.message !== "Failed to fetch" ? err.message : "Не получилось связаться с сервером.",
-        chips: [text.trim()],
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const t = input;
     setInput("");
-    void ask(t);
+    void askBot(actor, t);
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" aria-live="polite">
         {messages.map((m) => (
-          <Bubble key={m.id} m={m} actor={actor} onAction={onAction} onAsk={ask} update={update} />
+          <Bubble key={m.id} m={m} actor={actor} onAction={onAction} />
         ))}
         {busy && <div className="text-sm text-black/55 dark:text-white/55">AI-buddy думает…</div>}
         <div ref={bottomRef} />
@@ -76,12 +77,7 @@ export function ChatPanel({ actor, onAction }: Props) {
   );
 }
 
-function Bubble({
-  m, actor, onAction, onAsk, update,
-}: { m: Msg; actor: DemoUser; onAction: Props["onAction"]; onAsk: (t: string) => void; update: (id: string, p: Partial<Msg>) => void }) {
-  const createRequest = useDemo((s) => s.createRequest);
-  const push = useChat((s) => s.push);
-
+function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Props["onAction"] }) {
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
@@ -89,70 +85,111 @@ function Bubble({
       </div>
     );
   }
-
-  function confirm() {
-    if (!m.draft) return;
-    const req = createRequest(m.draft.itemId, m.draft.level, m.draft.justification);
-    update(m.id, { draft: { ...m.draft, state: "confirmed" } });
-    if (!req) return;
-    const res = RESOURCES.find((r) => r.id === req.resource_id);
-    const text =
-      req.status === "granted"
-        ? `Готово: заявка ${req.id} — доступ к «${res?.title}» выдан. Пункт плана закрыт.`
-        : `Заявка ${req.id} создана и ушла на согласование: ${findUser(req.approver_id)?.name}. Пункт плана ждёт ответа — я напомню, если затянется.`;
-    push({ id: msgId(), role: "assistant", kind: "text", content: text, scripted: true });
-  }
-
   return (
     <div className="flex justify-start">
       <div className={`max-w-[92%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
         m.kind === "error" ? "bg-red-500/10 text-red-800 dark:text-red-300" : "bg-black/5 dark:bg-white/10"
       }`}>
         <div className="whitespace-pre-wrap">{m.content}</div>
-
-        {m.draft && (
-          <div className="mt-2 rounded-xl border border-black/10 bg-[var(--background)] p-3 text-sm dark:border-white/15">
-            <div className="mb-1.5 font-semibold">Заявка на доступ · черновик</div>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-              <dt className="text-black/55 dark:text-white/55">Ресурс</dt><dd>{m.draft.resourceTitle}</dd>
-              <dt className="text-black/55 dark:text-white/55">Права</dt><dd>{LEVELS[m.draft.level]} (минимально достаточные)</dd>
-              <dt className="text-black/55 dark:text-white/55">Обоснование</dt><dd>{m.draft.justification}</dd>
-              <dt className="text-black/55 dark:text-white/55">Согласует</dt><dd>{m.draft.approver}</dd>
-            </dl>
-            {m.draft.state === "pending" ? (
-              <div className="mt-3 flex gap-2">
-                <button onClick={confirm} className="rounded-lg bg-[#00aaff] px-3 py-1.5 font-medium text-white">Подтвердить</button>
-                <button onClick={() => update(m.id, { draft: { ...m.draft!, state: "cancelled" } })} className="rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20">
-                  Отменить
-                </button>
-              </div>
-            ) : (
-              <div className="mt-2 text-black/55 dark:text-white/55">{m.draft.state === "confirmed" ? "Подтверждено" : "Отменено — ничего не отправлено"}</div>
-            )}
-          </div>
-        )}
-
+        {m.draft && <DraftCard m={m} actor={actor} />}
         {m.sources && m.sources.length > 0 && (
           <div className="mt-2 text-xs text-black/55 dark:text-white/55">Источник: {m.sources.join(", ")} · демо-данные, не регламент Авито</div>
         )}
-        {m.action && actor.role === "intern" && (
-          <button onClick={() => onAction(m.action!)} className="mt-2 rounded-lg bg-[#00aaff] px-3 py-1.5 text-sm font-medium text-white">
-            {m.action.label}
-          </button>
+        {m.actions && m.actions.length > 0 && actor.role === "intern" && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {m.actions.map((a, i) => (
+              <button
+                key={a.label}
+                onClick={() => onAction(a)}
+                className={i === 0 && a.kind !== "snooze"
+                  ? "rounded-lg bg-[#00aaff] px-3 py-1.5 text-sm font-medium text-white"
+                  : "rounded-lg border border-black/15 px-3 py-1.5 text-sm dark:border-white/20"}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
         )}
-        {m.chips && m.chips.length > 0 && (
+        {(m.chips?.length || m.retry) && (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {m.chips.map((c) => (
-              <button key={c} onClick={() => onAsk(c)} className="rounded-full border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
-                {m.kind === "error" ? "Повторить" : c}
+            {m.retry && (
+              <button onClick={() => askBot(actor, m.retry!)} className="rounded-full border border-current px-2.5 py-1 text-sm">Повторить</button>
+            )}
+            {m.chips?.map((c) => (
+              <button key={c} onClick={() => askBot(actor, c)} className="rounded-full border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
+                {c}
               </button>
             ))}
           </div>
         )}
         {m.scripted && m.kind === "text" && (
-          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">макет · ответ из тестовых данных</div>
+          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">сценарный ответ · из данных плана</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
+  const update = useChat((s) => s.update);
+  const push = useChat((s) => s.push);
+  const resources = useResources(actor);
+  const refresh = useRefresh();
+  const [pending, setPending] = useState(false);
+  const draft = m.draft!;
+  const params = draft.params as Record<string, string | undefined>;
+  const resource = resources.data?.find((r) => r.id === params.resource_id);
+  const isAccess = draft.tool === "create_access_request";
+
+  async function run(kind: "confirm" | "cancel") {
+    setPending(true);
+    try {
+      const result = kind === "confirm" ? await api.confirm(actor.id, draft.id) : await api.cancel(actor.id, draft.id);
+      update(m.id, { draft: result });
+      if (result.status === "done" && isAccess) {
+        const req = (result.result as { request?: AccessRequest } | null)?.request;
+        push({
+          id: msgId(), role: "assistant", kind: "text", scripted: true,
+          content: req?.status === "granted"
+            ? `Готово: заявка ${req.id} — доступ к «${resource?.title ?? req.resource_id}» выдан. Пункт плана закрыт.`
+            : `Заявка ${req?.id} создана и ушла на согласование: ${findUser(req?.approver_id)?.name ?? "согласующий"}. Пункт плана ждёт ответа — я напомню, если затянется.`,
+        });
+      } else if (result.status === "failed") {
+        push({ id: msgId(), role: "assistant", kind: "error", content: `Не получилось: ${result.error}` });
+      }
+      await refresh();
+    } catch (err) {
+      push({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-xl border border-black/10 bg-[var(--background)] p-3 text-sm dark:border-white/15">
+      <div className="mb-1.5 font-semibold">{isAccess ? "Заявка на доступ · черновик" : "Черновик действия"}</div>
+      {isAccess ? (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt className="text-black/55 dark:text-white/55">Ресурс</dt><dd>{resource?.title ?? params.resource_id}</dd>
+          <dt className="text-black/55 dark:text-white/55">Права</dt><dd>{LEVELS[params.level ?? "read"]} (минимально достаточные)</dd>
+          <dt className="text-black/55 dark:text-white/55">Обоснование</dt><dd>{params.justification}</dd>
+          <dt className="text-black/55 dark:text-white/55">Согласует</dt><dd>{approverText(resource, actor)}</dd>
+        </dl>
+      ) : (
+        <div>{draft.title}</div>
+      )}
+      {draft.status === "pending" ? (
+        <div className="mt-3 flex gap-2">
+          <button disabled={pending} onClick={() => run("confirm")} className="rounded-lg bg-[#00aaff] px-3 py-1.5 font-medium text-white disabled:opacity-50">Подтвердить</button>
+          <button disabled={pending} onClick={() => run("cancel")} className="rounded-lg border border-black/15 px-3 py-1.5 disabled:opacity-50 dark:border-white/20">
+            Отменить
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 text-black/55 dark:text-white/55">
+          {draft.status === "done" ? "Подтверждено" : draft.status === "cancelled" ? "Отменено — ничего не отправлено" : "Не выполнено"}
+        </div>
+      )}
     </div>
   );
 }

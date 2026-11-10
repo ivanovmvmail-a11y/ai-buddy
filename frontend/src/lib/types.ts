@@ -1,13 +1,21 @@
-// Типы повторяют контракт имитаций сервисов: docs/specs/101-plan-next-step/plan.md, раздел 3.1.
-// Когда появится API (задача T4), те же типы придут с сервера.
+// Модели онбординга. Повторяют контракт имитаций сервисов (docs/specs/101-plan-next-step/plan.md, 3.1)
+// и docs/API.md. Zod проверяет каждый ответ сервера: если контракт разъехался — понятная ошибка,
+// а не «undefined» где-то в интерфейсе.
+import { z } from "zod";
 
-export type Role = "intern" | "mentor" | "lead" | "hrbp" | "curator";
-export type Stage = "week1" | "week2" | "month1" | "month2" | "after3m";
-export type OwnerRole = "intern" | "mentor" | "lead";
-export type ItemStatus = "not_started" | "in_progress" | "waiting" | "done";
-export type SkillLevel = "novice" | "familiar" | "confident";
-export type AccessLevel = "read" | "edit" | "admin";
-export type RequestStatus = "created" | "pending_approval" | "granted" | "rejected";
+export const Role = z.enum(["intern", "mentor", "lead", "hrbp", "curator"]);
+export const Stage = z.enum(["week1", "week2", "month1", "month2", "after3m"]);
+export const OwnerRole = z.enum(["intern", "mentor", "lead"]);
+export const ItemStatus = z.enum(["not_started", "in_progress", "waiting", "done"]);
+export const SkillLevel = z.enum(["novice", "familiar", "confident"]);
+export const AccessLevel = z.enum(["read", "edit", "admin"]);
+
+export type Role = z.infer<typeof Role>;
+export type Stage = z.infer<typeof Stage>;
+export type OwnerRole = z.infer<typeof OwnerRole>;
+export type ItemStatus = z.infer<typeof ItemStatus>;
+export type SkillLevel = z.infer<typeof SkillLevel>;
+export type AccessLevel = z.infer<typeof AccessLevel>;
 
 export type DemoUser = {
   id: string;
@@ -17,81 +25,116 @@ export type DemoUser = {
   mentor_id?: string | null;
 };
 
-export type PlanItem = {
-  id: string;
-  intern_id: string;
-  stage: Stage;
-  order: number;
-  title: string;
-  summary: string;
-  owner_role: OwnerRole;
-  topic: string | null;
-  doc_source_id: string | null;
-  resource_id: string | null;
-  due_day: number | null;
-  practice: string | null;
-  status: ItemStatus;
-  status_reason: string | null;
-  updated_at: string;
-  updated_by: string | null;
-  overdue: boolean;
-  waiting_for: string | null;
-  waiting_days: number | null;
-};
+export const PlanItem = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  stage: Stage,
+  order: z.number(),
+  title: z.string(),
+  summary: z.string(),
+  owner_role: OwnerRole,
+  topic: z.string().nullable(),
+  doc_source_id: z.string().nullable(),
+  resource_id: z.string().nullable(),
+  due_day: z.number().nullable(),
+  practice: z.string().nullable(),
+  status: ItemStatus,
+  status_reason: z.string().nullable(),
+  updated_at: z.string(),
+  updated_by: z.string().nullable(),
+  overdue: z.boolean(),
+  waiting_for: z.string().nullable(),
+  waiting_days: z.number().nullable(),
+});
+export type PlanItem = z.infer<typeof PlanItem>;
 
-export type StageInfo = {
-  stage: Stage;
-  title: string;
-  total: number;
-  done: number;
-  state: "passed" | "current" | "ahead";
-};
+export const StageInfo = z.object({
+  stage: Stage,
+  title: z.string(),
+  total: z.number(),
+  done: z.number(),
+  state: z.enum(["passed", "current", "ahead"]),
+});
+export type StageInfo = z.infer<typeof StageInfo>;
 
-export type NextStep = { item: PlanItem | null; waiting: PlanItem[] };
+export const Plan = z.object({
+  intern_id: z.string(),
+  current_day: z.number(),
+  items: z.array(PlanItem),
+  ladder: z.array(StageInfo),
+  next_step: z.object({ item: PlanItem.nullable(), waiting: z.array(PlanItem) }),
+});
+export type Plan = z.infer<typeof Plan>;
+export type NextStep = Plan["next_step"];
 
-export type Plan = {
-  intern_id: string;
-  current_day: number;
-  items: PlanItem[];
-  ladder: StageInfo[];
-  next_step: NextStep;
-};
+export const AccessResource = z.object({
+  id: z.string(),
+  title: z.string(),
+  kind: z.enum(["base", "team_space"]),
+  team: z.string().nullable(),
+  approver: z.enum(["auto", "mentor"]),
+});
+export type AccessResource = z.infer<typeof AccessResource>;
 
-export type AccessResource = {
-  id: string;
-  title: string;
-  kind: "base" | "team_space";
-  team: string | null;
-  approver: "auto" | "mentor";
-};
+export const AccessRequest = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  resource_id: z.string(),
+  level: AccessLevel,
+  justification: z.string(),
+  status: z.enum(["created", "pending_approval", "granted", "rejected"]),
+  approver_id: z.string().nullable(),
+  reject_reason: z.string().nullable(),
+  plan_item_id: z.string().nullable(),
+  created_day: z.number(),
+  resource_title: z.string().optional(), // есть в GET /access/requests
+});
+export type AccessRequest = z.infer<typeof AccessRequest>;
 
-export type AccessRequest = {
-  id: string;
-  intern_id: string;
-  resource_id: string;
-  level: AccessLevel;
-  justification: string;
-  status: RequestStatus;
-  approver_id: string | null;
-  reject_reason: string | null;
-  plan_item_id: string | null;
-  created_day: number;
-};
+export const SkillProfile = z.object({
+  intern_id: z.string(),
+  skills: z.record(z.string(), SkillLevel),
+  strengths: z.array(z.string()),
+  growth: z.array(z.string()),
+});
+export type SkillProfile = z.infer<typeof SkillProfile>;
 
-export type SkillProfile = {
-  intern_id: string;
-  skills: Record<string, SkillLevel>;
-  strengths: string[];
-  growth: string[];
-};
+export const Reminder = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  plan_item_id: z.string().nullable(),
+  request_id: z.string().nullable(),
+  text: z.string(),
+  status: z.enum(["active", "snoozed", "done"]),
+  created_day: z.number(),
+  snooze_until_day: z.number().nullable(),
+});
+export type Reminder = z.infer<typeof Reminder>;
 
-export type Reminder = {
-  id: string;
-  user_id: string;
-  plan_item_id: string | null;
-  request_id: string | null;
-  text: string;
-  status: "active" | "snoozed" | "done";
-  created_day: number;
-  snooze_until_day: number | null;
-};
+export const Action = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  tool: z.string(),
+  title: z.string(),
+  params: z.record(z.string(), z.unknown()),
+  status: z.enum(["pending", "done", "failed", "cancelled"]),
+  result: z.record(z.string(), z.unknown()).nullable(),
+  error: z.string().nullable(),
+});
+export type Action = z.infer<typeof Action>;
+
+export const Source = z.object({ title: z.string(), url: z.string().nullable() });
+export const ChatResponse = z.object({
+  reply: z.string(),
+  sources: z.array(Source).default([]),
+  actions: z.array(Action).default([]),
+});
+export type ChatResponse = z.infer<typeof ChatResponse>;
+
+export const Health = z.object({ status: z.string(), llm_provider: z.string() });
+export const InternsResponse = z.object({ interns: z.array(z.object({ id: z.string(), name: z.string(), team: z.string() })) });
+export const RequestsResponse = z.object({ requests: z.array(AccessRequest) });
+export const ResourcesResponse = z.object({ resources: z.array(AccessResource) });
+export const RemindersResponse = z.object({ reminders: z.array(Reminder) });
+export const DaysResponse = z.object({ days: z.record(z.string(), z.number()) });
+export const ResetResponse = z.object({ status: z.string() });
