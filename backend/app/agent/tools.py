@@ -43,7 +43,22 @@ class Tool:
     def spec(self) -> ToolSpec:
         schema = self.args_model.model_json_schema()
         schema.pop("title", None)
-        return ToolSpec(name=self.name, description=self.description, parameters=schema)
+        return ToolSpec(name=self.name, description=self.description, parameters=simplify_schema(schema))
+
+
+def simplify_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Необязательное поле pydantic (`str | None`) описывается через anyOf с null — GigaChat такое
+    отклоняет (422 «Type properties.<поле>.type is wrong»). Оставляем простой тип: поле и так не в required."""
+    for prop in schema.get("properties", {}).values():
+        variants = prop.get("anyOf")
+        if variants:
+            rest = [v for v in variants if v.get("type") != "null"]
+            if len(rest) == 1:
+                prop.pop("anyOf")
+                prop.update(rest[0])
+                if prop.get("default", ...) is None:
+                    prop.pop("default")
+    return schema
 
 
 @dataclass

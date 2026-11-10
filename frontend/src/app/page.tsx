@@ -1,63 +1,130 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ChatPanel } from "@/components/ChatPanel";
+import { askBot, ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
-import { actionFor, draftFor, explain, greeting, msgId, useChat, type BotAction } from "@/lib/chat";
-import { DEMO_USERS, ROLE_TITLES } from "@/lib/mock-data";
-import { findUser, remindersFor } from "@/lib/plan-logic";
-import { useDemo } from "@/lib/store";
-import type { PlanItem } from "@/lib/types";
+import { api } from "@/lib/api";
+import {
+  accessDraftParams, explainQuestion, explainScripted, greeting, msgId, reminderMsg, useChat, type BotAction,
+} from "@/lib/chat";
+import { keys, useHealth, useRefresh } from "@/lib/queries";
+import { useSession } from "@/lib/store";
+import type { AccessRequest, DemoUser, Plan, PlanItem } from "@/lib/types";
+import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
 
 export default function Home() {
-  const userId = useDemo((s) => s.userId);
-  const setUser = useDemo((s) => s.setUser);
+  const userId = useSession((s) => s.userId);
+  const setUser = useSession((s) => s.setUser);
   const actor = findUser(userId)!;
   const [tab, setTab] = useState<"plan" | "chat">("plan");
-  const resetChat = useChat((s) => s.reset);
-  const push = useChat((s) => s.push);
+  const client = useQueryClient();
+  const refresh = useRefresh();
+  const health = useHealth(userId);
+  const scriptedMode = health.data?.llm_provider === "echo";
+  const [demoError, setDemoError] = useState<string | null>(null);
+
+  const say = useChat((s) => s.push);
+
+  async function loadPlan(internId: string): Promise<Plan | null> {
+    try {
+      return await client.fetchQuery({ queryKey: keys.plan(actor.id, internId), queryFn: () => api.plan(actor.id, internId) });
+    } catch {
+      return null;
+    }
+  }
+
+  /** Новые напоминания — сообщением бота, по одному разу (имитация ИИ-крона, спека 301). */
+  async function showReminders(who: DemoUser, plan: Plan | null) {
+    try {
+      const { reminders } = await api.reminders(who.id);
+      const fresh = reminders.filter((r) => !useChat.getState().seenReminders.includes(r.id));
+      useChat.getState().markSeen(fresh.map((r) => r.id));
+      for (const r of fresh) say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));
+      return fresh.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  async function welcome() {
+    const who = actor;
+    useChat.getState().reset([]);
+    const plan = who.role === "intern" ? await loadPlan(who.id) : null;
+    let approvals: AccessRequest[] = [];
+    if (who.role === "mentor") {
+      approvals = await api.requests(who.id).then((r) => r.requests.filter((x) => x.status === "pending_approval" && x.approver_id === who.id)).catch(() => []);
+    }
+    if (useSession.getState().userId !== who.id) return; // успели войти под другим пользователем
+    if (who.role === "intern" && !plan) {
+      say({ id: msgId(), role: "assistant", kind: "error", content: "Не получилось загрузить план. Проверь, что сервер запущен, и нажми «Сброс» или обнови страницу." });
+      return;
+    }
+    say(greeting(who, plan, approvals));
+    await showReminders(who, plan);
+  }
 
   useEffect(() => {
-    resetChat([greeting(useDemo.getState(), actor)]);
+    void welcome();
     // приветствие — при каждом входе под другим пользователем
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  function onExplain(item: PlanItem) {
-    push({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` }, explain(useDemo.getState(), item));
+  async function onExplain(item: PlanItem) {
     setTab("chat");
+    if (!scriptedMode) return askBot(actor, explainQuestion(item));
+    const profile = await client
+      .fetchQuery({ queryKey: keys.profile(actor.id, item.intern_id), queryFn: () => api.profile(actor.id, item.intern_id) })
+      .catch(() => undefined);
+    say({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` }, explainScripted(item, profile));
   }
 
-  function onDo(item: PlanItem) {
-    push({ id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}` }, draftFor(item, actor));
+  async function onDo(item: PlanItem) {
     setTab("chat");
-  }
-
-  function onAction(a: BotAction) {
-    const item = useDemo.getState().items.find((i) => i.id === a.itemId);
-    if (!item) return;
-    if (a.kind === "do") onDo(item);
-    else onExplain(item);
-  }
-
-  function nextDay() {
-    useDemo.getState().nextDay();
-    const state = useDemo.getState();
-    const reminders = remindersFor(state, actor);
-    for (const r of reminders) {
-      const item = state.items.find((i) => i.id === r.plan_item_id);
-      push({
-        id: msgId(), role: "assistant", kind: "text", scripted: true, content: `🔔 ${r.text}`,
-        action: item && item.status !== "waiting" ? actionFor(item) : undefined,
-      });
-      state.dismissReminder(r.id); // одно напоминание на пункт — без повторов
+    say({ id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}` });
+    try {
+      const draft = await api.draft(actor.id, "create_access_request", accessDraftParams(item, actor));
+      say({ id: msgId(), role: "assistant", kind: "draft", content: "Подготовил черновик заявки. Проверь и подтверди — без тебя ничего не отправлю.", draft });
+    } catch (err) {
+      say({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
     }
-    if (!reminders.length) push({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Новый день. Зависших пунктов нет." });
   }
 
-  function reset() {
-    useDemo.getState().reset();
-    resetChat([greeting(useDemo.getState(), actor)]);
+  async function onAction(a: BotAction) {
+    if (a.kind === "snooze") {
+      await api.snooze(actor.id, a.reminderId).catch(() => undefined);
+      say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Хорошо, напомню завтра." });
+      return;
+    }
+    const plan = await loadPlan(a.internId);
+    const item = plan?.items.find((i) => i.id === a.itemId);
+    if (!item) return;
+    if (a.kind === "do") await onDo(item);
+    else await onExplain(item);
+  }
+
+  async function nextDay() {
+    setDemoError(null);
+    try {
+      await api.nextDay(actor.id);
+      await refresh();
+      const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
+      const shown = await showReminders(actor, plan);
+      if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Новый день. Зависших пунктов нет." });
+    } catch (err) {
+      setDemoError((err as Error).message);
+    }
+  }
+
+  async function reset() {
+    setDemoError(null);
+    try {
+      await api.reset(actor.id);
+      await client.invalidateQueries();
+      await welcome();
+    } catch (err) {
+      setDemoError((err as Error).message);
+    }
   }
 
   return (
@@ -82,10 +149,13 @@ export default function Home() {
           </select>
         </label>
         <div className="ml-auto flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
-          <span className="text-black/45 dark:text-white/45">Демо-панель</span>
+          <span className="text-black/45 dark:text-white/45">
+            Демо-панель{scriptedMode ? " · сценарный режим (без ключа модели)" : ""}
+          </span>
           <button onClick={nextDay} className="rounded-md bg-black/5 px-2 py-1 hover:bg-black/10 dark:bg-white/10">Следующий день</button>
           <button onClick={reset} className="rounded-md px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10">Сброс</button>
         </div>
+        {demoError && <p role="alert" className="w-full text-xs text-red-700 dark:text-red-300">{demoError}</p>}
       </header>
 
       <div className="flex border-b border-black/10 md:hidden dark:border-white/10" role="tablist">

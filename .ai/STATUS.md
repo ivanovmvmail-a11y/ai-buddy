@@ -16,8 +16,10 @@
 | 10 | Эмбеддер GigaChat (по выбору) + Windows-цикл + авто-загрузка документов в Docker; миграция RAG в Supabase | Claude | claude/gigachat-embeddings | готово | #13 | эмбеддинги GigaChat на бесплатном тарифе — 402, по умолчанию поиск по словам |
 | 11 | Спека 101 (план, статусы, следующий шаг) + контракт имитаций сервисов для Codex | Claude | claude/spec-101-plan | готово | #15 | задачи T1–T5 в docs/specs/101-plan-next-step/tasks.md |
 | 12 | 101-T1: имитации сервисов (чек-лист, доступы, найм, часы, события) в памяти + seed + тесты | Codex | codex/mcp-services | готово | [#17](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/17) | Слито; отложенный пункт 6 реализован в T3 |
-| 13 | 101-T2: макет экрана «план + чат» на тестовых данных | Claude | claude/plan-screen | на ревью | | Vitest 24 теста, покрытие 99%; данные пока в браузере, API — в T4 |
-| 14 | 101-T3: PostgreSQL-хранилище онбординга, миграция, seed и оптимизация чтения | Codex | codex/onboarding-postgres | на ревью | | --mcp-postgres: 453 passed, 98,78%; офлайн: 287 passed, 93,34%; AC-5 между процессами |
+| 13 | 101-T2: макет экрана «план + чат» на тестовых данных | Claude | claude/plan-screen | готово | #16 | Vitest 24 теста, покрытие 99%; данные пока в браузере, API — в T4 |
+| 14 | 101-T4a [API]: HTTP онбординга + инструменты агента поверх имитаций сервисов | Claude | claude/api-onboarding | готово | #19 | 318 тестов, покрытие 99%; проверено вживую с GigaChat |
+| 15 | 101-T4b: интерфейс на API (TanStack Query, Zod) + resource_title в заявках [API] | Claude | claude/frontend-api | на ревью | | 28 тестов Vitest на поддельном сервере, покрытие 99%; проверено вживую |
+| 16 | 101-T3: PostgreSQL-хранилище онбординга, миграция, seed и оптимизация чтения | Codex | codex/onboarding-postgres | на ревью | | --mcp-postgres: 453 passed, 98,78%; офлайн: 287 passed, 93,34%; AC-5 между процессами |
 
 ## Блокеры
 _нет_

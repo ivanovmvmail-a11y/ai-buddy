@@ -4,6 +4,8 @@ import asyncio
 import pytest
 
 from app import main, rag
+from app.mcp_server import storage as onboarding_storage
+from app.mcp_server.seed import load_seed
 from app.agent import service
 from app.config import settings
 from app.llm import LLMReply, ToolCall, get_llm
@@ -55,7 +57,7 @@ def use_llm(monkeypatch):
 
 
 @pytest.fixture
-def client(monkeypatch, agent):
+def client(monkeypatch, agent, fresh_onboarding):
     monkeypatch.setattr(settings, "llm_provider", "echo")
     get_llm.cache_clear()
     yield main.create_app().test_client()
@@ -74,6 +76,14 @@ def no_configured_database(monkeypatch):
     clear_cache()
     yield
     clear_cache()
+
+
+@pytest.fixture
+def fresh_onboarding(monkeypatch):
+    """Каждый тест начинает со стартовых данных имитаций сервисов (seed), без общего состояния."""
+    store = onboarding_storage.InMemoryStore(load_seed())
+    monkeypatch.setattr(onboarding_storage, "get_store", lambda: store)
+    return store
 
 
 def pytest_addoption(parser):
