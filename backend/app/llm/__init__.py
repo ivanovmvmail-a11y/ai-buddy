@@ -1,4 +1,6 @@
-"""LLM-слой (зона Claude). Провайдер выбирается переменной LLM_PROVIDER: gigachat | openai | echo."""
+"""LLM-слой (зона Claude). Провайдер выбирается переменной LLM_PROVIDER: gigachat | openai | scenario | echo.
+
+scenario — сценарный режим без ключа (спека 003); echo — заглушка для разработки (повторяет сообщение)."""
 from functools import lru_cache
 
 from app.config import settings
@@ -19,6 +21,10 @@ def get_llm() -> LLMProvider:
         from .openai_provider import OpenAICompatibleProvider
 
         return OpenAICompatibleProvider()
+    if provider == "scenario":
+        from .scenario_provider import ScenarioProvider
+
+        return ScenarioProvider()
     from .echo_provider import EchoProvider
 
     return EchoProvider()

@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # gigachat | openai | echo  (echo — заглушка без ключей, для разработки)
-    llm_provider: str = "echo"
+    llm_provider: str = "scenario"
 
     # GigaChat (https://developers.sber.ru/studio)
     gigachat_credentials: str = ""  # Authorization Key из личного кабинета

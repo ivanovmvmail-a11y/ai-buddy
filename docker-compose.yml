@@ -5,7 +5,7 @@
 #            чтобы не конфликтовать с уже установленным PostgreSQL). Консоль базы:
 #            docker compose exec db psql -U buddy -d ai_buddy
 #
-# Без backend/.env всё работает в демо-режиме (LLM-заглушка echo, ключи не нужны).
+# Без backend/.env всё работает в сценарном режиме (LLM_PROVIDER=scenario, спека 003, ключи не нужны).
 # Чтобы подключить нейросеть — заполните backend/.env по образцу backend/.env.example.
 name: ai-buddy
 

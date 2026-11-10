@@ -18,7 +18,8 @@
 | 12 | 101-T1: имитации сервисов (чек-лист, доступы, найм, часы, события) в памяти + seed + тесты | Codex | codex/mcp-services | готово | [#17](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/17) | Ревью 1–5, 7–9 исправлено, 6 → T3; 281 passed, покрытие 98,82% |
 | 13 | 101-T2: макет экрана «план + чат» на тестовых данных | Claude | claude/plan-screen | готово | #16 | Vitest 24 теста, покрытие 99%; данные пока в браузере, API — в T4 |
 | 14 | 101-T4a [API]: HTTP онбординга + инструменты агента поверх имитаций сервисов | Claude | claude/api-onboarding | готово | #19 | 318 тестов, покрытие 99%; проверено вживую с GigaChat |
-| 15 | 101-T4b: интерфейс на API (TanStack Query, Zod) + resource_title в заявках [API] | Claude | claude/frontend-api | на ревью | | 28 тестов Vitest на поддельном сервере, покрытие 99%; проверено вживую |
+| 15 | 101-T4b: интерфейс на API (TanStack Query, Zod) + resource_title в заявках [API] | Claude | claude/frontend-api | готово | #20 | 28 тестов Vitest на поддельном сервере, покрытие 99%; проверено вживую |
+| 16 | Спека 003: сценарный режим без ключа (LLM_PROVIDER=scenario по умолчанию) | Claude | claude/scenario-mode | на ревью | | 337 тестов backend; проверено на демо-документах |
 
 ## Блокеры
 _нет_

@@ -17,7 +17,7 @@ docker compose up --build
 - backend — http://localhost:8000/health
 - база PostgreSQL + pgvector — внутри Docker (порт наружу не открыт, чтобы не мешать установленному у вас PostgreSQL); консоль: `docker compose exec db psql -U buddy -d ai_buddy` (тестовые учётные данные `buddy` / `buddy`)
 
-**Без ключей** всё запускается в демо-режиме: вместо нейросети отвечает заглушка `echo`.
+**Без ключей** всё запускается в **сценарном режиме** (`LLM_PROVIDER=scenario`, спека [003](docs/specs/003-scenario-mode/spec.md)): весь маршрут демо проходится — следующий шаг по плану, черновик заявки на доступ с подтверждением, отказ на чужие данные, ответ по документам с источником, «в базе нет» с черновиком вопроса наставнику. Ответы собираются из данных сервисов и документов, без нейросети; в интерфейсе это подписано.
 Чтобы подключить нейросеть: `cp backend/.env.example backend/.env`, указать `LLM_PROVIDER` и ключ (см. «Подключение GigaChat»), перезапустить `docker compose up --build`.
 
 Остановить: `docker compose down`. Стереть базу и начать с нуля: `docker compose down -v`.
@@ -40,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Без ключей backend работает в режиме `LLM_PROVIDER=echo` (повторяет сообщение), чтобы интерфейс можно было делать сразу.
+Без ключей backend работает в сценарном режиме `LLM_PROVIDER=scenario`. Для разработки есть `LLM_PROVIDER=echo` — просто повторяет сообщение.
 
 ## Тестовые пользователи и вход (имитация)
 
@@ -68,7 +68,7 @@ backend/app/
   main.py         Flask: /health, /chat
   async_runner.py общий event loop для async-кода (LLM, RAG, MCP)
   agent/          логика агента, промпты           (Claude)
-  llm/            провайдеры LLM: gigachat|openai|echo (Claude)
+  llm/            провайдеры LLM: gigachat|openai|scenario|echo (Claude)
   rag/            поиск по документам команды      (Codex)
   mcp_server/     MCP-инструменты к корп. сервисам (Codex)
   db/             Supabase                          (Codex)
