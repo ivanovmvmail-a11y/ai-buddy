@@ -1,25 +1,9 @@
-// ТЕСТОВЫЕ ДАННЫЕ ДЛЯ МАКЕТА (задача T2 спеки 101). Всё синтетическое: «демо-данные, не регламент Авито».
-// После задачи T4 экран берёт данные из API, а этот файл остаётся только для тестов интерфейса.
-import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "./types";
+// Данные поддельного сервера для тестов интерфейса (бывший макет T2). Настоящие данные — seed имитаций
+// сервисов на backend. Всё синтетическое.
+import { DEMO_USERS } from "@/lib/users";
+import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "@/lib/types";
 
-export const DEMO_USERS: DemoUser[] = [
-  { id: "intern-anya", name: "Аня Смирнова", role: "intern", team: "Платформа объявлений", mentor_id: "mentor-petr" },
-  { id: "intern-ivan", name: "Иван Кузнецов", role: "intern", team: "Авито Доставка", mentor_id: "mentor-maria" },
-  { id: "mentor-petr", name: "Пётр Волков", role: "mentor", team: "Платформа объявлений" },
-  { id: "mentor-maria", name: "Мария Орлова", role: "mentor", team: "Авито Доставка" },
-  { id: "lead-olga", name: "Ольга Новикова", role: "lead", team: "Платформа объявлений" },
-  { id: "lead-sergey", name: "Сергей Лебедев", role: "lead", team: "Авито Доставка" },
-  { id: "hrbp-elena", name: "Елена Морозова", role: "hrbp", team: "HR" },
-  { id: "curator-dmitry", name: "Дмитрий Соколов", role: "curator", team: "Avito Start" },
-];
-
-export const ROLE_TITLES: Record<DemoUser["role"], string> = {
-  intern: "стажёр",
-  mentor: "наставник",
-  lead: "руководитель",
-  hrbp: "HR BP",
-  curator: "куратор",
-};
+export { DEMO_USERS };
 
 export const RESOURCES: AccessResource[] = [
   { id: "base-access", title: "Jira и Confluence", kind: "base", team: null, approver: "auto" },

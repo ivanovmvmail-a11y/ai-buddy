@@ -103,7 +103,7 @@
 | `POST /plan/items/{id}/status` `{"status":"done"\|"in_progress","reason"?}` | ответственный за пункт; наставник возвращает пункт стажёра с `reason` | `PlanItem` |
 | `GET /plan/summary?intern_id=&week=1` | те же, кто видит план | `{"intern_id","week","closed":[…],"access_granted":[…],"carry_over":[PlanItem]}` |
 | `GET /access/resources` | стажёр | `{"resources":[AccessResource]}` |
-| `GET /access/requests?intern_id=` | стажёр — свои, наставник — своих | `{"requests":[AccessRequest]}`, новые сверху |
+| `GET /access/requests?intern_id=` | стажёр — свои, наставник — своих | `{"requests":[AccessRequest + "resource_title"]}`, новые сверху |
 | `POST /access/requests/{id}/decide` `{"approve":true\|false,"reason"?}` | только назначенный согласующий; при отказе `reason` обязателен | `AccessRequest` |
 | `GET /profile/skills?intern_id=` | стажёр — свой, наставник — своих | `SkillProfile` |
 | `GET /reminders` | все | `{"reminders":[Reminder]}` — только активные свои |

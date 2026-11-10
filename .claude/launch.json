@@ -4,14 +4,50 @@
     {
       "name": "backend",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "--directory", "backend", "flask", "--app", "app.main", "run", "--debug", "--port", "8000"],
+      "runtimeArgs": [
+        "run",
+        "--directory",
+        "backend",
+        "flask",
+        "--app",
+        "app.main",
+        "run",
+        "--debug",
+        "--port",
+        "8000"
+      ],
       "port": 8000
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "backend-alt",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set FRONTEND_ORIGINS=http://localhost:3001&& uv run --directory backend flask --app app.main run --debug --port 8001"
+      ],
+      "port": 8001,
+      "autoPort": false
+    },
+    {
+      "name": "frontend-alt",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set NEXT_PUBLIC_API_URL=http://localhost:8001&& npm --prefix frontend run dev -- -p 3001"
+      ],
+      "port": 3001,
+      "autoPort": false
     }
   ]
 }

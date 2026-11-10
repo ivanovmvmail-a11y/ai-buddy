@@ -11,6 +11,7 @@ from pydantic_core import to_jsonable_python
 
 from app import async_runner
 from app.agent import service
+from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
 from app.mcp_server import access, checklist, clock, hiring
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
@@ -98,7 +99,8 @@ def resources():
 @bp.get("/access/requests")
 def requests_list():
     reqs = async_runner.run(access.list_requests(g.user, request.args.get("intern_id")))
-    return {"requests": [_json(r) for r in reqs]}
+    titles = resource_titles()  # наставнику справочник ресурсов не выдаётся — название кладём в заявку
+    return {"requests": [{**_json(r), "resource_title": titles.get(r.resource_id, r.resource_id)} for r in reqs]}
 
 
 class DecideIn(BaseModel):
