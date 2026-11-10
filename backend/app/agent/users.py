@@ -26,13 +26,15 @@ class User(BaseModel):
     lead_id: str | None = None  # руководитель команды
 
 
-# Права — строки «ресурс:действие». Конкретный набор уточнится после интервью по сценариям.
+# Права — строки «ресурс:действие». Решают, какие инструменты показать модели; точную проверку
+# (свой стажёр, свой пункт, назначенный согласующий) делают имитации сервисов в app/mcp_server.
+_BASE = frozenset({"profile:read", "reminders:write"})
 ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
-    Role.INTERN: frozenset({"profile:read", "reminders:write"}),
-    Role.MENTOR: frozenset({"profile:read", "reminders:write", "interns:read"}),
-    Role.LEAD: frozenset({"profile:read", "reminders:write", "interns:read"}),
-    Role.HRBP: frozenset({"profile:read", "reminders:write", "interns:read"}),
-    Role.CURATOR: frozenset({"profile:read", "reminders:write", "interns:read"}),
+    Role.INTERN: _BASE | {"plan:read", "plan:write", "access:request", "access:read", "skills:read"},
+    Role.MENTOR: _BASE | {"interns:read", "plan:read", "plan:write", "access:read", "access:approve", "skills:read"},
+    Role.LEAD: _BASE | {"interns:read", "plan:read", "plan:write"},
+    Role.HRBP: _BASE | {"interns:read"},
+    Role.CURATOR: _BASE | {"interns:read", "plan:read"},
 }
 
 # Синтетические данные (ТЗ: реальные данные сотрудников не используем).

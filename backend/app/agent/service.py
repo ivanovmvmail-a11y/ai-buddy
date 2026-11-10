@@ -2,11 +2,14 @@
 import logging
 from dataclasses import dataclass, field
 
+from pydantic import ValidationError
+
 from app.llm import Message, get_llm
 from app.rag import retrieve
 
 from .actions import Action, ActionStore
 from .demo_tools import register_demo_tools
+from .onboarding_tools import plan_context, register_onboarding_tools
 from .prompts import SYSTEM_PROMPT, user_context
 from .tools import ToolExecutor, ToolRegistry, check_access, to_tool_content
 from .users import User
@@ -40,6 +43,10 @@ class ActionConflict(ActionError):
     status = 409
 
 
+class ActionInvalid(ActionError):
+    status = 422
+
+
 class Agent:
     def __init__(self, registry: ToolRegistry, store: ActionStore) -> None:
         self.registry = registry
@@ -50,7 +57,7 @@ class Agent:
         question = next((m.content for m in reversed(history) if m.role == "user"), "")
         docs = await retrieve(question, user)
 
-        system = SYSTEM_PROMPT + user_context(user.name, user.role.value, user.team)
+        system = SYSTEM_PROMPT + user_context(user.name, user.role.value, user.team) + await plan_context(user)
         if docs:
             context = "\n\n".join(f"### {d['title']}\n{d['content']}" for d in docs)
             system += (
@@ -101,13 +108,33 @@ class Agent:
         if not check_access(user, tool, args):
             raise ActionForbidden("Нет прав на это действие")
         try:
-            action.result = await tool.handler(user, args)
-            action.status = "done"
+            result = await tool.handler(user, args)
+            if isinstance(result, dict) and "error" in result:
+                # сервис отказал (права, неверный переход) — действие не выполнено
+                action.status = "failed"
+                action.error = result.get("message") or "Сервис отказал в выполнении"
+            else:
+                action.result = result
+                action.status = "done"
         except Exception as exc:
             log.exception("action failed user=%s action=%s", user.id, action.id)
             action.status = "failed"
             action.error = f"Сервис вернул ошибку: {exc}"
         return self.store.save(action)
+
+    def draft(self, user: User, tool_name: str, params: dict) -> Action:
+        """Черновик по кнопке интерфейса («Сделать за меня») — без модели, тот же путь подтверждения."""
+        tool = self.registry.get(tool_name)
+        if tool is None or tool.kind != "write":
+            raise ActionNotFound("Действие не найдено")
+        try:
+            args = tool.args_model.model_validate(params)
+        except ValidationError as exc:
+            raise ActionInvalid("Неверные данные: " + "; ".join(e["msg"] for e in exc.errors())) from exc
+        if not check_access(user, tool, args):
+            raise ActionForbidden("Нет прав на это действие")
+        title = tool.describe(args) if tool.describe else tool.description
+        return self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
 
     def cancel(self, user: User, action_id: str) -> Action:
         action = self._own_pending(user, action_id)
@@ -121,6 +148,7 @@ class Agent:
 def build_agent() -> Agent:
     registry = ToolRegistry()
     register_demo_tools(registry)
+    register_onboarding_tools(registry)
     return Agent(registry, ActionStore())
 
 

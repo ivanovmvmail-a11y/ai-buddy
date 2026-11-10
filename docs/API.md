@@ -81,3 +81,55 @@
 
 ## POST /actions/{id}/cancel
 Отменить черновик: `200 <Action>` со статусом `cancelled`; `404` / `409` — как у confirm.
+
+---
+
+# Онбординг: план, заявки, напоминания (спека 101, задача T4)
+Тонкий слой над имитациями сервисов `backend/app/mcp_server` — права проверяют сами сервисы.
+Модели (`Plan`, `PlanItem`, `AccessRequest`, `Reminder`, `SkillProfile`) — как в
+`docs/specs/101-plan-next-step/plan.md`, раздел 3.1. Демо-данные, не регламент Авито.
+
+**Ошибки (все эндпоинты раздела):** `404 {"detail":"Не найдено"}` — нет объекта **или нет доступа**
+(факт существования чужих данных не раскрывается); `403` — объект виден, но действие запрещено
+(стажёр отмечает пункт наставника, стажёр одобряет заявку); `409` — неверный переход статуса или
+повторная заявка; `422` — неверные данные (`detail` — список ошибок).
+
+Параметр `intern_id` (query) необязателен: по умолчанию — сам пользователь.
+
+| Метод и путь | Кто | Ответ |
+|---|---|---|
+| `GET /interns` | все | `{"interns":[{"id","name","team"}]}` — чьи планы можно открыть (HR BP — пусто) |
+| `GET /plan?intern_id=` | стажёр — свой, наставник — своих, руководитель — своих, куратор — всех | `Plan` |
+| `POST /plan/items/{id}/status` `{"status":"done"\|"in_progress","reason"?}` | ответственный за пункт; наставник возвращает пункт стажёра с `reason` | `PlanItem` |
+| `GET /plan/summary?intern_id=&week=1` | те же, кто видит план | `{"intern_id","week","closed":[…],"access_granted":[…],"carry_over":[PlanItem]}` |
+| `GET /access/resources` | стажёр | `{"resources":[AccessResource]}` |
+| `GET /access/requests?intern_id=` | стажёр — свои, наставник — своих | `{"requests":[AccessRequest]}`, новые сверху |
+| `POST /access/requests/{id}/decide` `{"approve":true\|false,"reason"?}` | только назначенный согласующий; при отказе `reason` обязателен | `AccessRequest` |
+| `GET /profile/skills?intern_id=` | стажёр — свой, наставник — своих | `SkillProfile` |
+| `GET /reminders` | все | `{"reminders":[Reminder]}` — только активные свои |
+| `POST /reminders/{id}/snooze` `{"days":1}` / `POST /reminders/{id}/done` | владелец | `Reminder` |
+| `POST /demo/next-day` `{"intern_id"?}` | любая роль (демо-панель) | `{"days":{"intern-anya":3,…}}`; запускает проверку напоминаний |
+| `POST /demo/reset` | любая роль (демо-панель) | `{"status":"reset"}` — стартовое состояние |
+
+Кнопки, которые нажимает человек («Готово», «Одобрить»), выполняются сразу — это и есть решение человека.
+
+## POST /actions — черновик по кнопке («Сделать за меня»)
+Запрос: `{"tool":"create_access_request","params":{"resource_id":"jira","level":"read","justification":"…"}}`.
+Ответ `201 <Action>` со статусом `pending` — та же карточка, что от агента; выполнить — `POST /actions/{id}/confirm`.
+`404` — нет такого write-инструмента; `403` — нет прав; `422` — неверные `params`.
+Если сервис отказал при подтверждении (например, заявка на ресурс уже есть) — `Action.status = "failed"`, текст в `error`.
+
+## Инструменты агента (`backend/app/agent/onboarding_tools.py`)
+| Инструмент | read/write | Право | Кому показан |
+|---|---|---|---|
+| `get_plan` | read | `plan:read` | стажёр, наставник, руководитель, куратор |
+| `set_plan_item_status` | write | `plan:write` | стажёр, наставник, руководитель |
+| `list_access_resources` | read | `access:request` | стажёр |
+| `create_access_request` | write | `access:request` | стажёр |
+| `list_access_requests` | read | `access:read` | стажёр, наставник |
+| `decide_access_request` | write | `access:approve` | наставник |
+| `get_skill_profile` | read | `skills:read` | стажёр, наставник |
+
+`set_skill_level` намеренно не инструмент: уровень навыка меняет только наставник, ИИ человека не оценивает.
+Стажёру в системный промпт добавляется сводка: день, следующий шаг, кого ждём, уровень по темам.
+
