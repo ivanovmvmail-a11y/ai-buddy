@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     gigachat_ca_bundle_file: str = ""  # путь к russian_trusted_root_ca.cer (см. README)
     gigachat_verify_ssl: bool = True
 
+    # Эмбеддинги для поиска по документам: fake (по словам, без ключей) | gigachat.
+    # gigachat нужен оплаченный пакет эмбеддингов: на бесплатном тарифе API отвечает 402.
+    # Документы и запросы должны векториться ОДНИМ эмбеддером: после смены — перезагрузить документы.
+    embeddings_provider: str = "fake"
+    gigachat_embeddings_model: str = "Embeddings"  # 1024 измерения, как в схеме базы
+
     # Любой OpenAI-совместимый API (OpenRouter, YandexGPT OpenAI-endpoint и т.п.)
     openai_api_key: str = ""
     openai_base_url: str = ""

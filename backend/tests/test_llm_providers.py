@@ -129,3 +129,58 @@ def test_get_llm_picks_provider(monkeypatch, provider, cls):
 def test_echo_ignores_tools():
     reply = async_runner.run(EchoProvider().chat([Message(role="user", content="привет")], [SPEC]))
     assert "привет" in reply.content and reply.tool_calls == []
+
+
+# --- Эмбеддинги GigaChat ---
+
+def test_gigachat_embedder_batches_and_orders(monkeypatch):
+    from app.llm import embeddings as emb
+
+    monkeypatch.setattr(emb, "BATCH_SIZE", 2)
+    calls = []
+
+    class Client:
+        async def aembeddings(self, texts, model):
+            calls.append((list(texts), model))
+            # API может вернуть элементы не по порядку — эмбеддер сортирует по index
+            items = [NS(index=i, embedding=[float(len(t))]) for i, t in enumerate(texts)]
+            return NS(data=list(reversed(items)))
+
+    embedder = emb.GigaChatEmbedder(client=Client(), model="Embeddings")
+    vectors = async_runner.run(embedder.embed(["a", "bb", "ccc"]))
+    assert vectors == [[1.0], [2.0], [3.0]]
+    assert calls == [(["a", "bb"], "Embeddings"), (["ccc"], "Embeddings")]
+    assert embedder.dimension == 1024
+
+
+def test_gigachat_embedder_uses_settings(monkeypatch):
+    from app.llm import embeddings as emb
+
+    monkeypatch.setattr(settings, "gigachat_credentials", "dGVzdDp0ZXN0")  # фиктивный тестовый ключ
+    monkeypatch.setattr(settings, "gigachat_embeddings_model", "Embeddings")
+    embedder = emb.GigaChatEmbedder()
+    assert embedder._model == "Embeddings" and embedder._client is not None
+
+
+@pytest.mark.parametrize(("explicit", "llm", "expected"), [
+    ("", "gigachat", "fake"),  # без явного выбора — без платных эмбеддингов
+    ("fake", "gigachat", "fake"),
+    ("GigaChat", "echo", "gigachat"),
+])
+def test_embeddings_provider_choice(monkeypatch, explicit, llm, expected):
+    from app.llm.embeddings import embeddings_provider
+
+    monkeypatch.setattr(settings, "embeddings_provider", explicit)
+    monkeypatch.setattr(settings, "llm_provider", llm)
+    assert embeddings_provider() == expected
+
+
+def test_async_runner_uses_selector_loop_on_windows(monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(async_runner.sys, "platform", "win32")
+    loop = async_runner._new_loop()
+    try:
+        assert isinstance(loop, asyncio.SelectorEventLoop)
+    finally:
+        loop.close()

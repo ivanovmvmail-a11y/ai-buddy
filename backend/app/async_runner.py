@@ -6,6 +6,7 @@ Flask обрабатывает запросы синхронно. Если за�
 с «Event loop is closed». Поэтому вся асинхронщина выполняется в одном loop.
 """
 import asyncio
+import sys
 import threading
 from collections.abc import Coroutine
 from typing import Any, TypeVar
@@ -16,11 +17,18 @@ _loop: asyncio.AbstractEventLoop | None = None
 _lock = threading.Lock()
 
 
+def _new_loop() -> asyncio.AbstractEventLoop:
+    # На Windows new_event_loop() даёт ProactorEventLoop, а async-psycopg с ним не работает.
+    if sys.platform == "win32":
+        return asyncio.SelectorEventLoop()
+    return asyncio.new_event_loop()
+
+
 def _get_loop() -> asyncio.AbstractEventLoop:
     global _loop
     with _lock:
         if _loop is None or _loop.is_closed():
-            _loop = asyncio.new_event_loop()
+            _loop = _new_loop()
             threading.Thread(target=_loop.run_forever, name="async-runner", daemon=True).start()
         return _loop
 

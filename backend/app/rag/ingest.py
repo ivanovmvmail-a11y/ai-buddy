@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> None:
     if service is None:
         parser.error("Set DATABASE_URL before loading documents")
     documents, chunks = run(ingest_directory(service, args.directory))
-    print(f"Loaded {documents} documents, {chunks} chunks (deterministic demo embedder)")
+    print(f"Loaded {documents} documents, {chunks} chunks (embedder: {type(service.embedder).__name__})")
 
 
 if __name__ == "__main__":

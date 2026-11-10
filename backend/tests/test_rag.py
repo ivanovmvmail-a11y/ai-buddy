@@ -163,6 +163,16 @@ def test_unconfigured_database(monkeypatch):
     assert isinstance(configured.embedder, DeterministicEmbedder)
 
 
+def test_gigachat_embedder_selected(monkeypatch):
+    from app.llm.embeddings import GigaChatEmbedder
+
+    monkeypatch.setattr(settings, "embeddings_provider", "gigachat")
+    monkeypatch.setattr(settings, "gigachat_credentials", "dGVzdDp0ZXN0")  # фиктивный тестовый ключ
+    assert isinstance(rag.make_embedder(), GigaChatEmbedder)
+    monkeypatch.setattr(settings, "embeddings_provider", "fake")
+    assert isinstance(rag.make_embedder(), DeterministicEmbedder)
+
+
 def test_service_is_cached_for_all_requests(monkeypatch):
     monkeypatch.setattr(settings, "database_url", "postgresql://example.invalid/demo")
     store_factory = Mock(return_value=InMemoryDocumentStore())
