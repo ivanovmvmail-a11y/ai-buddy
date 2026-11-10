@@ -1,0 +1,53 @@
+{
+  "notice": "демо-данные, не регламент Авито",
+  "request_fields": [
+    {"name": "resource_id", "label": "Ресурс", "type": "resource"},
+    {"name": "justification", "label": "Для какой учебной задачи нужен доступ", "type": "text"},
+    {"name": "level", "label": "Уровень прав", "type": "select", "options": ["read", "edit", "admin"], "default": "read"},
+    {"name": "approver", "label": "Кто согласует", "type": "approver"}
+  ],
+  "resources": [
+    {"id": "jira", "title": "Учебный Jira", "kind": "base", "team": null, "approver": "auto"},
+    {"id": "confluence", "title": "Учебный Confluence", "kind": "base", "team": null, "approver": "auto"},
+    {"id": "bitbucket-platform", "title": "Bitbucket: Платформа объявлений", "kind": "team_space", "team": "Платформа объявлений", "approver": "mentor"},
+    {"id": "bitbucket-delivery", "title": "Bitbucket: Авито Доставка", "kind": "team_space", "team": "Авито Доставка", "approver": "mentor"}
+  ],
+  "common_items": [
+    {"id": "w1.meet-team", "stage": "week1", "order": 1, "title": "Познакомиться с командой", "summary": "Расскажи о себе и узнай, с кем будете решать учебные задачи.", "owner_role": "intern", "due_day": 3, "doc_source_id": "demo:01-onboarding.md", "practice": "Запиши имена трёх коллег и вопросы для наставника."},
+    {"id": "w1.access-base", "stage": "week1", "order": 2, "title": "Запросить базовые доступы", "summary": "Открой учебный Jira через заявку. Базу знаний Confluence можно запросить отдельной заявкой из списка ресурсов.", "owner_role": "intern", "resource_id": "jira", "due_day": 3, "doc_source_id": "demo:01-onboarding.md", "practice": "Найди учебную задачу в трекере и опиши её ожидаемый результат."},
+    {"id": "w1.channels", "stage": "week1", "order": 4, "title": "Добавить стажёра в каналы Mattermost", "summary": "Покажи стажёру учебный канал команды и место для вопросов.", "owner_role": "mentor", "due_day": 4, "practice": "Проверьте вместе, что учебный канал открывается."},
+    {"id": "w1.one-to-one", "stage": "week1", "order": 5, "title": "Назначить регулярные встречи 1:1", "summary": "Договорись со стажёром о времени и удобном порядке вопросов.", "owner_role": "mentor", "due_day": 5, "practice": "Согласуйте повестку первой встречи и общий конспект."},
+    {"id": "w1.goals", "stage": "week1", "order": 6, "title": "Обсудить цели и ожидаемый результат", "summary": "Вместе со стажёром и наставником уточни цель первой учебной задачи.", "owner_role": "lead", "due_day": 7, "practice": "Зафиксируйте два наблюдаемых признака готового результата."},
+    {"id": "w1.notes", "stage": "week1", "order": 7, "title": "Завести конспект встреч с наставником", "summary": "Собери вопросы и договорённости в одной учебной заметке.", "owner_role": "intern", "due_day": 5, "topic": "git", "practice": "Запиши один непонятный шаг работы с веткой Git и обсуди его на 1:1."},
+    {"id": "w2.progress", "stage": "week2", "order": 1, "title": "Получить у куратора инструмент учёта прогресса", "summary": "Уточни, где хранить учебные цели и факты о выполненных шагах.", "owner_role": "intern", "due_day": 12, "doc_source_id": "demo:04-who-to-ask.md", "practice": "Внеси первую согласованную цель без оценок и баллов."}
+  ],
+  "team_items": {
+    "Платформа объявлений": [
+      {"id": "w1.team-space", "stage": "week1", "order": 3, "title": "Открыть пространство Платформы объявлений", "summary": "Запроси учебное пространство Bitbucket у своего наставника.", "owner_role": "intern", "resource_id": "bitbucket-platform", "due_day": 4, "topic": "git", "doc_source_id": "demo:05-platform-sandbox.md", "practice": "После выдачи доступа найди README учебного каталога."},
+      {"id": "w1.sandbox", "stage": "week1", "order": 8, "title": "Запустить песочницу объявлений", "summary": "Подготовь вымышленные карточки и проверь поиск по заголовку.", "owner_role": "intern", "due_day": 10, "topic": "ci", "doc_source_id": "demo:05-platform-sandbox.md", "practice": "Создай карточку бумажного змея и запиши результат smoke-теста."},
+      {"id": "w2.docs", "stage": "week2", "order": 2, "title": "Разобрать документы Платформы объявлений", "summary": "Посмотри схему состояний карточки и учебный дашборд Grafana.", "owner_role": "intern", "due_day": 14, "topic": "sql", "doc_source_id": "demo:06-platform-lifecycle.md", "practice": "Сформулируй вопрос о переходе карточки в архив."}
+    ],
+    "Авито Доставка": [
+      {"id": "w1.team-space", "stage": "week1", "order": 3, "title": "Открыть пространство Авито Доставки", "summary": "Запроси учебное пространство Bitbucket у своего наставника.", "owner_role": "intern", "resource_id": "bitbucket-delivery", "due_day": 4, "topic": "git", "doc_source_id": "demo:08-delivery-sandbox.md", "practice": "После выдачи доступа найди README учебного маршрута."},
+      {"id": "w1.sandbox", "stage": "week1", "order": 8, "title": "Подготовить песочницу доставки", "summary": "Собери вымышленное отправление между учебными пунктами.", "owner_role": "intern", "due_day": 10, "topic": "ci", "doc_source_id": "demo:08-delivery-sandbox.md", "practice": "Проверь путь бумажной посылки до приёма в учебном пункте."},
+      {"id": "w2.docs", "stage": "week2", "order": 2, "title": "Разобрать документы Авито Доставки", "summary": "Сравни цепочку статусов и пример учебного отчёта в Redash.", "owner_role": "intern", "due_day": 14, "topic": "sql", "doc_source_id": "demo:09-delivery-statuses.md", "practice": "Опиши, почему нельзя сразу выдать зарегистрированную посылку."}
+    ]
+  },
+  "outline_items": [
+    {"id": "m1.feedback", "stage": "month1", "order": 1, "title": "Обсудить первые результаты", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"},
+    {"id": "m1.project", "stage": "month1", "order": 2, "title": "Выбрать следующую учебную задачу", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"},
+    {"id": "m2.project", "stage": "month2", "order": 1, "title": "Показать промежуточный результат", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"},
+    {"id": "m2.questions", "stage": "month2", "order": 2, "title": "Уточнить темы для следующего шага", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"},
+    {"id": "after3m.result", "stage": "after3m", "order": 1, "title": "Подвести итоги стажировки", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"},
+    {"id": "after3m.next", "stage": "after3m", "order": 2, "title": "Обсудить дальнейший план", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"}
+  ],
+  "interns": [
+    {"id": "intern-anya", "start_date": "2026-11-10", "current_day": 2, "done_items": ["w1.meet-team"], "skills": {"git": "novice", "sql": "confident"}, "strengths": ["Уверенно читает учебные SQL-запросы", "Записывает вопросы к встрече"], "growth": ["Разобрать рабочий цикл ветки Git", "Попробовать разбор учебного код-ревью"]},
+    {"id": "intern-ivan", "start_date": "2026-11-04", "current_day": 8, "done_items": ["w1.meet-team", "w1.access-base", "w1.channels", "w1.one-to-one", "w1.goals"], "skills": {"git": "confident", "sql": "novice"}, "strengths": ["Уверенно работает с учебными ветками Git", "Показывает шаги воспроизведения ошибки"], "growth": ["Разобрать группировку в SQL", "Составить первый учебный запрос к отчёту"]}
+  ],
+  "requests": [
+    {"id": "REQ-1001", "intern_id": "intern-ivan", "resource_id": "bitbucket-delivery", "level": "read", "justification": "Нужно изучить учебный маршрут доставки", "status": "pending_approval", "created_day": 5},
+    {"id": "REQ-1002", "intern_id": "intern-ivan", "resource_id": "jira", "level": "read", "justification": "Нужен учебный трекер", "status": "granted", "created_day": 1},
+    {"id": "REQ-1003", "intern_id": "intern-ivan", "resource_id": "confluence", "level": "read", "justification": "Нужна учебная база знаний", "status": "granted", "created_day": 1}
+  ]
+}
