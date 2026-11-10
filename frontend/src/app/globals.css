@@ -23,3 +23,19 @@ body {
   color: var(--foreground);
   font-family: "Inter Variable", Arial, sans-serif;
 }
+
+/* better-ui: нажатие кнопки — scale 0.96 за 150 мс, только если пользователь не просил меньше анимаций.
+   Вкладки «План / Чат» — частое действие, без анимации. */
+@layer base {
+  button {
+    -webkit-tap-highlight-color: transparent;
+    transition-property: scale, background-color, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    button:not(:disabled):not([role="tab"]):active {
+      scale: 0.96;
+    }
+  }
+}

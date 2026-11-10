@@ -18,7 +18,8 @@ export function ChatPanel({ actor, onAction }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    bottomRef.current?.scrollIntoView?.({ behavior: calm ? "auto" : "smooth" });
   }, [messages, busy]);
 
   async function ask(text: string) {
@@ -52,7 +53,7 @@ export function ChatPanel({ actor, onAction }: Props) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" aria-live="polite">
         {messages.map((m) => (
           <Bubble key={m.id} m={m} actor={actor} onAction={onAction} onAsk={ask} update={update} />
         ))}
