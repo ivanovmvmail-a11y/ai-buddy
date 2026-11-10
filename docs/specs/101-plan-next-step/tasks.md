@@ -11,7 +11,7 @@
 | T5 | MCP-обёртка над функциями сервисов (пакет `mcp`) + тест вызова по протоколу | Codex | — (ТЗ: действия через MCP) | |
 
 - [ ] T1 — **реализовано, на ревью [PR #17](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/17)**: `backend/app/mcp_server/` по `plan.md` 3.1–3.4, тесты `backend/tests/mcp/`; чекбокс отмечается после мержа PR по правилу выше.
-- [ ] T2 — Claude: `frontend/`, данные-заглушки повторяют модели `Plan`, `AccessRequest`, `Reminder`.
+- [ ] T2 — Claude: `frontend/`, данные-заглушки повторяют модели `Plan`, `AccessRequest`, `Reminder`. Ветка `claude/plan-screen`.
 - [ ] T3 — Codex: после T1.
 - [ ] T4 — Claude: после T1.
 - [ ] T5 — Codex: после T1, параллельно с T3 не трогает те же файлы.
