@@ -12,6 +12,7 @@ from app.agent.actions import Action
 from app.agent.users import get_user
 from app.config import settings
 from app.llm import Message
+from app.onboarding_api import bp as onboarding_bp
 
 USER_HEADER = "X-User-Id"
 log = logging.getLogger("ai_buddy.api")
@@ -104,6 +105,7 @@ def create_app() -> Flask:
     def cancel_action(action_id: str):
         return _action_json(service.agent.cancel(g.user, action_id))
 
+    app.register_blueprint(onboarding_bp)
     return app
 
 
