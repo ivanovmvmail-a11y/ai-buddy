@@ -50,19 +50,19 @@ def _tick(data: OnboardingData, day: int | None = None, intern_ids: set[str] | N
         created.append(reminder)
         events._record(data, SYSTEM_ACTOR, "reminder_created", {"intern_id": item.intern_id, "reminder_id": reminder.id,
                       "item_id": item.id, "day": current_day})
-    return created
+    return [reminder.model_copy(deep=True) for reminder in created]
 
 
 async def get_day(actor: User, intern_id: str) -> int:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().read() as data:
         intern(data, intern_id)
         return data.interns[intern_id].current_day
 
 
 async def advance_day(actor: User, intern_id: str | None = None) -> dict[str, int]:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         targets = [intern_id] if intern_id is not None else list(data.interns)
         for target in targets:
             intern(data, target)
@@ -80,14 +80,14 @@ async def cron_tick(actor: Actor, day: int | None = None) -> list[Reminder]:
     require_system(actor)
     if day is not None:
         day = positive.validate_python(day)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         return _tick(data, day)
 
 
 async def list_reminders(actor: User) -> list[Reminder]:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
-        return [reminder for reminder in data.reminders.values() if reminder.user_id == actor.id]
+    async with storage.get_store().read() as data:
+        return [reminder.model_copy(deep=True) for reminder in data.reminders.values() if reminder.user_id == actor.id]
 
 
 def _reminder_context(data: OnboardingData, reminder: Reminder) -> dict:
@@ -103,7 +103,7 @@ def _reminder_context(data: OnboardingData, reminder: Reminder) -> dict:
 
 async def snooze_reminder(actor: User, id: str, days: int = 1) -> Reminder:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         reminder = data.reminders.get(id)
         if reminder is None or reminder.user_id != actor.id:
             raise NotFound()
@@ -113,19 +113,19 @@ async def snooze_reminder(actor: User, id: str, days: int = 1) -> Reminder:
         context = _reminder_context(data, reminder)
         reminder.status, reminder.snooze_until_day = "snoozed", context["day"] + days
         events._record(data, actor, "reminder_snoozed", {"reminder_id": id, "days": days, **context})
-        return reminder
+        return reminder.model_copy(deep=True)
 
 
 async def done_reminder(actor: User, id: str) -> Reminder:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         reminder = data.reminders.get(id)
         if reminder is None or reminder.user_id != actor.id:
             raise NotFound()
         if reminder.status != "done":
             reminder.status, reminder.snooze_until_day = "done", None
             events._record(data, actor, "reminder_completed", {"reminder_id": id, **_reminder_context(data, reminder)})
-        return reminder
+        return reminder.model_copy(deep=True)
 
 
 async def reset_demo(actor: User) -> None:
