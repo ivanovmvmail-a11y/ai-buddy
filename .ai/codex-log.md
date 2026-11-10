@@ -10,6 +10,7 @@
 ```
 
 ## 2026-11-10 — RAG: поиск по документам команды (codex/rag-basic)
+- PR: [#12](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/12) → main, без слияния.
 - Сделано: миграция `20261110120000_rag_documents.sql` для чистого PostgreSQL + pgvector (документы, фрагменты vector(1024), RLS без Supabase-ролей); прямой async psycopg по `DATABASE_URL`; интерфейсы Embedder/DocumentStore и поддельные реализации для офлайн-тестов.
 - Сделано: markdown-фрагменты с перекрытием, проверка векторов до записи, атомарная замена по `source_id`; SQL-фильтр `team IS NULL OR team = user.team` до top-k + повторная проверка результатов адаптера; контракт retrieve сохранён.
 - Сделано: 10 синтетических документов (4 общих, по 3 на каждую команду), CLI `cd backend && uv run python -m app.rag.ingest`, инструкция в `backend/app/rag/README.md`, спецификация `docs/specs/002-rag-basic.md`; psycopg и архитектура записаны в DECISIONS, uv.lock обновлён.
