@@ -15,7 +15,9 @@ from functools import cache
 from app.agent.users import User
 from app.config import settings
 
-from .embeddings import DeterministicEmbedder
+from app.llm.embeddings import GigaChatEmbedder, embeddings_provider
+
+from .embeddings import DeterministicEmbedder, Embedder
 from .postgres import PostgresDocumentStore
 from .service import RAGService
 
@@ -24,14 +26,21 @@ log = logging.getLogger("ai_buddy.rag")
 
 @cache
 def get_service() -> RAGService | None:
-    """Точка подключения GigaChat-эмбеддера Claude; до этого — поддельный для демо.
+    """Сервис поиска: эмбеддер по настройкам (см. make_embedder) + PostgreSQL.
 
     Один сервис на процесс. Пул открывается лениво при первом SQL-запросе
     на общем event loop проекта, а не при импорте/создании приложения Flask.
     """
     if not settings.database_url:
         return None
-    return RAGService(DeterministicEmbedder(), PostgresDocumentStore(settings.database_url))
+    return RAGService(make_embedder(), PostgresDocumentStore(settings.database_url))
+
+
+def make_embedder() -> Embedder:
+    """GigaChat — если EMBEDDINGS_PROVIDER=gigachat, иначе поддельный (по словам, без ключей)."""
+    if embeddings_provider() == "gigachat":
+        return GigaChatEmbedder()
+    return DeterministicEmbedder()
 
 
 async def retrieve(query: str, user: User, k: int = 4) -> list[dict]:

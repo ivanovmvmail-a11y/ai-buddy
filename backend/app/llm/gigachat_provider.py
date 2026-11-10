@@ -38,25 +38,30 @@ def to_gigachat_functions(tools: list[ToolSpec]) -> list[dict]:
     return [{"name": t.name, "description": t.description, "parameters": t.parameters} for t in tools]
 
 
+def make_client() -> GigaChat:
+    """Клиент GigaChat из настроек: для чата и эмбеддингов (одни ключ и сертификат)."""
+    if not settings.gigachat_credentials:
+        raise RuntimeError("GIGACHAT_CREDENTIALS не задан в backend/.env")
+    kwargs: dict = {
+        "credentials": settings.gigachat_credentials,
+        "scope": settings.gigachat_scope,
+        "model": settings.gigachat_model,
+        "timeout": 60,
+    }
+    ca_file = settings.gigachat_ca_bundle_file or (str(DEFAULT_CA_FILE) if DEFAULT_CA_FILE.exists() else "")
+    if ca_file:
+        # с сертификатом проверка SSL всегда включена, GIGACHAT_VERIFY_SSL игнорируется
+        kwargs["ca_bundle_file"] = ca_file
+    else:
+        kwargs["verify_ssl_certs"] = settings.gigachat_verify_ssl
+    return GigaChat(**kwargs)
+
+
 class GigaChatProvider:
     name = "gigachat"
 
     def __init__(self) -> None:
-        if not settings.gigachat_credentials:
-            raise RuntimeError("GIGACHAT_CREDENTIALS не задан в backend/.env")
-        kwargs: dict = {
-            "credentials": settings.gigachat_credentials,
-            "scope": settings.gigachat_scope,
-            "model": settings.gigachat_model,
-            "timeout": 60,
-        }
-        ca_file = settings.gigachat_ca_bundle_file or (str(DEFAULT_CA_FILE) if DEFAULT_CA_FILE.exists() else "")
-        if ca_file:
-            # с сертификатом проверка SSL всегда включена, GIGACHAT_VERIFY_SSL игнорируется
-            kwargs["ca_bundle_file"] = ca_file
-        else:
-            kwargs["verify_ssl_certs"] = settings.gigachat_verify_ssl
-        self._client = GigaChat(**kwargs)
+        self._client = make_client()
 
     async def chat(self, messages: list[Message], tools: list[ToolSpec] | None = None) -> LLMReply:
         payload: dict = {"messages": to_gigachat_messages(messages)}

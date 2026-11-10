@@ -30,4 +30,6 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
 
 # 1 процесс (общий event loop для LLM-клиентов, см. app/async_runner.py) + потоки для параллельных запросов
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "8", "--timeout", "180", "app.main:app"]
+# Перед стартом загружаем демо-документы для поиска (повторная загрузка заменяет старые версии).
+# Если загрузка не удалась (например, нет доступа к GigaChat), сервер всё равно стартует — просто без документов.
+CMD ["sh", "-c", "python -m app.rag.ingest || echo 'WARNING: demo documents were not loaded'; exec gunicorn --bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 180 app.main:app"]
