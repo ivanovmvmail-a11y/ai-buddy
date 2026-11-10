@@ -1,6 +1,6 @@
 # Автопроверка каждого PR и каждого коммита в main:
 #   backend  — тесты + отчёт о покрытии (артефакт coverage-backend)
-#   frontend — линтер + сборка
+#   frontend — линтер, тесты с покрытием (порог 80% строк), сборка
 #   docker   — `docker compose up` на чистой машине, как у экспертов, и проверка, что всё отвечает
 name: CI
 
@@ -42,7 +42,7 @@ jobs:
             backend/htmlcov/
 
   frontend:
-    name: Frontend — линтер и сборка
+    name: Frontend — линтер, тесты и сборка
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -56,6 +56,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - name: Тесты с покрытием (Vitest, порог 80% строк)
+        run: npm run test:cov
       - run: npm run build
 
   docker:
