@@ -12,6 +12,7 @@
 | 6 | Инструменты агента: права + черновик→подтверждение [API] | Claude | claude/agent-tools | готово | #9 | |
 | 7 | Шаблон SDD-спецификаций + 001-agent-tools | Claude | claude/sdd-template | готово | #10 | |
 | 8 | Страховочные правки по отзыву жюри [API] | Claude | claude/safety-fixes | на ревью | | |
+| 9 | RAG: загрузка документов и поиск с изоляцией команд | Codex | codex/rag-basic | на ревью | [#12](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/12) | Пункты 1–7 ревью исправлены; 117 офлайн + 4 PostgreSQL-теста, покрытие 98,97% |
 
 ## Блокеры
 _нет_
