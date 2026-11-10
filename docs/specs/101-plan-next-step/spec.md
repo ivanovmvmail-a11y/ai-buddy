@@ -86,7 +86,20 @@
 ## 9. Трассировка
 | Критерий | Автотест |
 |---|---|
-| AC-1…AC-11 | `backend/tests/mcp/test_checklist.py` (Codex, T1) · AC-1, AC-6 в интерфейсе — `frontend` Vitest (Claude, T4) |
+| AC-1 | `backend/tests/mcp/test_checklist.py::test_ac1_working_items_and_inert_outlines` |
+| AC-2 | `backend/tests/mcp/test_checklist.py::test_ac2_common_skeleton_and_team_items` |
+| AC-3 | `backend/tests/mcp/test_checklist.py::test_ac3_overdue_is_next_and_computed` |
+| AC-4 | `backend/tests/mcp/test_checklist.py::test_ac4_only_waiting_means_no_own_step` |
+| AC-5 (изменение и чтение в T1) | `backend/tests/mcp/test_checklist.py::test_ac5_status_survives_service_calls_in_same_store`; сохранение после перезапуска — T3, в T1 не заявляется |
+| AC-6 | `backend/tests/mcp/test_checklist.py::test_ac6_intern_cannot_change_other_owner_or_service` |
+| AC-7 | `backend/tests/mcp/test_checklist.py::test_ac7_mentor_returns_with_visible_reason`, `test_ac7_mentor_return_requires_reason` |
+| AC-8 | `backend/tests/mcp/test_checklist.py::test_ac8_foreign_plan_looks_missing`, `backend/tests/mcp/test_permissions.py::test_plan_and_summary_read_matrix` |
+| AC-9 | `backend/tests/mcp/test_checklist.py::test_ac9_curator_read_only` |
+| AC-10 | `backend/tests/mcp/test_checklist.py::test_ac10_ladder_progress_and_remaining_count` |
+| AC-11 | `backend/tests/mcp/test_checklist.py::test_ac11_advance_and_reset_restore_initial_states` |
+
+Полная таблица прав 3.2 проверяется в `backend/tests/mcp/test_permissions.py` для всех восьми DEMO_USERS.
+Сквозные AC-1/AC-6 в интерфейсе и HTTP — T4 (Claude); статус всей спецификации пока не меняется.
 
 ## 10. Открытые вопросы
 - Финальные формулировки пунктов и практических заданий — люди команды правят тексты в seed-файле после T1.
