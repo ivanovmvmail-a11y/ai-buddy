@@ -5,7 +5,7 @@
 | # | Задача | Владелец | Ветка | Статус | PR | Заметки |
 |---|---|---|---|---|---|---|
 | 1 | Каркас проекта (backend + frontend + правила) | Claude | main (init) | готово | — | стартовый коммит |
-| 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | на ревью | | интервью проведено 10.11; один глубокий сценарий «Первые недели и чек-лист» + профиль стажёра |
+| 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | готово | #14 | интервью проведено 10.11; один глубокий сценарий «Первые недели и чек-лист» + профиль стажёра |
 | 3 | Деплой Vercel + Render + UptimeRobot (бонус к Docker) | Claude + Миша | claude/deploy | todo | | проверить GigaChat с Render |
 | 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | готово | #7 | по ТЗ: стек Авито Go / Python+Flask |
 | 5 | Docker: запуск одной командой | Claude | claude/docker | готово | #8 | Docker и тесты проверяет CI на GitHub (локально нет SVM в BIOS) |
@@ -14,6 +14,9 @@
 | 8 | Страховочные правки по отзыву жюри [API] | Claude | claude/safety-fixes | готово | #11 | |
 | 9 | RAG: загрузка документов и поиск с изоляцией команд | Codex | codex/rag-basic | готово | [#12](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/12) | Пункты 1–7 ревью исправлены; 117 офлайн + 4 PostgreSQL-теста, покрытие 98,97% |
 | 10 | Эмбеддер GigaChat (по выбору) + Windows-цикл + авто-загрузка документов в Docker; миграция RAG в Supabase | Claude | claude/gigachat-embeddings | готово | #13 | эмбеддинги GigaChat на бесплатном тарифе — 402, по умолчанию поиск по словам |
+| 11 | Спека 101 (план, статусы, следующий шаг) + контракт имитаций сервисов для Codex | Claude | claude/spec-101-plan | на ревью | | задачи T1–T5 в docs/specs/101-plan-next-step/tasks.md |
+| 12 | 101-T1: имитации сервисов (чек-лист, доступы, найм, часы, события) в памяти + seed + тесты | Codex | codex/mcp-services | todo | | ждёт мержа спеки 101 |
+| 13 | 101-T2: макет экрана «план + чат» на тестовых данных | Claude | claude/plan-screen | todo | | к чекпоинту 1 |
 
 ## Блокеры
 _нет_
