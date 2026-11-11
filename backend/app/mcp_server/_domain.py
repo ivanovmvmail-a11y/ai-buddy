@@ -60,6 +60,7 @@ def item_view(data: OnboardingData, item: PlanItem, day: int | None = None) -> P
     current_day = state.current_day if day is None else day
     updated_day = (item.updated_at.astimezone(timezone.utc).date() - state.start_date).days + 1
     return item.model_copy(update={
+        "skill_level": data.profiles[item.intern_id].skills.get(item.topic) if item.intern_id in data.profiles else None,
         "overdue": item.status != "done" and item.due_day is not None and current_day > item.due_day,
         "waiting_days": max(0, current_day - updated_day) if item.status == "waiting" else None,
     }, deep=True)

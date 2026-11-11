@@ -22,7 +22,7 @@ from app.mcp_server.errors import Conflict
 from app.mcp_server.models import Event, OnboardingData
 from app.mcp_server.postgres import PostgresStore, TABLES
 from app.mcp_server.seed import load_seed
-from .conftest import MIGRATION
+from .conftest import apply_onboarding_migrations, MIGRATION
 
 run = async_runner.run
 ANYA = DEMO_USERS["intern-anya"]
@@ -158,15 +158,15 @@ a = DEMO_USERS['intern-anya']
 p = run(checklist.get_plan(a, a.id))
 print(json.dumps({'day': p.current_day, 'notes': next(i.status for i in p.items if i.id == 'anya.w1.notes'),
  'git': run(hiring.get_skill_profile(a, a.id)).skills['git'],
- 'requests': len(run(access.list_requests(a))), 'reminders': len(run(clock.list_reminders(a)))}))
+ 'requests': len(run(access.list_requests(a))), 'reminders': sorted(r.kind for r in run(clock.list_reminders(a)))}))
 run(storage.get_store().close())
 """
     persisted = json.loads(child(dsn, inspect_code))
-    # Два напоминания: незапрошенный базовый доступ и ожидание пространства команды.
-    assert persisted == {"day": 4, "notes": "done", "git": "familiar", "requests": 1, "reminders": 2}
+    # Два прежних напоминания и уведомление о смене навыка сохраняются после перезапуска.
+    assert persisted == {"day": 4, "notes": "done", "git": "familiar", "requests": 1, "reminders": ["access_request", "plan_item", "skill_changed"]}
     child(dsn, None, "--reset")
     restored = json.loads(child(dsn, inspect_code))
-    assert restored == {"day": 2, "notes": "not_started", "git": "novice", "requests": 0, "reminders": 0}
+    assert restored == {"day": 2, "notes": "not_started", "git": "novice", "requests": 0, "reminders": []}
 
 
 def test_two_pools_serialize_seed_and_duplicate_requests(onboarding_dsn):
@@ -259,7 +259,7 @@ def test_migration_on_clean_postgres_closes_default_public_grants(onboarding_dsn
                     owner.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated")
                 owner.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO PUBLIC")
                 owner.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO PUBLIC")
-                owner.execute(MIGRATION.read_text(encoding="utf-8"))
+                apply_onboarding_migrations(owner)
                 owner.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(reader)))
                 for _, table, *_ in TABLES:
                     owner.execute(sql.SQL("GRANT SELECT ON {} TO {}").format(sql.Identifier("public", table), sql.Identifier(reader)))
