@@ -1,4 +1,6 @@
 """Публичные модели по plan.md §3.1 и снимок состояния для хранилища T1."""
+from .self_check_models import SelfCheckResult
+
 from datetime import date, datetime
 from typing import Literal
 
@@ -146,6 +148,7 @@ class OnboardingData(Model):
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
+    self_check_attempts: dict[str, SelfCheckResult] = Field(default_factory=dict)
     profiles: dict[str, SkillProfile] = Field(default_factory=dict)
     reminders: dict[str, Reminder] = Field(default_factory=dict)
     drafts: dict[str, ActionDraft] = Field(default_factory=dict)

@@ -1,4 +1,8 @@
 """MCP/stdio: один пользователь на процесс, права проверяют сервисы онбординга."""
+from . import drafts, self_check
+from .self_check_models import Index, Question, SelfCheckResult, Topic
+from .models import ActionDraft
+
 import argparse
 import logging
 import os
@@ -73,6 +77,31 @@ def create_server(user_id: str) -> FastMCP:
     async def decide_request(request_id: str, approve: StrictBool, reason: str | None = None) -> AccessRequest:
         """Наставник одобряет свою pending-заявку или отклоняет с причиной."""
         return await call(access.decide_request, request_id, approve, reason)
+
+    @server.tool(annotations=READ)
+    async def self_check_questions(topic: Topic) -> list[Question]:
+        """Два-три учебных вопроса по теме для своей команды, без ключа ответов."""
+        return await call(drafts.invoke_by_id, self_check.get_questions, topic)
+
+    @server.tool(annotations=CREATE)
+    async def self_check_draft_answers(topic: Topic, answers: dict[str, Index]) -> ActionDraft:
+        """Подготовить личную самопроверку; сохранение результата после подтверждения человеком в UI."""
+        return await call(drafts.invoke_by_id, self_check.draft_answers, topic, answers)
+
+    @server.tool(annotations=READ)
+    async def self_check_get_result(result_id: str) -> SelfCheckResult:
+        """Только собственный разбор со ссылками на документы; чужие результаты скрыты."""
+        return await call(drafts.invoke_by_id, self_check.get_result, result_id)
+
+    @server.tool(annotations=READ)
+    async def self_check_list_results() -> list[SelfCheckResult]:
+        """История своих самопроверок. Не меняет карту навыков."""
+        return await call(drafts.invoke_by_id, self_check.list_results)
+
+    @server.tool(annotations=READ)
+    async def self_check_get_draft(draft_id: str) -> ActionDraft:
+        """Прочитать только свой черновик ответов."""
+        return await call(drafts.invoke_by_id, drafts.get_draft, draft_id)
 
     @server.tool(annotations=READ)
     async def get_skill_profile(intern_id: str) -> SkillProfile:

@@ -1,5 +1,6 @@
 """Прямой PostgreSQL: один ленивый async-пул и атомарный unit of work."""
 from contextlib import asynccontextmanager
+from .self_check_models import SelfCheckResult
 
 from psycopg import sql
 from psycopg.types.json import Jsonb
@@ -13,12 +14,13 @@ TABLES = (
     ("drafts", "service_drafts", ActionDraft, "id"),
     ("interns", "intern_state", InternState, "intern_id"),
     ("resources", "access_resources", AccessResource, "id"),
+    ("self_check_attempts", "self_check_attempts", SelfCheckResult, "id"),
     ("items", "plan_items", PlanItem, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
     ("reminders", "reminders", Reminder, "id"),
 )
-JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload"}
+JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload", "review"}
 DERIVED_FIELDS = {"overdue", "waiting_days"}
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
 

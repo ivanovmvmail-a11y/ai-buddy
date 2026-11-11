@@ -1,0 +1,185 @@
+{
+  "notice": "демо-данные, не регламент Авито",
+  "questions": [
+    {
+      "id": "platform.git.diff",
+      "team": "Платформа объявлений",
+      "topic": "git",
+      "prompt": "Платформа объявлений: Что посмотреть перед коммитом учебного изменения?",
+      "options": [
+        "Разницу файлов (git diff)",
+        "Список отпусков",
+        "Чужие пароли"
+      ],
+      "correct_index": 0,
+      "explanation": "git diff показывает изменения; проверьте, что коммит решает одну учебную задачу.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "platform.git.branch",
+      "team": "Платформа объявлений",
+      "topic": "git",
+      "prompt": "Платформа объявлений: Где подготовить отдельную учебную задачу?",
+      "options": [
+        "Прямо в общей main",
+        "В отдельной ветке Git",
+        "В чужой заявке"
+      ],
+      "correct_index": 1,
+      "explanation": "Отдельная ветка изолирует задачу до ревью и слияния.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "platform.sql.where",
+      "team": "Платформа объявлений",
+      "topic": "sql",
+      "prompt": "Платформа объявлений: Чем отфильтровать строки до группировки?",
+      "options": [
+        "ORDER BY",
+        "HAVING",
+        "WHERE"
+      ],
+      "correct_index": 2,
+      "explanation": "WHERE отбирает исходные строки; HAVING проверяет уже созданные группы.",
+      "source_id": "demo:03-glossary.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/03-glossary.md"
+    },
+    {
+      "id": "platform.sql.count",
+      "team": "Платформа объявлений",
+      "topic": "sql",
+      "prompt": "Платформа объявлений: Как посчитать все строки, включая строки с NULL в колонке?",
+      "options": [
+        "COUNT(*)",
+        "COUNT(колонка)",
+        "SUM(колонка)"
+      ],
+      "correct_index": 0,
+      "explanation": "COUNT(*) считает строки; COUNT(колонка) пропускает NULL в выбранной колонке.",
+      "source_id": "demo:03-glossary.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/03-glossary.md"
+    },
+    {
+      "id": "platform.ci.pipeline",
+      "team": "Платформа объявлений",
+      "topic": "ci",
+      "prompt": "Платформа объявлений: Что делает учебный CI после изменения кода?",
+      "options": [
+        "Всегда одобряет ревью",
+        "Автоматически запускает сборку и тесты",
+        "Ставит уровень навыка"
+      ],
+      "correct_index": 1,
+      "explanation": "CI автоматически проверяет сборку и тесты; уровень навыка ставит только наставник.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "platform.ci.failure",
+      "team": "Платформа объявлений",
+      "topic": "ci",
+      "prompt": "Платформа объявлений: Что сделать при красной проверке CI?",
+      "options": [
+        "Игнорировать",
+        "Сразу слить PR",
+        "Прочитать лог и устранить причину"
+      ],
+      "correct_index": 2,
+      "explanation": "Красная проверка требует разбора лога и исправления причины перед слиянием.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "delivery.git.diff",
+      "team": "Авито Доставка",
+      "topic": "git",
+      "prompt": "Авито Доставка: Что посмотреть перед коммитом учебного изменения?",
+      "options": [
+        "Разницу файлов (git diff)",
+        "Список отпусков",
+        "Чужие пароли"
+      ],
+      "correct_index": 0,
+      "explanation": "git diff показывает изменения; проверьте, что коммит решает одну учебную задачу.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "delivery.git.branch",
+      "team": "Авито Доставка",
+      "topic": "git",
+      "prompt": "Авито Доставка: Где подготовить отдельную учебную задачу?",
+      "options": [
+        "Прямо в общей main",
+        "В отдельной ветке Git",
+        "В чужой заявке"
+      ],
+      "correct_index": 1,
+      "explanation": "Отдельная ветка изолирует задачу до ревью и слияния.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "delivery.sql.where",
+      "team": "Авито Доставка",
+      "topic": "sql",
+      "prompt": "Авито Доставка: Чем отфильтровать строки до группировки?",
+      "options": [
+        "ORDER BY",
+        "HAVING",
+        "WHERE"
+      ],
+      "correct_index": 2,
+      "explanation": "WHERE отбирает исходные строки; HAVING проверяет уже созданные группы.",
+      "source_id": "demo:03-glossary.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/03-glossary.md"
+    },
+    {
+      "id": "delivery.sql.count",
+      "team": "Авито Доставка",
+      "topic": "sql",
+      "prompt": "Авито Доставка: Как посчитать все строки, включая строки с NULL в колонке?",
+      "options": [
+        "COUNT(*)",
+        "COUNT(колонка)",
+        "SUM(колонка)"
+      ],
+      "correct_index": 0,
+      "explanation": "COUNT(*) считает строки; COUNT(колонка) пропускает NULL в выбранной колонке.",
+      "source_id": "demo:03-glossary.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/03-glossary.md"
+    },
+    {
+      "id": "delivery.ci.pipeline",
+      "team": "Авито Доставка",
+      "topic": "ci",
+      "prompt": "Авито Доставка: Что делает учебный CI после изменения кода?",
+      "options": [
+        "Всегда одобряет ревью",
+        "Автоматически запускает сборку и тесты",
+        "Ставит уровень навыка"
+      ],
+      "correct_index": 1,
+      "explanation": "CI автоматически проверяет сборку и тесты; уровень навыка ставит только наставник.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    },
+    {
+      "id": "delivery.ci.failure",
+      "team": "Авито Доставка",
+      "topic": "ci",
+      "prompt": "Авито Доставка: Что сделать при красной проверке CI?",
+      "options": [
+        "Игнорировать",
+        "Сразу слить PR",
+        "Прочитать лог и устранить причину"
+      ],
+      "correct_index": 2,
+      "explanation": "Красная проверка требует разбора лога и исправления причины перед слиянием.",
+      "source_id": "demo:02-code-review.md",
+      "source_url": "https://github.com/ivanovmvmail-a11y/ai-buddy/blob/main/backend/app/rag/demo_docs/02-code-review.md"
+    }
+  ]
+}
