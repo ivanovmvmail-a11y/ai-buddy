@@ -23,6 +23,7 @@ export type DemoUser = {
   role: Role;
   team: string;
   mentor_id?: string | null;
+  lead_id?: string | null; // руководитель — решает заявки на отгул (SPEC 3.8)
 };
 
 export const PlanItem = z.object({
@@ -225,3 +226,21 @@ export const PlanCompare = z.object({
   personal: z.record(z.string(), z.array(PlanItem)),
 });
 export type PlanCompare = z.infer<typeof PlanCompare>;
+
+// SPEC 3.8 (11.11): отгул на один день. Причина — закрытый список, без медицинских подробностей.
+export const AbsenceRequest = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  intern_name: z.string(),
+  lead_id: z.string(),
+  day: z.string(),
+  reason: z.enum(["personal", "family", "study"]),
+  reason_title: z.string(),
+  status: z.enum(["pending", "approved", "rejected"]),
+  created_day: z.number(),
+  decided_day: z.number().nullable().optional(),
+});
+export type AbsenceRequest = z.infer<typeof AbsenceRequest>;
+export const AbsenceRequestsResponse = z.object({ requests: z.array(AbsenceRequest) });
+/** Наставнику — только факт «отсутствует <дата>», без причины и номера заявки. */
+export const AbsenceFactsResponse = z.object({ facts: z.array(z.object({ intern_id: z.string(), day: z.string() })) });

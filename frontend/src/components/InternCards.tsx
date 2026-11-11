@@ -11,6 +11,7 @@ import { useSession } from "@/lib/store";
 import { findUser } from "@/lib/users";
 import type { DemoUser, Metrics, SkillLevel, SkillProfile } from "@/lib/types";
 import { LEVELS, TOPIC_TITLES } from "@/lib/skills";
+import { AbsenceFacts } from "./AbsencePanel";
 
 type Intern = { id: string; name: string; team: string };
 
@@ -93,6 +94,8 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
           </div>
         </>
       )}
+
+      {actor.role === "mentor" && <AbsenceFacts actor={actor} internId={intern.id} />}
 
       <TopicsLine actor={actor} internId={intern.id} />
 

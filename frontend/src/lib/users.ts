@@ -3,8 +3,8 @@
 import type { DemoUser, Role } from "./types";
 
 export const DEMO_USERS: DemoUser[] = [
-  { id: "intern-anya", name: "Аня Смирнова", role: "intern", team: "Платформа объявлений", mentor_id: "mentor-petr" },
-  { id: "intern-ivan", name: "Иван Кузнецов", role: "intern", team: "Авито Доставка", mentor_id: "mentor-maria" },
+  { id: "intern-anya", name: "Аня Смирнова", role: "intern", team: "Платформа объявлений", mentor_id: "mentor-petr", lead_id: "lead-olga" },
+  { id: "intern-ivan", name: "Иван Кузнецов", role: "intern", team: "Авито Доставка", mentor_id: "mentor-maria", lead_id: "lead-sergey" },
   { id: "mentor-petr", name: "Пётр Волков", role: "mentor", team: "Платформа объявлений" },
   { id: "mentor-maria", name: "Мария Орлова", role: "mentor", team: "Авито Доставка" },
   { id: "lead-olga", name: "Ольга Новикова", role: "lead", team: "Платформа объявлений" },
