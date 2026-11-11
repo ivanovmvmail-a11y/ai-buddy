@@ -90,7 +90,7 @@
 | AC-2 | `backend/tests/mcp/test_checklist.py::test_ac2_common_skeleton_and_team_items` |
 | AC-3 | `backend/tests/mcp/test_checklist.py::test_ac3_overdue_is_next_and_computed` |
 | AC-4 | `backend/tests/mcp/test_checklist.py::test_ac4_only_waiting_means_no_own_step` |
-| AC-5 (изменение и чтение в T1) | `backend/tests/mcp/test_checklist.py::test_ac5_status_survives_service_calls_in_same_store`; сохранение после перезапуска — T3, в T1 не заявляется |
+| AC-5 | `backend/tests/mcp/test_checklist.py::test_ac5_status_survives_service_calls_in_same_store`; `backend/tests/mcp/test_postgres_store.py::test_ac5_state_survives_process_restart_and_cli_reset_targets_database` — запись, чтение и reset в разных Python-процессах, PostgreSQL (`--mcp-postgres`) |
 | AC-6 | `backend/tests/mcp/test_checklist.py::test_ac6_intern_cannot_change_other_owner_or_service` |
 | AC-7 | `backend/tests/mcp/test_checklist.py::test_ac7_mentor_returns_with_visible_reason`, `test_ac7_mentor_return_requires_reason` |
 | AC-8 | `backend/tests/mcp/test_checklist.py::test_ac8_foreign_plan_looks_missing`, `backend/tests/mcp/test_permissions.py::test_plan_and_summary_read_matrix` |
@@ -99,6 +99,8 @@
 | AC-11 | `backend/tests/mcp/test_checklist.py::test_ac11_advance_and_reset_restore_initial_states` |
 
 Полная таблица прав 3.2 проверяется в `backend/tests/mcp/test_permissions.py` для всех восьми DEMO_USERS.
+Общий набор `backend/tests/mcp/` запускается на памяти и PostgreSQL с флагом `--mcp-postgres`.
+Оптимизация чтения/журнала и изоляция результатов проверяются в `test_postgres_store.py`.
 Сквозные AC-1/AC-6 в интерфейсе и HTTP — T4 (Claude); статус всей спецификации пока не меняется.
 
 ## 10. Открытые вопросы

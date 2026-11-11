@@ -58,7 +58,7 @@ def timestamp(data: OnboardingData, intern_id: str, day: int | None = None) -> d
 def item_view(data: OnboardingData, item: PlanItem, day: int | None = None) -> PlanItem:
     state = data.interns[item.intern_id]
     current_day = state.current_day if day is None else day
-    updated_day = (item.updated_at.date() - state.start_date).days + 1
+    updated_day = (item.updated_at.astimezone(timezone.utc).date() - state.start_date).days + 1
     return item.model_copy(update={
         "overdue": item.status != "done" and item.due_day is not None and current_day > item.due_day,
         "waiting_days": max(0, current_day - updated_day) if item.status == "waiting" else None,
