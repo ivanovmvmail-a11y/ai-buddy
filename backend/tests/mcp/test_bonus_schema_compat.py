@@ -42,11 +42,7 @@ def test_old_schema_stays_in_postgres_and_recovers_after_live_migration(onboardi
             run(clock.advance_day(DEMO_USERS['intern-anya'],'intern-anya'))
             filtered = run(demo.seed_for_schema(load_seed()))
             assert not filtered.drafts
-            async def reset_core():
-                async with demo.transaction() as data:
-                    for field in type(data).model_fields:
-                        setattr(data, field, getattr(filtered, field))
-            run(reset_core())
+            run(clock.reset_demo(DEMO_USERS['intern-anya']))
             run(checklist.set_item_status(DEMO_USERS['intern-anya'],'anya.w1.notes','done'))
             run(clock.advance_day(DEMO_USERS['intern-anya'],'intern-anya'))
             async def prepare():
