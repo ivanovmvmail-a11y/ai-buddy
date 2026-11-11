@@ -139,7 +139,7 @@ function Ladder({ ladder }: { ladder: StageInfo[] }) {
   );
 }
 
-const HINT: Partial<Record<SkillLevel, string>> = { novice: "здесь помогу подробно", confident: "ты это знаешь" };
+const HINT: Partial<Record<SkillLevel, string>> = { novice: "здесь помогу подробно" };
 
 function PlanRow({
   item, actor, isNext, level, onExplain, onDo,
@@ -148,7 +148,13 @@ function PlanRow({
   const mark = useMutation({ mutationFn: () => api.setStatus(actor.id, item.id, "done"), onSuccess: refresh });
   const working = isWorking(item.stage);
   const st = STATUS[item.status];
-  const hint = level && actor.id === item.intern_id ? HINT[level] : undefined;
+  const self = actor.id === item.intern_id;
+  // Карту навыков видят только сам стажёр и наставник (SPEC 7) — от неё зависят «почему» и «коротко».
+  const seesSkills = self || actor.role === "mentor";
+  const lvl = item.skill_level ?? level;
+  const hint = lvl && self ? HINT[lvl] : undefined;
+  const personal = item.kind === "personal";
+  const short = seesSkills && !personal && lvl === "confident";
 
   return (
     <li
@@ -164,6 +170,20 @@ function PlanRow({
       <div className="text-[15px] font-medium leading-snug">{item.title}</div>
       {working && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+          <span
+            className={`rounded-full px-2 py-0.5 ${
+              personal
+                ? "bg-violet-500/12 font-medium text-violet-700 dark:text-violet-300"
+                : "border border-black/10 text-black/50 dark:border-white/15 dark:text-white/50"
+            }`}
+          >
+            {personal ? (self ? "для тебя" : "персональный") : "для всех"}
+          </span>
+          {short && (
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
+              {self ? "ты это умеешь — коротко" : "умеет — коротко"}
+            </span>
+          )}
           <span className={`rounded-full px-2 py-0.5 ${st.cls}`}>{st.label}</span>
           {item.overdue && item.status !== "waiting" && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-orange-800 dark:text-orange-300">срок прошёл</span>}
           <span className="text-black/50 dark:text-white/50">
@@ -172,6 +192,9 @@ function PlanRow({
           </span>
           {hint && <span className="text-black/50 dark:text-white/50">· {hint}</span>}
         </div>
+      )}
+      {personal && item.reason && seesSkills && (
+        <p className="mt-1 text-xs text-black/55 dark:text-white/55">Почему: {item.reason}</p>
       )}
       {item.status === "waiting" && item.waiting_for && (
         <p className="mt-1 text-xs text-black/55 dark:text-white/55">
