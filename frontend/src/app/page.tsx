@@ -13,7 +13,7 @@ import {
   type BotAction, type Msg,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
-import { useSession } from "@/lib/store";
+import { savedUserId, useSession } from "@/lib/store";
 import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
 
@@ -85,9 +85,28 @@ export default function Home() {
     }
   }
 
+  /** Прошлая переписка и неподтверждённые черновики — с сервера (SPEC 9, аудит D7). Сбой — начинаем с чистого чата. */
+  async function restoreChat(who: DemoUser) {
+    const [past, drafts] = await Promise.all([
+      api.history(who.id).then((h) => h.messages).catch(() => []),
+      api.actions(who.id).then((a) => a.actions.filter((x) => x.status === "pending")).catch(() => []),
+    ]);
+    if (useSession.getState().userId !== who.id) return;
+    for (const m of past) {
+      say({
+        id: msgId(), role: m.role, kind: "text", content: m.content, scripted: m.scripted || undefined,
+        sources: m.sources.length ? m.sources : undefined, answerId: m.answer_id ?? undefined,
+      });
+    }
+    for (const draft of [...drafts].reverse()) {
+      say({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик ждёт твоего решения.", draft });
+    }
+  }
+
   async function welcome() {
     const who = actor;
     useChat.getState().reset([]);
+    await restoreChat(who);
     const plan = who.role === "intern" ? await loadPlan(who.id) : null;
     let approvals: AccessRequest[] = [];
     if (who.role === "mentor") {
@@ -117,6 +136,12 @@ export default function Home() {
       /* сводка — дополнение к приветствию */
     }
   }
+
+  useEffect(() => {
+    const saved = savedUserId();
+    if (saved && saved !== userId && findUser(saved)) setUser(saved); // вернуться под тем же пользователем
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     void welcome();

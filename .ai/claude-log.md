@@ -222,3 +222,8 @@
 - «Сброс» очищает черновики. Статус `running` в контракте и интерфейсе («Выполняется…»).
 - Тесты: backend 460 (+5 в `tests/test_actions.py`), frontend 58.
 - HANDOFF → Codex: таблица действий, таблица переписки, материалы наставника (audience).
+
+## 2026-11-11 — аудит S6/D7: переписка и вход переживают обновление (claude/chat-history)
+- `app/agent/history.py`: протокол `HistoryStore` (append/list/clear), в памяти; PostgreSQL — `app.db.history.postgres_history_store` от Codex (HANDOFF, п. 2). Пишем вопрос и ответ из `/chat` и сценарные объяснения; `GET /chat/history` — только своя; «Сброс» очищает.
+- Интерфейс: при входе — история, затем неподтверждённые черновики (`GET /actions`), затем приветствие; браузер помнит последнего пользователя (localStorage с защитой от приватного окна).
+- Тесты: backend 464 (`tests/test_history.py`), frontend 60 (в тестах — свой localStorage: Node 24 подменяет jsdom). В браузере: Иван спросил → обновил страницу → тот же Иван и прошлый ответ.

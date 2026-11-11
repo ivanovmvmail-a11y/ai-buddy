@@ -174,3 +174,16 @@ export const Metrics = z.object({
   conflict_topics: z.array(TopicCount).default([]), // документы противоречат друг другу (SPEC 3.7)
 });
 export type Metrics = z.infer<typeof Metrics>;
+
+// GET /chat/history — своя переписка, старые сверху (SPEC 9).
+export const ChatHistory = z.object({
+  messages: z.array(z.object({
+    id: z.string(),
+    role: z.enum(["user", "assistant"]),
+    content: z.string(),
+    sources: z.array(DocSource),
+    answer_id: z.string().nullable(),
+    scripted: z.boolean(),
+  })),
+});
+export const ActionsResponse = z.object({ actions: z.array(Action) });
