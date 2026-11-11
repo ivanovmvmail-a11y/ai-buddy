@@ -174,13 +174,16 @@ class ScenarioProvider:
         # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
         # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
         need = min(2, len(wanted)) or 1
-        best = (0, "", "")
-        for title, content in _docs(system):
+        # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
+        # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
+        best, best_key = (0, "", ""), None
+        for rank, (title, content) in enumerate(_docs(system)):
             for heading, unit in _units(content):
                 score = _overlap(wanted, heading + " " + unit)
-                # при равном совпадении — более содержательный абзац (а не строка глоссария)
-                if (score, len(unit)) > (best[0], len(best[2])):
-                    best = (score, title, unit)
+                definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
+                key = (score, not definition, -rank, len(unit))
+                if best_key is None or key > best_key:
+                    best, best_key = (score, title, unit), key
         if best[0] >= need:
             fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
             return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
