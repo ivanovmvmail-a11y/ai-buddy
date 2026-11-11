@@ -125,3 +125,41 @@ def test_closed_without_human_rules():
     assert not analytics.closed_without_human({"with_source": True, "topic": "hr"})
     assert not analytics.closed_without_human({"tools": ["get_plan"], "refused": True})
     assert not analytics.closed_without_human({"topic": "other"})
+
+
+def _plan_items(client, user):
+    return client.get("/plan", headers=as_user(user)).get_json()["items"]
+
+
+def test_ac5_scripted_explain_is_counted_without_text(scenario):
+    items = _plan_items(scenario, "intern-anya")
+    with_doc = next(i for i in items if i["doc_source_id"])
+    no_doc = next(i for i in items if not i["doc_source_id"])
+    for item in (with_doc, no_doc):
+        resp = scenario.post(f"/plan/items/{item['id']}/explained", headers=as_user("intern-anya"))
+        assert resp.status_code == 201 and resp.get_json()["answer_id"].startswith("ans_")
+    first, second = answered()
+    assert first["with_source"] and not second["with_source"]
+    assert first["tools"] == ["explain_item"] and first["intern_id"] == "intern-anya"
+    assert with_doc["title"] not in str(first)  # название пункта не сохраняется, только тема
+    assert analytics.closed_without_human(first) and analytics.closed_without_human(second)
+    answer_id = resp.get_json()["answer_id"]
+    assert scenario.post("/feedback", json={"answer_id": answer_id, "useful": True},
+                         headers=as_user("intern-anya")).status_code == 204
+    metrics = scenario.get("/metrics", headers=as_user("mentor-petr")).get_json()
+    assert metrics["questions"] == 2 and metrics["with_source_share"] == 0.5 and metrics["closed_without_human"] == 2
+
+
+def test_ac5_scripted_explain_foreign_or_missing_item_is_404(scenario):
+    anya_item = _plan_items(scenario, "intern-anya")[0]["id"]
+    assert scenario.post(f"/plan/items/{anya_item}/explained", headers=as_user("intern-ivan")).status_code == 404
+    assert scenario.post("/plan/items/nope/explained", headers=as_user("intern-anya")).status_code == 404
+    assert answered() == []
+
+
+def test_ac5_mentor_explain_is_not_an_intern_question(scenario):
+    anya_item = _plan_items(scenario, "intern-anya")[0]["id"]
+    resp = scenario.post(f"/plan/items/{anya_item}/explained?intern_id=intern-anya", headers=as_user("mentor-petr"))
+    assert resp.status_code == 201
+    [p] = answered()
+    assert "intern_id" not in p  # вопросы наставника в метрики стажёров не попадают

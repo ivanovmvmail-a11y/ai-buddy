@@ -132,6 +132,7 @@ export const ChatResponse = z.object({
 });
 export type ChatResponse = z.infer<typeof ChatResponse>;
 
+export const ExplainedResponse = z.object({ answer_id: z.string() }); // сценарное объяснение записано в события
 export const Health = z.object({ status: z.string(), llm_provider: z.string() });
 export const InternsResponse = z.object({ interns: z.array(z.object({ id: z.string(), name: z.string(), team: z.string() })) });
 export const RequestsResponse = z.object({ requests: z.array(AccessRequest) });

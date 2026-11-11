@@ -69,6 +69,12 @@ async def record_answer(user: User, *, answer_id: str, question: str, reply: str
         log.exception("question_answered not recorded user=%s", user.id)
 
 
+async def record_explained(user: User, *, answer_id: str, title: str, with_source: bool, latency_ms: int) -> None:
+    """Сценарный режим: объяснение пункта собрано из данных плана без модели — событие как у /chat."""
+    await record_answer(user, answer_id=answer_id, question=title, reply="", sources=int(with_source),
+                        tools=["explain_item"], refused=False, drafts=0, latency_ms=latency_ms)
+
+
 async def record_feedback(user: User, answer_id: str, useful: bool) -> None:
     answered = await events.list_events(SYSTEM_ACTOR, type="question_answered")
     if not any(e.payload.get("answer_id") == answer_id and e.payload.get("user_id") == user.id for e in answered):
