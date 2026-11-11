@@ -5,11 +5,12 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
-from .models import (AccessRequest, AccessResource, Event, InternState, OnboardingData,
+from .models import (AccessRequest, AccessResource, ActionDraft, Event, InternState, OnboardingData,
                      PlanItem, Reminder, SkillProfile)
 
 # Порядок соответствует внешним ключам; SQL-имена определены кодом, не вводом пользователя.
 TABLES = (
+    ("drafts", "service_drafts", ActionDraft, "id"),
     ("interns", "intern_state", InternState, "intern_id"),
     ("resources", "access_resources", AccessResource, "id"),
     ("items", "plan_items", PlanItem, "id"),

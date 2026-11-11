@@ -132,6 +132,15 @@ class Event(Model):
     payload: dict[str, JsonValue]
 
 
+class ActionDraft(Model):
+    id: str
+    owner_id: str
+    action: str
+    payload: dict[str, JsonValue]
+    status: Literal["pending", "confirmed", "cancelled"] = "pending"
+    result_id: str | None = None
+
+
 class OnboardingData(Model):
     interns: dict[str, InternState] = Field(default_factory=dict)
     items: dict[str, PlanItem] = Field(default_factory=dict)
@@ -139,4 +148,5 @@ class OnboardingData(Model):
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
     profiles: dict[str, SkillProfile] = Field(default_factory=dict)
     reminders: dict[str, Reminder] = Field(default_factory=dict)
+    drafts: dict[str, ActionDraft] = Field(default_factory=dict)
     events: list[Event] = Field(default_factory=list)

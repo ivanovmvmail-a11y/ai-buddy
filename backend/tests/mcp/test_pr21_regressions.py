@@ -21,7 +21,7 @@ from app.mcp_server.models import AccessRequest, Reminder
 from app.mcp_server.postgres import PostgresStore, TABLES
 from app.mcp_server.seed import load_seed
 from app.mcp_server.seed.__main__ import main as seed_main
-from .conftest import MIGRATION, docker_command
+from .conftest import apply_onboarding_migrations, MIGRATION, docker_command
 
 run = async_runner.run
 ANYA = DEMO_USERS['intern-anya']
@@ -204,7 +204,7 @@ def test_first_http_request_bootstraps_empty_tables_or_falls_back_for_existing_v
         with psycopg.connect(dsn, autocommit=True) as connection:
             connection.execute((MIGRATION.parent / '20261110120000_rag_documents.sql').read_text(encoding='utf-8'))
             if has_schema:
-                connection.execute(MIGRATION.read_text(encoding='utf-8'))
+                apply_onboarding_migrations(connection)
                 assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (0,)
         monkeypatch.setattr(settings, 'database_url', dsn)
         storage.get_store.cache_clear()
