@@ -6,19 +6,20 @@ from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
 from .models import (AccessRequest, AccessResource, Event, InternState, OnboardingData,
-                     PlanItem, Reminder, SkillProfile)
+                     PlanItem, Reminder, SkillProfile, CatalogItem)
 
 # Порядок соответствует внешним ключам; SQL-имена определены кодом, не вводом пользователя.
 TABLES = (
     ("interns", "intern_state", InternState, "intern_id"),
     ("resources", "access_resources", AccessResource, "id"),
+    ("personal_catalog", "personal_catalog", CatalogItem, "key"),
     ("items", "plan_items", PlanItem, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
     ("reminders", "reminders", Reminder, "id"),
 )
 JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload"}
-DERIVED_FIELDS = {"overdue", "waiting_days"}
+DERIVED_FIELDS = {"overdue", "waiting_days", "skill_level", "in_plan"}
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
 
 
@@ -115,7 +116,7 @@ class PostgresStore(PostgresPoolOwner):
             await connection.execute("SELECT pg_advisory_xact_lock(%s)", (LOCK_ID,))
             cursor = await connection.execute(sql.SQL("SELECT EXISTS ({}) AS populated").format(
                 sql.SQL(" UNION ALL ").join(sql.SQL("SELECT 1 FROM {}").format(sql.Identifier("public", table))
-                                             for table in [entry[1] for entry in TABLES] + ["events"])))
+                                             for table in [entry[1] for entry in TABLES if entry[0] != "personal_catalog"] + ["events"])))
             populated = (await cursor.fetchone())["populated"]
             if populated and not reset:
                 return

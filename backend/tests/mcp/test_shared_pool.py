@@ -17,7 +17,7 @@ from app.rag.embeddings import DeterministicEmbedder
 from app.rag.ingest import ingest_directory
 from app.rag.postgres import PostgresDocumentStore
 from app.rag.service import RAGService
-from .conftest import MIGRATION
+from .conftest import apply_onboarding_migrations, MIGRATION
 
 run = async_runner.run
 RAG_MIGRATION = MIGRATION.with_name('20261110120000_rag_documents.sql')
@@ -41,7 +41,7 @@ def shared_database(onboarding_dsn):
 def test_real_shared_pool_budget_transaction_isolation_and_owner_lifetime(shared_database, monkeypatch, first_closed):
     dsn = shared_database
     with psycopg.connect(dsn, autocommit=True) as owner:
-        owner.execute(MIGRATION.read_text(encoding='utf-8'))
+        apply_onboarding_migrations(owner)
     rag, onboarding = PostgresDocumentStore(dsn), PostgresStore(dsn)
     service = RAGService(DeterministicEmbedder(), rag)
     monkeypatch.setattr(storage, 'get_store', lambda: onboarding)
