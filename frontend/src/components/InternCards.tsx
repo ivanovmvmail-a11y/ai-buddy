@@ -3,11 +3,13 @@
 // Экран наставника (спека 201): карточки стажёров без рейтинга и сравнения. Порядок — как в списке
 // стажёров, без сортировки по прогрессу; только факты: что закрыто, что зависло, итоги недели.
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { isWorking, waitedFor } from "@/lib/plan-logic";
-import { useInterns, useMetrics, usePlan, useProfile, useSummary } from "@/lib/queries";
+import { useInterns, useMetrics, usePlan, useProfile, useRefresh, useSummary } from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import { findUser } from "@/lib/users";
-import type { DemoUser, Metrics } from "@/lib/types";
+import type { DemoUser, Metrics, SkillLevel, SkillProfile } from "@/lib/types";
 
 type Intern = { id: string; name: string; team: string };
 
@@ -97,6 +99,9 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
         <div className="mt-2 grid gap-1">
           <div><span className="font-medium">Сильные стороны:</span> {profile.data.strengths.join(", ") || "—"}</div>
           <div><span className="font-medium">Темы для роста:</span> {profile.data.growth.join(", ") || "—"}</div>
+          {actor.role === "mentor" && (
+            <SkillLevels actor={actor} profile={profile.data} topics={(plan.data?.items ?? []).map((i) => i.topic)} />
+          )}
         </div>
       )}
 
@@ -153,5 +158,49 @@ function TopicsLine({ actor, internId }: { actor: DemoUser; internId: string }) 
         </div>
       )}
     </div>
+  );
+}
+
+const TOPIC_TITLES: Record<string, string> = { git: "Git", sql: "SQL", ci: "CI и тесты" };
+const LEVELS: Array<{ id: SkillLevel; title: string }> = [
+  { id: "novice", title: "новичок" },
+  { id: "familiar", title: "знаком" },
+  { id: "confident", title: "уверенно" },
+];
+
+/** Спека 104: уровень по теме меняет только наставник; по нему бот выбирает глубину объяснений. */
+function SkillLevels({ actor, profile, topics }: { actor: DemoUser; profile: SkillProfile; topics: Array<string | null> }) {
+  const refresh = useRefresh();
+  const save = useMutation({
+    mutationFn: ({ topic, level }: { topic: string; level: SkillLevel }) => api.setSkill(actor.id, profile.intern_id, topic, level),
+    onSuccess: refresh,
+  });
+  const all = [...new Set([...Object.keys(profile.skills), ...topics.filter((t): t is string => !!t)])].sort();
+  if (!all.length) return null;
+  return (
+    <fieldset className="mt-1" disabled={save.isPending}>
+      <legend className="font-medium">Уровень по темам</legend>
+      <div className="mt-1 grid gap-1">
+        {all.map((topic) => {
+          const name = TOPIC_TITLES[topic] ?? topic;
+          return (
+            <label key={topic} className="flex items-center justify-between gap-2">
+              <span>{name}</span>
+              <select
+                aria-label={`Уровень: ${name}`}
+                value={profile.skills[topic] ?? ""}
+                onChange={(e) => save.mutate({ topic, level: e.target.value as SkillLevel })}
+                className="rounded-lg border border-black/15 bg-transparent px-2 py-1 dark:border-white/20"
+              >
+                {!profile.skills[topic] && <option value="" disabled>не указан</option>}
+                {LEVELS.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
+              </select>
+            </label>
+          );
+        })}
+      </div>
+      {save.isError && <p role="alert" className="mt-1 text-red-800 dark:text-red-300">{save.error.message}</p>}
+      <p className="mt-1 text-xs text-black/45 dark:text-white/45">Ставит только наставник. Бот подстраивает глубину объяснений, стажёра не оценивает.</p>
+    </fieldset>
   );
 }

@@ -33,6 +33,20 @@ describe("экран наставника (спека 201)", () => {
     expect(within(region).getByText(/Темы для роста:/)).toBeTruthy();
   });
 
+  it("спека 104: наставник меняет уровень по теме, куратор — нет", async () => {
+    open("mentor-petr");
+    const region = await cards();
+    const git = await within(region).findByRole("combobox", { name: "Уровень: Git" });
+    expect((git as HTMLSelectElement).value).toBe("novice");
+    expect(within(region).getByRole("combobox", { name: "Уровень: CI и тесты" })).toBeTruthy();
+    await act(async () => fireEvent.change(git, { target: { value: "confident" } }));
+    await waitFor(() => expect(srv.calls.some((c) => c.method === "POST" && c.path === "/profile/skills")).toBe(true));
+    expect(srv.calls.find((c) => c.method === "POST" && c.path === "/profile/skills")?.body).toEqual({
+      intern_id: "intern-anya", topic: "git", level: "confident",
+    });
+    await waitFor(() => expect((within(region).getByRole("combobox", { name: "Уровень: Git" }) as HTMLSelectElement).value).toBe("confident"));
+  });
+
   it("Мария: у Ивана зависли заявка и просроченный пункт", async () => {
     open("mentor-maria");
     const region = await cards();
