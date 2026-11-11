@@ -5,7 +5,9 @@
 это и есть решение человека. Действия, которые готовит ИИ или кнопка «Сделать за меня», идут через
 черновик и `POST /actions/{id}/confirm`.
 """
+import hmac
 import time
+from urllib.parse import unquote
 from typing import Literal
 
 from flask import Blueprint, g, jsonify, request
@@ -13,6 +15,7 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic_core import to_jsonable_python
 
 from app import async_runner
+from app.config import settings
 from app.agent import analytics, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
@@ -213,13 +216,33 @@ class NextDayIn(BaseModel):
     intern_id: str | None = None
 
 
+DEMO_KEY_HEADER = "X-Demo-Key"
+DEMO_KEY_REQUIRED = "Нужно код-слово демо"
+
+
+def _demo_key_error():
+    """Публичный сайт: без код-слова посетитель не сбросит данные посреди показа (аудит D6)."""
+    expected = settings.demo_key
+    if not expected:
+        return None
+    # Браузер не пропускает кириллицу в заголовке — интерфейс шлёт encodeURIComponent(код-слово).
+    given = unquote(request.headers.get(DEMO_KEY_HEADER, ""))
+    if hmac.compare_digest(given.encode(), expected.encode()):
+        return None
+    return jsonify(detail=DEMO_KEY_REQUIRED), 403
+
+
 @bp.post("/demo/next-day")
 def next_day():
+    if (denied := _demo_key_error()) is not None:
+        return denied
     body = _body(NextDayIn)
     return {"days": async_runner.run(clock.advance_day(g.user, body.intern_id))}
 
 
 @bp.post("/demo/reset")
 def reset():
+    if (denied := _demo_key_error()) is not None:
+        return denied
     async_runner.run(clock.reset_demo(g.user))
     return {"status": "reset"}

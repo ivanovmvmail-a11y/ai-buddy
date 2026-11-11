@@ -127,7 +127,7 @@ docs/                 SPEC, API, DECISIONS, specs/ (SDD-спецификации
 - **База:** Supabase (миграции уже применены), подключение через Session pooler.
 
 Оба сервиса в одном проекте Railway, собираются из Docker-файлов и сами обновляются при мерже в `main`.
-- `ai-buddy` (backend): Root Directory `/backend`, Healthcheck `/health`, домен на порт 8000. Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта.
+- `ai-buddy` (backend): Root Directory `/backend`, Healthcheck `/health`, домен на порт 8000. Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта, `DEMO_KEY` = код-слово для кнопок «Сброс» / «Следующий день» (чтобы посетители не сбросили данные во время показа; знает только команда).
 - `ai-buddy-site` (frontend): Root Directory `/frontend`, домен на порт 3000. Variables: `NEXT_PUBLIC_API_URL` = адрес backend, `PORT=3000`.
 
 Почему не другие хостинги (проверено из России 11.11.2026): Render, `*.onrender.com` и `*.vercel.app` не открываются; Koyeb закрыл бесплатную регистрацию; Netlify отдаёт файлы больше ~14 КБ с зависанием, и сайт не загружается. Пробный период Railway — 30 дней / $5.

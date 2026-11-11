@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { askBot, ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
 import { ReminderBell } from "@/components/ReminderBell";
-import { api } from "@/lib/api";
+import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
   accessDraftParams, explainQuestion, explainScripted, greeting, msgId, reminderMsg, useChat, type BotAction,
 } from "@/lib/chat";
@@ -13,6 +13,39 @@ import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import type { AccessRequest, DemoUser, Plan, PlanItem, Reminder } from "@/lib/types";
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
+
+const DEMO_KEY_STORAGE = "ai-buddy-demo-key";
+
+function storedDemoKey(): string | undefined {
+  try {
+    return sessionStorage.getItem(DEMO_KEY_STORAGE) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Демо-кнопка на публичном сайте: если сервер просит код-слово — спросить один раз за вкладку (аудит D6). */
+async function withDemoKey<T>(call: (key?: string) => Promise<T>): Promise<T> {
+  const needsKey = (err: unknown) => err instanceof ApiError && err.status === 403 && err.message === DEMO_KEY_REQUIRED;
+  try {
+    return await call(storedDemoKey());
+  } catch (err) {
+    if (!needsKey(err)) throw err;
+  }
+  const key = window.prompt("Код-слово для демо-кнопок")?.trim();
+  if (!key) throw new ApiError("Без код-слова демо-кнопки на этом сайте не работают.", 403);
+  try {
+    const result = await call(key);
+    try {
+      sessionStorage.setItem(DEMO_KEY_STORAGE, key);
+    } catch {
+      /* приватное окно — спросим снова в следующий раз */
+    }
+    return result;
+  } catch (err) {
+    throw needsKey(err) ? new ApiError("Код-слово не подошло.", 403) : err;
+  }
+}
 
 export default function Home() {
   const userId = useSession((s) => s.userId);
@@ -118,7 +151,7 @@ export default function Home() {
   async function nextDay() {
     setDemoError(null);
     try {
-      await api.nextDay(actor.id);
+      await withDemoKey((key) => api.nextDay(actor.id, key));
       await refresh();
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
       const shown = await showReminders(actor, plan);
@@ -131,7 +164,7 @@ export default function Home() {
   async function reset() {
     setDemoError(null);
     try {
-      await api.reset(actor.id);
+      await withDemoKey((key) => api.reset(actor.id, key));
       await client.invalidateQueries();
       await welcome();
     } catch (err) {

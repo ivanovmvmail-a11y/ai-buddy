@@ -60,7 +60,7 @@ def create_app() -> Flask:
     app.json.ensure_ascii = False  # кириллица в ответах как есть, без \uXXXX
 
     origins = [o.strip() for o in settings.frontend_origins.split(",") if o.strip()]
-    CORS(app, origins=origins, allow_headers=["Content-Type", USER_HEADER])
+    CORS(app, origins=origins, allow_headers=["Content-Type", USER_HEADER, "X-Demo-Key"])
 
     @app.before_request
     def load_user():
