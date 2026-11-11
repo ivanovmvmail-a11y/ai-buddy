@@ -8,7 +8,8 @@ import { ProfilePanel } from "@/components/ProfilePanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  accessDraftParams, actionFor, explainScripted, followupQuestion, followupsFor, greeting, msgId, reminderMsg, useChat,
+  accessDraftParams, actionFor, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, msgId, reminderMsg,
+  useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
@@ -98,7 +99,23 @@ export default function Home() {
       return;
     }
     say(greeting(who, plan, approvals));
+    if (plan) await showWeekly(who, plan.current_day);
     await showReminders(who, plan);
+  }
+
+  /** Начало новой недели — бот сам присылает итоги прошедшей (SPEC 3.2). Сбой сводки остальному не мешает. */
+  async function showWeekly(who: DemoUser, day: number) {
+    const week = finishedWeek(day);
+    if (week === null) return;
+    try {
+      const [summary, resources] = await Promise.all([
+        api.summary(who.id, who.id, week),
+        api.resources(who.id).then((r) => r.resources).catch(() => []),
+      ]);
+      say(weeklySummaryMsg(summary, Object.fromEntries(resources.map((r) => [r.id, r.title]))));
+    } catch {
+      /* сводка — дополнение к приветствию */
+    }
   }
 
   useEffect(() => {
@@ -175,6 +192,7 @@ export default function Home() {
       await withDemoKey((key) => api.nextDay(actor.id, key));
       await refresh();
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
+      if (plan) await showWeekly(actor, plan.current_day);
       const shown = await showReminders(actor, plan);
       if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Новый день. Зависших пунктов нет." });
     } catch (err) {

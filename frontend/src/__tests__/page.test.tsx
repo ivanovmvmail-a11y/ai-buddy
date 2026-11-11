@@ -243,6 +243,32 @@ describe("экран «план + чат» на API", () => {
     expect(await screen.findByRole("heading", { name: "Мой план" })).toBeTruthy();
   });
 
+  it("итоги недели стажёру: при входе в первый день новой недели (Иван, день 8)", async () => {
+    open("intern-ivan");
+    expect(await screen.findByText(/Итоги недели 1 — только факты из плана/)).toBeTruthy();
+    expect(screen.getByText(/Переходит на следующую неделю: «/)).toBeTruthy();
+    expect(screen.getByText(/Эту же сводку видит наставник/)).toBeTruthy();
+    expect(srv.calls.some((c) => c.path === "/plan/summary?intern_id=intern-ivan&week=1")).toBe(true);
+  });
+
+  it("итоги недели стажёру: «Следующий день» через конец недели (Аня 7 → 8)", async () => {
+    srv.state.days["intern-anya"] = 7;
+    open();
+    await screen.findByText(/7-й день стажировки/);
+    expect(screen.queryByText(/Итоги недели/)).toBeNull();
+    await click(screen.getByRole("button", { name: "Следующий день" }));
+    expect(await screen.findByText(/Итоги недели 1 — только факты из плана/)).toBeTruthy();
+    expect(screen.getByText(/Закрыто: «/)).toBeTruthy();
+  });
+
+  it("сбой сводки недели не ломает приветствие", async () => {
+    srv.state.days["intern-anya"] = 8;
+    srv.summaryFails = true;
+    open();
+    expect(await screen.findByText(/8-й день стажировки/)).toBeTruthy();
+    expect(screen.queryByText(/Итоги недели/)).toBeNull();
+  });
+
   it("у наставника нет вкладки «Мой профиль»", async () => {
     open("mentor-petr");
     await screen.findByText(/План: Аня Смирнова/);

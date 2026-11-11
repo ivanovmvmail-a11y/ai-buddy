@@ -79,6 +79,7 @@ export type FakeServer = {
   calls: Array<{ method: string; path: string; user: string; body: unknown }>;
   feedback: Array<{ answer_id: string; useful: boolean }>;
   explainFails?: boolean;
+  summaryFails?: boolean;
   metrics: Record<string, unknown> | null;
   /** Код-слово демо-кнопок, как DEMO_KEY на сервере; не задано — кнопки открыты. */
   demoKey?: string;
@@ -114,6 +115,7 @@ export function installFakeServer(): FakeServer {
       return see(internId) && (actor.role === "intern" || actor.role === "mentor") && prof ? ok(prof) : err(404, "Не найдено");
     }
     if (p === "/plan/summary") {
+      if (srv.summaryFails) return err(500, "Ошибка");
       if (!see(internId)) return err(404, "Не найдено");
       const own = s.items.filter((i) => i.intern_id === internId && WORKING.includes(i.stage));
       return ok({
