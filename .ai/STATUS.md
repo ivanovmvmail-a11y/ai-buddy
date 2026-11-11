@@ -54,7 +54,7 @@
 | 48 | Ревью Codex #59 (повторно), #61, #62; поддельный сервер фронта — новые документы пунктов, как в #62 | Claude | claude/mock-howto-links | на ревью | | frontend 64 |
 | 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | на ревью | | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
 
-| 50 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | — | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
+| 50 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
