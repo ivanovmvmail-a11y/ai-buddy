@@ -4,14 +4,14 @@ import argparse
 import logging
 import os
 
+from . import absence, drafts
+from .absence_models import AbsenceFact, AbsenceReason, AbsenceRequest
+from .models import ActionDraft
+
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import StrictBool, ValidationError
-
-from . import absence, drafts
-from .absence_models import AbsenceFact, AbsenceReason, AbsenceRequest
-from .models import ActionDraft
 
 from app.agent.users import DEMO_USERS
 from app.async_runner import run
