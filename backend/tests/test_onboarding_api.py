@@ -316,3 +316,29 @@ def test_tool_schemas_have_no_nullable_anyof(agent):
         for name, prop in tool.spec().parameters.get("properties", {}).items():
             assert "anyOf" not in prop, (tool.name, name)
             assert "type" in prop or "enum" in prop, (tool.name, name)
+
+
+# --- Код-слово демо-кнопок (аудит D6) ---------------------------------------------------------------
+
+@pytest.mark.parametrize("url", ["/demo/reset", "/demo/next-day"])
+def test_demo_buttons_need_key_when_configured(client, monkeypatch, url):
+    from urllib.parse import quote
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "demo_key", "маяк")
+    before = get(client, "/plan").get_json()["current_day"]
+    for key in (None, "", "не-то"):
+        headers = as_user("intern-anya") | ({"X-Demo-Key": quote(key)} if key is not None else {})
+        res = client.post(url, json={}, headers=headers)
+        assert res.status_code == 403 and res.get_json() == {"detail": "Нужно код-слово демо"}
+    assert get(client, "/plan").get_json()["current_day"] == before
+    ok = client.post(url, json={}, headers=as_user("intern-anya") | {"X-Demo-Key": quote("маяк")})
+    assert ok.status_code == 200
+
+
+def test_demo_buttons_open_without_configured_key(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "demo_key", "")
+    assert post(client, "/demo/reset").status_code == 200

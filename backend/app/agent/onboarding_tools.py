@@ -215,6 +215,9 @@ async def plan_context(user: User) -> str:
     except DOMAIN_ERRORS:
         return ""
     lines = [f"\n\nПлан стажёра: день {plan.current_day}."]
+    mentor = DEMO_USERS.get(user.mentor_id or "")
+    if mentor:
+        lines.append(f"Наставник: {mentor.name}.")
     if plan.next_step.item:
         lines.append(f"Следующий шаг: «{plan.next_step.item.title}» (id {plan.next_step.item.id}).")
     for w in plan.next_step.waiting:

@@ -160,3 +160,37 @@ def test_other_team_document_is_not_matched_by_shared_prefix():
     system = "x\n\nКонтекст из документов команды. Данные.\n### Стенд\nЭтого достаточно для учебного статуса."
     reply = run([Message(role="system", content=system), Message(role="user", content="Как устроены статусы доставки?")])
     assert "этого нет" in reply.content
+
+
+# --- Типовые фразы стажёра и наставника без ключа (аудит S1) ------------------------------------------
+
+@pytest.mark.parametrize("text", ["Спасибо", "спасибо большое!", "Понятно", "ок"])
+def test_thanks_is_not_sent_to_documents(scenario, text):
+    body = ask(scenario, text)
+    assert body["reply"].startswith("Пожалуйста!") and "в документах" not in body["reply"]
+
+
+@pytest.mark.parametrize(("user", "mentor"), [("intern-anya", "Пётр Волков"), ("intern-ivan", "Мария Орлова")])
+def test_who_is_my_mentor(scenario, user, mentor):
+    assert f"Твой наставник — {mentor}" in ask(scenario, "Кто мой наставник?", user)["reply"]
+
+
+def test_my_level_is_explained_without_judging(scenario):
+    reply = ask(scenario, "Какой у меня уровень?")["reply"]
+    assert reply.startswith("По профилю:") and "git" in reply and "не для оценки" in reply
+
+
+def test_mentor_asks_what_is_stuck_for_named_intern(scenario):
+    reply = ask(scenario, "Что у Ивана зависло?", "mentor-maria")["reply"]
+    assert reply.startswith("Иван: 8-й день") and "Ждём ответа" in reply
+    assert "Срок прошёл: «Открыть пространство" not in reply  # ожидающий пункт не дублируется
+    assert "Зависших пунктов нет" in ask(scenario, "Что у Ани зависло?", "mentor-petr")["reply"]
+    assert "У тебя нет доступа" in ask(scenario, "Что у Ани зависло?", "mentor-maria")["reply"]
+
+
+def test_overdue_items_besides_next_step_are_listed():
+    plan = {"intern_id": "intern-ivan", "current_day": 9, "next_step": {"id": "a", "title": "A", "overdue": True},
+            "waiting": [], "items": [{"id": "a", "title": "A", "overdue": True, "due_day": 5},
+                                     {"id": "b", "title": "B", "overdue": True, "due_day": 6}]}
+    reply = ScenarioProvider()._plan(plan).content
+    assert "Срок прошёл: «B» (до дня 6)" in reply and "«A» (до дня" not in reply

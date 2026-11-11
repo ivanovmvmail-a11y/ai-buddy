@@ -66,24 +66,58 @@ npm run dev
 ## Структура
 ```
 backend/app/
-  main.py         Flask: /health, /chat
-  async_runner.py общий event loop для async-кода (LLM, RAG, MCP)
-  agent/          логика агента, промпты           (Claude)
-  llm/            провайдеры LLM: gigachat|openai|scenario|echo (Claude)
-  rag/            поиск по документам команды      (Codex)
-  mcp_server/     MCP-инструменты к корп. сервисам (Codex)
-  db/             Supabase                          (Codex)
-frontend/src/     Next.js, страница чата            (Claude)
-docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
-.ai/              STATUS + журналы агентов
+  main.py             Flask: /health, /chat, подключение HTTP онбординга
+  onboarding_api.py   HTTP: план, заявки, профиль, напоминания, метрики, демо-кнопки
+  async_runner.py     общий event loop для async-кода (LLM, RAG, MCP)
+  agent/              логика агента, права, черновики действий, промпты      (Claude)
+  llm/                провайдеры LLM: gigachat|openai|scenario|echo          (Claude)
+  rag/                поиск по документам команды, демо-документы            (Codex)
+  mcp_server/         имитации сервисов (план, доступы, найм, события) + MCP (Codex)
+  db/                 общий пул PostgreSQL                                    (Codex)
+backend/golden/       золотой набор: 37 контрольных вопросов и прогон
+frontend/src/         Next.js: экран «план + чат», экран наставника         (Claude)
+ops/grafana/          готовая панель метрик
+supabase/migrations/  схема БД
+docs/                 SPEC, API, DECISIONS, specs/ (SDD-спецификации), отчёты золотого набора
+.ai/                  STATUS + журналы агентов
 ```
+
+## Маршрут проверки (10–15 минут, без ключа)
+
+Запустите `docker compose up --build` и откройте http://localhost:3000. Пользователь переключается списком **«Войти как»** в шапке, там же кнопки **«Следующий день»** (сдвигает демо-время) и **«Сброс»** (возвращает демо-данные к началу — нажмите перед проверкой). Без ключа ответы помечены «Сценарный ответ».
+
+| # | Что сделать | Что должно произойти |
+|---|---|---|
+| 1 | «Войти как» → **Аня Смирнова — стажёр** | Слева план на 3 месяца (день 2, недели 1–2 подробно), справа чат. Бот пишет первым: какой сегодня день, сколько закрыто, следующий шаг |
+| 2 | У пункта «Открыть пространство Платформы объявлений» (метка «здесь помогу подробно») нажать **«Объяснить»**, затем то же у «Разобрать документы Платформы объявлений» (метка «ты это знаешь») | Глубина объяснения зависит от уровня Ани в теме: первое — по шагам, второе — коротко. Практическое задание, источник, кнопки «Полезно / Не полезно» |
+| 3 | У пункта «Запросить базовые доступы» **«Сделать за меня»** → **«Подтвердить»** | Карточка-черновик заявки (ресурс, права «чтение», кто согласует). До подтверждения ничего не создаётся. Учебный Jira выдаётся сразу — пункт «сделано» |
+| 3а | У пункта «Открыть пространство Платформы объявлений» **«Сделать за меня»** → **«Подтвердить»** | Заявка `REQ-…` ушла наставнику Петру; пункт «ждёт другого человека», бот обещает напомнить |
+| 4 | «Войти как» → **Пётр Волков — наставник** | Карточка Ани: что зависло, частые темы, уровень по темам, итоги недели. Блок «Ждут твоего одобрения» → **«Одобрить»**. В плане Ани у пункта «Назначить регулярные встречи 1:1» — **«Готово»** |
+| 5 | Снова **Аня** | Пункт с доступом закрыт, следующий шаг сместился |
+| 6 | «Войти как» → **Иван Кузнецов — стажёр** | Другая команда (Авито Доставка), другой план и другие метки уровня. Спросить «Кого я жду?» — ответ из его заявок. **«Следующий день»** → в колокольчике 🔔 напоминание о просроченном пункте |
+| 7 | Снова **Аня**, в чате по очереди: «Покажи план Ивана» · «Какие статусы проходит учебное отправление в Доставке?» · «Где взять рабочий ноутбук?» | Отказ без подробностей · ответ без данных чужой команды · «в базе нет» и черновик вопроса наставнику |
+| 8 | Grafana http://localhost:3002 → панель **«AI-buddy — польза вживую»** | Вопросы, темы, оценки «полезно». Отчёт золотого набора — [docs/golden-report.md](docs/golden-report.md). Модель меняется одной переменной `LLM_PROVIDER` |
+
+Если сайт не открывается — проверьте, что порты **3000, 8000, 3002** свободны (не запущены другие серверы разработки), и перезапустите `docker compose up`.
+
+## Версии
+
+| Компонент | Версия |
+|---|---|
+| Docker Desktop / Docker Compose | 4.x / v2 |
+| Python (backend) | 3.12 (образ `python:3.12-slim`), менеджер пакетов uv |
+| Flask · GigaChat SDK · psycopg · pydantic-settings · MCP SDK | 3.1.3 · 0.2.4 · 3.3.8 · 2.14.3 · 1.30.0 (точные версии — `backend/uv.lock`) |
+| Node.js (frontend) | 24 (образ `node:24-alpine`) |
+| Next.js · React · TypeScript · Tailwind | 15.5.28 · 19.1.10 · 5 · 4 (точные версии — `frontend/package-lock.json`) |
+| PostgreSQL + pgvector | 17 (образ `pgvector/pgvector:pg17`) |
+| Grafana | 12.3.1 |
 
 ## Проверка
 Каждый PR автоматически проверяет GitHub Actions (`.github/workflows/ci.yml`): тесты и покрытие backend (отчёт — артефакт `coverage-backend`), линтер и сборка frontend, запуск всего проекта через `docker compose up`.
 
 - `GET http://localhost:8000/health` → `{"status":"ok", ...}`
-- На http://localhost:3000 отправить сообщение — приходит ответ.
-- Тесты backend: `cd backend && uv run pytest --cov=app --cov-report=term-missing`
+- Сценарий целиком — «Маршрут проверки» выше.
+- Тесты backend: `cd backend && uv run --extra mcp pytest --cov=app --cov-report=term-missing`
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
 - Золотой набор (37 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md)
 
@@ -93,7 +127,7 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 - **База:** Supabase (миграции уже применены), подключение через Session pooler.
 
 Оба сервиса в одном проекте Railway, собираются из Docker-файлов и сами обновляются при мерже в `main`.
-- `ai-buddy` (backend): Root Directory `/backend`, Healthcheck `/health`, домен на порт 8000. Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта.
+- `ai-buddy` (backend): Root Directory `/backend`, Healthcheck `/health`, домен на порт 8000. Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта, `DEMO_KEY` = код-слово для кнопок «Сброс» / «Следующий день» (чтобы посетители не сбросили данные во время показа; знает только команда).
 - `ai-buddy-site` (frontend): Root Directory `/frontend`, домен на порт 3000. Variables: `NEXT_PUBLIC_API_URL` = адрес backend, `PORT=3000`.
 
 Почему не другие хостинги (проверено из России 11.11.2026): Render, `*.onrender.com` и `*.vercel.app` не открываются; Koyeb закрыл бесплатную регистрацию; Netlify отдаёт файлы больше ~14 КБ с зависанием, и сайт не загружается. Пробный период Railway — 30 дней / $5.
