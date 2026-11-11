@@ -2,16 +2,15 @@
 from datetime import datetime, timezone
 
 from . import storage
-from ._domain import nonempty, timestamp
+from ._domain import nonempty
 from ._system import require_system
 from .models import Actor, Event, OnboardingData
 
 
 def _record(data: OnboardingData, actor: Actor, type: str, payload: dict) -> Event:
     """Только из уже авторизованной бизнес-транзакции, не пользовательский инструмент."""
-    intern_id = payload.get("intern_id")
     event = Event(
-        ts=timestamp(data, intern_id, payload.get("day")) if intern_id in data.interns else datetime.now(timezone.utc),
+        ts=datetime.now(timezone.utc),
         user_id=actor.id, role=actor.role, team=actor.team, type=type, payload=payload,
     )
     data.events.append(event)

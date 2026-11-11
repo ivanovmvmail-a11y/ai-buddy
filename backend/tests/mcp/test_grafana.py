@@ -33,6 +33,8 @@ def metrics_database(onboarding_dsn):
 def test_dashboard_has_expected_panels_without_identity_columns():
     dashboard = json.loads(DASHBOARD.read_text(encoding='utf-8'))
     assert dashboard['uid'] == 'ai-buddy-demo' and dashboard['refresh'] == '5s'
+    assert dashboard['time'] == {'from':'now-30d','to':'now'}
+    assert dashboard['timezone'] == 'browser'
     assert len(dashboard['panels']) == 10
     assert len({panel['id'] for panel in dashboard['panels']}) == 10
     for panel in dashboard['panels']:
@@ -81,7 +83,7 @@ def test_panel_sql_matches_metrics_and_reader_cannot_read_private_tables_or_writ
         assert reader.execute('SHOW default_transaction_read_only').fetchone() == ('on',)
         assert reader.execute('SELECT count(*),sum(closed_without_human::int) FROM grafana_answers').fetchone() == (5, sum(map(closed_without_human, answers)))
         for panel in json.loads(DASHBOARD.read_text(encoding='utf-8'))['panels']:
-            query = panel['targets'][0]['rawSql'].replace("$__timeGroupAlias(ts,'1d')", "date_trunc('day',ts) AS time").replace('$__timeFilter(ts)', 'true')
+            query = panel['targets'][0]['rawSql'].replace("$__timeGroupAlias(ts,'1d')", "date_trunc('day',ts) AS time").replace('$__timeFilter(ts)', 'true').replace('${__timezone}', 'Europe/Moscow')
             cursor = reader.execute(query)
             cursor.fetchall()  # Каждый настоящий запрос панели исполняется ограниченным пользователем.
             assert not {'user_id', 'intern_id', 'payload'} & {column.name for column in cursor.description}
@@ -145,3 +147,48 @@ def test_grafana_views_revoke_supabase_default_grants_and_keep_datasource(onboar
             admin.execute(sql.SQL('DROP DATABASE IF EXISTS {} WITH (FORCE)').format(sql.Identifier(database)))
             for role in created_roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
+
+@pytest.mark.parametrize('zone,timestamps,expected',[
+    ('Europe/Moscow',['2026-11-10T20:59:00+00:00','2026-11-10T21:01:00+00:00'],
+        [('2026-11-09T21:00:00+00:00',1),('2026-11-10T21:00:00+00:00',1)]),
+    ('UTC',['2026-11-10T20:59:00+00:00','2026-11-10T21:01:00+00:00'],
+        [('2026-11-10T00:00:00+00:00',2)]),
+    ('America/New_York',['2026-11-01T05:30:00+00:00','2026-11-01T06:30:00+00:00'],
+        [('2026-11-01T04:00:00+00:00',2)]),
+])
+def test_daily_buckets_follow_dashboard_timezone_including_midnight_and_dst(metrics_database,zone,timestamps,expected):
+    dashboard=json.loads(DASHBOARD.read_text())
+    assert dashboard['time']=={'from':'now-30d','to':'now'} and dashboard['timezone']=='browser'
+    panel=next(p for p in dashboard['panels'] if p['title']=='Вопросы по дням')
+    query=panel['targets'][0]['rawSql'].replace('${__timezone}',zone).replace('$__timeFilter(ts)','true')
+    with psycopg.connect(**metrics_database,autocommit=True) as connection:
+        connection.execute(MIGRATION.read_text())
+        connection.execute(METRICS.read_text())
+        connection.execute('SET TIME ZONE UTC')
+        for ts in timestamps:
+            connection.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (%s,'system','system','system','question_answered',%s)",
+                (ts,Jsonb({'intern_id':'intern-anya','topic':'git'})))
+        assert [(ts.isoformat(),count) for ts,count in connection.execute(query).fetchall()]==expected
+
+
+def test_new_event_with_virtual_future_day_is_visible_in_current_time_window(metrics_database,monkeypatch):
+    from datetime import datetime,timezone
+    from app import async_runner
+    from app.mcp_server import events,storage
+    from app.mcp_server._system import SYSTEM_ACTOR
+    from app.mcp_server.postgres import PostgresStore
+    from app.mcp_server.seed import load_seed
+    from psycopg.conninfo import make_conninfo
+    with psycopg.connect(**metrics_database,autocommit=True) as connection:
+        connection.execute(MIGRATION.read_text());connection.execute(METRICS.read_text())
+    store=PostgresStore(make_conninfo(**metrics_database))
+    monkeypatch.setattr(storage,'get_store',lambda:store)
+    try:
+        async_runner.run(store.initialize(load_seed()))
+        start=datetime.now(timezone.utc)
+        event=async_runner.run(events.log_event(SYSTEM_ACTOR,'question_answered',{'intern_id':'intern-anya','day':4000,'topic':'git'}))
+        end=datetime.now(timezone.utc)
+        assert start<=event.ts<=end
+        with psycopg.connect(**metrics_database) as connection:
+            assert connection.execute('SELECT count(*) FROM public.grafana_answers WHERE ts BETWEEN %s AND %s',(start,end)).fetchone()==(1,)
+    finally: async_runner.run(store.close())
