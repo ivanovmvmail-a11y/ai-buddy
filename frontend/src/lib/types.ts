@@ -194,3 +194,34 @@ export const ChatHistory = z.object({
   })),
 });
 export const ActionsResponse = z.object({ actions: z.array(Action) });
+
+// SPEC 4 (11.11): бот предлагает поднять уровень, решает наставник. Стажёру эндпоинт отвечает 404.
+export const SkillSuggestion = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  intern_name: z.string(),
+  topic: z.string(),
+  topic_title: z.string(),
+  from_level: SkillLevel,
+  to_level: SkillLevel,
+  basis: z.string(),
+  created_day: z.number(),
+  status: z.enum(["pending", "accepted", "dismissed"]),
+  decided_day: z.number().nullable(),
+});
+export type SkillSuggestion = z.infer<typeof SkillSuggestion>;
+export const SuggestionsResponse = z.object({ suggestions: z.array(SkillSuggestion) });
+
+// SPEC 5 (11.11): два плана рядом — общие пункты совпадают, персональные различаются. Не рейтинг.
+export const PlanCompare = z.object({
+  interns: z.array(z.object({ id: z.string(), name: z.string() })),
+  common: z.array(z.object({
+    key: z.string(),
+    title: z.string(),
+    stage: Stage,
+    topic: z.string().nullable(),
+    by_intern: z.record(z.string(), z.object({ status: ItemStatus, skill_level: SkillLevel.nullable() })),
+  })),
+  personal: z.record(z.string(), z.array(PlanItem)),
+});
+export type PlanCompare = z.infer<typeof PlanCompare>;

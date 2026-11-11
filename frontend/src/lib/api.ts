@@ -3,7 +3,8 @@ import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
   AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
-  Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile, WeeklySummary,
+  PlanCompare, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
+  SkillSuggestion, SuggestionsResponse, WeeklySummary,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -95,6 +96,11 @@ export const api = {
     if (!res.ok) throw new ApiError(`Ошибка сервера: ${res.status}`, res.status);
   },
   metrics: (u: string, internId?: string) => request(`/metrics${q(internId)}`, Metrics, u),
+  suggestions: (u: string) => request("/skills/suggestions?status=pending", SuggestionsResponse, u),
+  decideSuggestion: (u: string, id: string, accept: boolean) =>
+    request(`/skills/suggestions/${encodeURIComponent(id)}/decide`, SkillSuggestion, u, post({ accept })),
+  compare: (u: string, a: string, b: string) =>
+    request(`/plan/compare?intern_ids=${encodeURIComponent(a)},${encodeURIComponent(b)}`, PlanCompare, u),
   nextDay: (u: string, key?: string) => request("/demo/next-day", DaysResponse, u, { ...post(), headers: demoKey(key) }),
   reset: (u: string, key?: string) => request("/demo/reset", ResetResponse, u, { ...post(), headers: demoKey(key) }),
 };
