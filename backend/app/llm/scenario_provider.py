@@ -87,6 +87,40 @@ def _units(content: str) -> list[tuple[str, str]]:
     return [(h, u) for h, u in units if "синтетическ" not in u.lower()]
 
 
+CONFLICT_MARK = "Документы расходятся"
+_NUMBERS = {"одн": 1, "дв": 2, "тр": 3, "четыр": 4, "пят": 5}
+_DURATION = re.compile(
+    r"(?<![а-яё])(?:(?:(\d+)|(одн|дв|тр|четыр|пят)[а-яё]*)\s+)?(?:рабоч[а-яё]*\s+)?"
+    r"(день|дн(?:я|ей|и)|час(?:а|ов)?|недел[ьиюяе])(?![а-яё])")
+
+
+def _durations(text: str) -> set[tuple[int, str]]:
+    """Сроки в тексте: «в течение рабочего дня» → (1, день), «двух рабочих дней» → (2, день)."""
+    found = set()
+    for digits, word, unit in _DURATION.findall(text.lower().replace("ё", "е")):
+        n = int(digits) if digits else _NUMBERS.get(word, 1)
+        found.add((n, "день" if unit.startswith(("де", "дн")) else unit[:3]))
+    return found
+
+
+def _conflict(best: tuple[int, str, str], wanted: set[str], need: int, system: str) -> str | None:
+    """SPEC 3.7: два документа отвечают на вопрос разными сроками — не выбираем молча, показываем оба."""
+    mine = _durations(best[2])
+    if not mine:
+        return None
+    for title, content in _docs(system):
+        if title == best[1]:
+            continue
+        for heading, unit in _units(content):
+            other = _durations(unit)
+            if other and other != mine and _overlap(wanted, heading + " " + unit) >= need:
+                return (f"{CONFLICT_MARK}: в них разные сроки.\n\n"
+                        f"• «{best[1]}»: {best[2]}\n• «{title}»: {unit}\n\n"
+                        "Не буду выбирать молча — уточни у наставника, какой вариант действует. "
+                        "Расхождение я отметил: наставник увидит, что документ стоит обновить.")
+    return None
+
+
 def _names_someone(q: str) -> str | None:
     """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
     return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
@@ -184,6 +218,8 @@ class ScenarioProvider:
                 key = (score, not definition, -rank, len(unit))
                 if best_key is None or key > best_key:
                     best, best_key = (score, title, unit), key
+        if best[0] >= need and (conflict := _conflict(best, wanted, need, system)):
+            return conflict
         if best[0] >= need:
             fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
             return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."

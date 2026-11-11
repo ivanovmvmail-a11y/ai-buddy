@@ -171,5 +171,6 @@ export const Metrics = z.object({
   feedback: z.object({ useful: z.number(), not_useful: z.number() }),
   topics: z.array(TopicCount),
   unanswered_topics: z.array(TopicCount),
+  conflict_topics: z.array(TopicCount).default([]), // документы противоречат друг другу (SPEC 3.7)
 });
 export type Metrics = z.infer<typeof Metrics>;

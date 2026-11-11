@@ -225,7 +225,7 @@ export function installFakeServer(): FakeServer {
       if (!["mentor", "lead", "curator"].includes(actor.role)) return err(404, "Не найдено");
       return srv.metrics ? ok(srv.metrics) : ok({
         interns: visible(actor), questions: 0, closed_without_human: 0, with_source_share: 0, refused: 0, drafts: 0,
-        avg_latency_ms: 0, feedback: { useful: 0, not_useful: 0 }, topics: [], unanswered_topics: [],
+        avg_latency_ms: 0, feedback: { useful: 0, not_useful: 0 }, topics: [], unanswered_topics: [], conflict_topics: [],
       });
     }
     if (p === "/chat") {

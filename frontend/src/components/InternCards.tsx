@@ -152,6 +152,12 @@ function TopicsLine({ actor, internId }: { actor: DemoUser; internId: string }) 
   return (
     <div className="mt-2 grid gap-1">
       <div><span className="font-medium">Частые темы:</span> {list(m.topics)}</div>
+      {m.conflict_topics.length > 0 && (
+        <div>
+          <span className="font-medium">Документы расходятся:</span> {list(m.conflict_topics)}
+          <span className="text-black/50 dark:text-white/50"> — стоит обновить документ</span>
+        </div>
+      )}
       {m.unanswered_topics.length > 0 && (
         <div>
           <span className="font-medium">Нет ответа в документах:</span> {list(m.unanswered_topics)}

@@ -194,3 +194,37 @@ def test_overdue_items_besides_next_step_are_listed():
                                      {"id": "b", "title": "B", "overdue": True, "due_day": 6}]}
     reply = ScenarioProvider()._plan(plan).content
     assert "Срок прошёл: «B» (до дня 6)" in reply and "«A» (до дня" not in reply
+
+
+# --- Противоречия в документах (SPEC 3.7, аудит S6) ---------------------------------------------------
+
+def test_durations_are_parsed_without_false_matches():
+    from app.llm.scenario_provider import _durations
+    assert _durations("Ревью приходит в течение рабочего дня") == {(1, "день")}
+    assert _durations("не дольше двух рабочих дней, а иногда 3 часа") == {(2, "день"), (3, "час")}
+    assert _durations("Сегодня часто обсуждаем задачи") == set()
+
+
+@pytest.fixture
+def demo_docs(scenario, monkeypatch):
+    """Поиск по настоящим демо-документам (как в золотом наборе), без базы."""
+    from golden.run import _demo_rag
+    rag = async_runner.run(_demo_rag())
+    monkeypatch.setattr(service, "retrieve", lambda query, user, k=4: rag.retrieve(query, user, k))
+    return scenario
+
+
+def test_conflicting_documents_show_both_and_reach_mentor(demo_docs):
+    scenario = demo_docs
+    reply = ask(scenario, "Сколько ждать ревью?")["reply"]
+    assert reply.startswith("Документы расходятся")
+    assert "«Платформа объявлений — кого звать на ревью»" in reply and "«Регламент учебного код-ревью»" in reply
+    assert "уточни у наставника" in reply
+    metrics = scenario.get("/metrics?intern_id=intern-anya", headers=as_user("mentor-petr")).get_json()
+    assert metrics["conflict_topics"] == [{"topic": "git", "title": "git и ревью", "count": 1}]
+    assert metrics["closed_without_human"] == 0  # расхождение решает человек
+
+
+def test_consistent_documents_give_plain_answer(demo_docs):
+    reply = ask(demo_docs, "Сколько ждать ревью?", "intern-ivan")["reply"]
+    assert reply.startswith("Нашёл в документе") and "расходятся" not in reply
