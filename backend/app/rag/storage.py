@@ -28,6 +28,10 @@ class SearchHit:
 
 
 class DocumentStore(Protocol):
+    async def close(self) -> None:
+        """Освободить ресурсы на event loop владельца хранилища."""
+        ...
+
     async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
         """Атомарно заменить документ и все его фрагменты по source_id."""
         ...
@@ -40,6 +44,9 @@ class DocumentStore(Protocol):
 class InMemoryDocumentStore:
     def __init__(self) -> None:
         self.documents: dict[str, tuple[Document, list[Chunk]]] = {}
+
+    async def close(self) -> None:
+        pass
 
     async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
         self.documents[document.source_id] = (document, chunks)
