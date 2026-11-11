@@ -96,6 +96,7 @@ export const SkillProfile = z.object({
   skills: z.record(z.string(), SkillLevel),
   strengths: z.array(z.string()),
   growth: z.array(z.string()),
+  updated_by: z.string().nullable().optional(), // кто последним менял уровень (наставник)
 });
 export type SkillProfile = z.infer<typeof SkillProfile>;
 

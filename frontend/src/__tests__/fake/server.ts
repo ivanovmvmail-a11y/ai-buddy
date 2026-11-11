@@ -106,6 +106,7 @@ export function installFakeServer(): FakeServer {
       if (!prof || !see(prof.intern_id)) return err(404, "Не найдено");
       if (actor.role !== "mentor") return err(403, "Нет прав");
       prof.skills = { ...prof.skills, [String(body.topic)]: body.level as SkillLevel };
+      prof.updated_by = actor.id;
       return ok(prof);
     }
     if (p === "/profile/skills") {

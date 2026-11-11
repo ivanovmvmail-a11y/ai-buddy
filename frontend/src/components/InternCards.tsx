@@ -10,6 +10,7 @@ import { useInterns, useMetrics, usePlan, useProfile, useRefresh, useSummary } f
 import { useSession } from "@/lib/store";
 import { findUser } from "@/lib/users";
 import type { DemoUser, Metrics, SkillLevel, SkillProfile } from "@/lib/types";
+import { LEVELS, TOPIC_TITLES } from "@/lib/skills";
 
 type Intern = { id: string; name: string; team: string };
 
@@ -161,12 +162,6 @@ function TopicsLine({ actor, internId }: { actor: DemoUser; internId: string }) 
   );
 }
 
-const TOPIC_TITLES: Record<string, string> = { git: "Git", sql: "SQL", ci: "CI и тесты" };
-const LEVELS: Array<{ id: SkillLevel; title: string }> = [
-  { id: "novice", title: "новичок" },
-  { id: "familiar", title: "знаком" },
-  { id: "confident", title: "уверенно" },
-];
 
 /** Спека 104: уровень по теме меняет только наставник; по нему бот выбирает глубину объяснений. */
 function SkillLevels({ actor, profile, topics }: { actor: DemoUser; profile: SkillProfile; topics: Array<string | null> }) {

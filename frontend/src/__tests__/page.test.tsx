@@ -226,6 +226,29 @@ describe("экран «план + чат» на API", () => {
     expect(await screen.findByText(/Объясни пункт «Завести конспект/)).toBeTruthy();
   });
 
+  it("«Мой профиль»: стажёр видит, что бот о нём знает, без правки", async () => {
+    srv.state.profiles[0].updated_by = "mentor-petr";
+    open();
+    await screen.findByText(/2-й день стажировки/);
+    await click(screen.getByRole("tab", { name: "Мой профиль" }));
+    expect(await screen.findByRole("heading", { name: "Мой профиль" })).toBeTruthy();
+    expect(screen.getByText("Пётр Волков")).toBeTruthy();
+    expect(screen.getByText("Ольга Новикова")).toBeTruthy();
+    expect(screen.getByText("Git — новичок")).toBeTruthy();
+    expect(screen.getByText("SQL — уверенно")).toBeTruthy();
+    expect(screen.getByText(/Не влияет на права/)).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: /Git/ })).toBeNull(); // уровни стажёр не правит
+    expect(screen.getByText("Последнее изменение: Пётр Волков")).toBeTruthy();
+    await click(screen.getByRole("tab", { name: "Мой план" }));
+    expect(await screen.findByRole("heading", { name: "Мой план" })).toBeTruthy();
+  });
+
+  it("у наставника нет вкладки «Мой профиль»", async () => {
+    open("mentor-petr");
+    await screen.findByText(/План: Аня Смирнова/);
+    expect(screen.queryByRole("tab", { name: "Мой профиль" })).toBeNull();
+  });
+
   it("«Следующий день» и «Сброс»", async () => {
     open();
     await screen.findByText(/2-й день стажировки/);
