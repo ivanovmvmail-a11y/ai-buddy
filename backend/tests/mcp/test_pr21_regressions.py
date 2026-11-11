@@ -227,7 +227,7 @@ def test_first_http_request_bootstraps_empty_tables_or_falls_back_for_existing_v
             assert client.get('/plan?intern_id=intern-ivan', headers=headers).status_code == 404
             if has_schema:
                 with psycopg.connect(dsn) as connection:
-                    assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (2,)
+                    assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (len(load_seed().interns),)
                     assert connection.execute("SELECT status FROM plan_items WHERE id='anya.w1.notes'").fetchone() == ('done',)
                 assert isinstance(store._store, PostgresStore)
                 run(store.close())

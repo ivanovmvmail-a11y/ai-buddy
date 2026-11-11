@@ -189,7 +189,7 @@ def test_r9_seed_passes_historical_day_without_temporarily_advancing_clock(monke
     original = checklist._change_status
     seen = []
     def checked(data, actor, item, status, *args, **kwargs):
-        assert data.interns[item.intern_id].current_day == {"intern-anya": 2, "intern-ivan": 8}[item.intern_id]
+        assert data.interns[item.intern_id].current_day == {"intern-anya": 2, "intern-ivan": 8, "intern-kirill": 3, "intern-liza": 3}[item.intern_id]
         assert kwargs["day"] == (5 if status == "waiting" else 1)
         seen.append((item.id, kwargs["day"]))
         return original(data, actor, item, status, *args, **kwargs)
