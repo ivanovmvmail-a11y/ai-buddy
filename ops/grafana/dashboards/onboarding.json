@@ -12,7 +12,7 @@
   "refresh": "5s",
   "timezone": "browser",
   "time": {
-    "from": "now-7d",
+    "from": "now-30d",
     "to": "now"
   },
   "panels": [
@@ -292,7 +292,7 @@
             "type": "grafana-postgresql-datasource",
             "uid": "ai-buddy-postgres"
           },
-          "rawSql": "SELECT $__timeGroupAlias(ts,'1d'), count(*) AS questions FROM public.grafana_answers WHERE $__timeFilter(ts) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT date_trunc('day', ts, '${__timezone}') AS time, count(*) AS questions FROM public.grafana_answers WHERE $__timeFilter(ts) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "rawQuery": true
         }
@@ -311,7 +311,8 @@
           "fields": "",
           "values": false
         }
-      }
+      },
+      "description": "Календарные сутки в часовом поясе дашборда (по умолчанию — браузера), включая переходы летнего времени. UTC-группировка не используется."
     },
     {
       "id": 8,
