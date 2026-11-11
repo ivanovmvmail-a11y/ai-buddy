@@ -22,7 +22,7 @@
 | 16 | 101-T3: PostgreSQL-хранилище онбординга, миграция, seed и оптимизация чтения | Codex | codex/onboarding-postgres | готово | [#21](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/21) | Ревью 1–4, 8 исправлено; 5–7 → HANDOFF; PostgreSQL: 507 passed / 98,32%; офлайн: 336 passed / 93,47% |
 | 17 | Спека 003: сценарный режим без ключа (LLM_PROVIDER=scenario по умолчанию) | Claude | claude/scenario-mode | готово | #22 | 337 тестов backend; проверено на демо-документах |
 | 18 | Спека 201: экран наставника — карточки стажёров, что зависло, итоги недели | Claude | claude/mentor-screen | готово | #23 | после #22; 34 теста Vitest |
-| 19 | Спека 004: золотой набор (37 вопросов) + отчёты; промпт против выдумок | Claude | claude/golden-set | готово | #24 | сценарный 37/37, GigaChat 37/37, утечек 0 |
+| 19 | Спека 004: золотой набор (37 вопросов) + отчёты; промпт против выдумок | Claude | claude/golden-set | готово | #24 | сценарный 37/37, GigaChat 36/37 (отчёт docs/golden-report-gigachat.md), утечек 0 |
 | 20 | Спека 302 [API]: события чата, «полезно / не полезно», /metrics, частые темы у наставника | Claude | claude/events-metrics | готово | #25 | после #24; backend +22 теста, frontend 39 |
 | 21 | Проверка «как у эксперта» в Docker: сценарный режим по умолчанию, честные источники | Claude | claude/docker-expert-check | готово | | весь маршрут SPEC 14 пройден в чистой копии без ключей |
 | 22 | Спека 104 [API]: наставник меняет уровень навыка стажёра (HTTP + экран наставника) | Claude | claude/skill-profile | готово | #35 | |
@@ -35,8 +35,15 @@
 | 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | готово | [#41](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/41) | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
 | 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | готово | [#42](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/42) | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен; миграции #39 и #42 применены к Supabase (Claude) |
 | 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | готово | #43 | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
-| 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | на ревью | | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
-| 33 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | [#45](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/45) | 683 passed / 98,37% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | готово | #44 | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
+| 33 | Аудит 11.11, B2: маршрут проверки в README (шаги, кнопки), версии, порты, структура | Claude | claude/readme-expert-route | готово | #47 | шаги сверены в браузере без ключа |
+| 34 | Аудит 11.11: D3 журнал сервера (LOG_LEVEL), D5 статусы спецификаций, очередь S2–S4 для Codex в HANDOFF | Claude | claude/audit-hardening | готово | #48 | 426 passed |
+| 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | готово | #49 | backend 428, frontend 49 / 98% |
+| 36 | [API] Аудит S1+S7: без ключа объяснение, «по шагам», «к кому идти» — сервер по документу пункта; фразы «спасибо», «кто наставник», «что у Ани зависло» | Claude | claude/scenario-answers | на ревью | | backend 452, frontend 51 / 98%, золотой 37/37 |
+
+| 37 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | [#45](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/45) | 683 passed / 98,37% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 38 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 673 passed / 98,31% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 39 | Бонус: приватная самопроверка по темам карты навыков | Codex | codex/self-check | на ревью | [#50](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/50) | 684 passed / 98,30% с ветвлениями; оба PostgreSQL-флага; /health=200 |
 
 ## Блокеры
 _нет_

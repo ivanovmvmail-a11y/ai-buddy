@@ -24,7 +24,7 @@ export async function askBot(actor: DemoUser, text: string) {
   try {
     const res = await api.chat(actor.id, history);
     chat.push({
-      id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources.map((s) => s.title),
+      id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources,
       answerId: res.answer_id ?? undefined,
     });
     for (const action of res.actions) {
@@ -96,7 +96,18 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
         <div className="whitespace-pre-wrap">{m.content}</div>
         {m.draft && <DraftCard m={m} actor={actor} />}
         {m.sources && m.sources.length > 0 && (
-          <div className="mt-2 text-xs text-black/55 dark:text-white/55">Источник: {m.sources.join(", ")} · демо-данные, не регламент Авито</div>
+          <div className="mt-2 text-xs text-black/55 dark:text-white/55">
+            Источник:{" "}
+            {m.sources.map((s, i) => (
+              <span key={s.title}>
+                {i > 0 && ", "}
+                {s.url ? (
+                  <a href={s.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[#00aaff]">{s.title}</a>
+                ) : s.title}
+              </span>
+            ))}{" "}
+            · демо-данные, не регламент Авито
+          </div>
         )}
         {m.actions && m.actions.length > 0 && actor.role === "intern" && (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -108,6 +119,15 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
                   ? "rounded-lg bg-[#00aaff] px-3 py-1.5 text-sm font-medium text-white"
                   : "rounded-lg border border-black/15 px-3 py-1.5 text-sm dark:border-white/20"}
               >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {m.followups && m.followups.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {m.followups.map((a) => (
+              <button key={a.label} onClick={() => onAction(a)} className="rounded-full border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
                 {a.label}
               </button>
             ))}

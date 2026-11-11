@@ -44,12 +44,23 @@ def _action_json(action: Action) -> dict:
     return action.model_dump(mode="json")
 
 
+def configure_logging(level: str) -> None:
+    """Журнал в stdout (Docker/Railway собирают его сами). Без этого INFO-строки агента терялись."""
+    root = logging.getLogger()
+    if not root.handlers:  # gunicorn/pytest могли уже настроить — не дублируем вывод
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        root.addHandler(handler)
+    root.setLevel(getattr(logging, level.upper(), logging.INFO))
+
+
 def create_app() -> Flask:
+    configure_logging(settings.log_level)
     app = Flask(__name__)
     app.json.ensure_ascii = False  # кириллица в ответах как есть, без \uXXXX
 
     origins = [o.strip() for o in settings.frontend_origins.split(",") if o.strip()]
-    CORS(app, origins=origins, allow_headers=["Content-Type", USER_HEADER])
+    CORS(app, origins=origins, allow_headers=["Content-Type", USER_HEADER, "X-Demo-Key"])
 
     @app.before_request
     def load_user():
