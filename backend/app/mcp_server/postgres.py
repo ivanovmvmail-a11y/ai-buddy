@@ -6,7 +6,7 @@ from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
 from .models import (AccessRequest, AccessResource, Event, InternState, OnboardingData,
-                     PlanItem, Reminder, SkillProfile, CatalogItem)
+                     PlanItem, Reminder, SkillProfile, CatalogItem, SkillSuggestion)
 
 # Порядок соответствует внешним ключам; SQL-имена определены кодом, не вводом пользователя.
 TABLES = (
@@ -16,14 +16,18 @@ TABLES = (
     ("items", "plan_items", PlanItem, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
+    ("suggestions", "skill_suggestions", SkillSuggestion, "id"),
     ("reminders", "reminders", Reminder, "id"),
 )
-JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload"}
+JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload", "evidence"}
 DERIVED_FIELDS = {"overdue", "waiting_days", "skill_level", "in_plan"}
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
 
 
 def _dump(model):
+    if isinstance(model, SkillSuggestion):
+        return {**model.model_dump(mode="json", exclude={"intern_name", "topic_title"}),
+                "evidence": model.evidence}
     return model.model_dump(mode="json", exclude=DERIVED_FIELDS)
 
 

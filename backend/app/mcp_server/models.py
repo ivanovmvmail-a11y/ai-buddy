@@ -126,6 +126,22 @@ class SkillProfile(Model):
     updated_at: AwareDatetime
 
 
+class SkillSuggestion(Model):
+    id: str
+    intern_id: str
+    mentor_id: str
+    intern_name: str = ""
+    topic: str
+    topic_title: str = ""
+    from_level: SkillLevel
+    to_level: SkillLevel
+    basis: str
+    evidence: list[str] = Field(default_factory=list, exclude=True)
+    created_day: int = Field(ge=1)
+    status: Literal["pending", "accepted", "dismissed"] = "pending"
+    decided_day: int | None = Field(default=None, ge=1)
+
+
 class Reminder(Model):
     id: str
     user_id: str
@@ -159,5 +175,6 @@ class OnboardingData(Model):
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
     profiles: dict[str, SkillProfile] = Field(default_factory=dict)
     reminders: dict[str, Reminder] = Field(default_factory=dict)
+    suggestions: dict[str, SkillSuggestion] = Field(default_factory=dict)
     personal_catalog: dict[str, CatalogItem] = Field(default_factory=dict)
     events: list[Event] = Field(default_factory=list)
