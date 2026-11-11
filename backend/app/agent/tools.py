@@ -25,6 +25,9 @@ log = logging.getLogger("ai_buddy.tools")
 Handler = Callable[[User, BaseModel], Awaitable[dict[str, Any]]]
 Authorize = Callable[[User, BaseModel], bool]
 Describe = Callable[[BaseModel], str]
+# Проверка данных до черновика: False — объекта для пользователя «нет» (не раскрываем ни название, ни факт).
+Precheck = Callable[[User, BaseModel], Awaitable[bool]]
+NOT_FOUND_MESSAGE = "Такого ресурса или объекта нет среди доступных тебе."
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,8 @@ class Tool:
     authorize: Authorize | None = None
     # человеко-понятный заголовок черновика для write-инструментов
     describe: Describe | None = None
+    # проверка до черновика, что объект виден пользователю (аудит D4: чужой ресурс — сразу «нет»)
+    precheck: Precheck | None = None
 
     def spec(self) -> ToolSpec:
         schema = self.args_model.model_json_schema()
@@ -106,6 +111,9 @@ class ToolExecutor:
             return {"error": "forbidden", "message": FORBIDDEN_MESSAGE}
 
         if tool.kind == "write":
+            if tool.precheck and not await tool.precheck(user, args):
+                log.info("draft refused, not visible user=%s tool=%s", user.id, tool.name)
+                return {"error": "not_found", "message": NOT_FOUND_MESSAGE}
             title = tool.describe(args) if tool.describe else tool.description
             action = await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
             log.info("draft user=%s tool=%s action=%s", user.id, tool.name, action.id)
