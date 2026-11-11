@@ -106,6 +106,7 @@
 | `GET /access/requests?intern_id=` | стажёр — свои, наставник — своих | `{"requests":[AccessRequest + "resource_title"]}`, новые сверху |
 | `POST /access/requests/{id}/decide` `{"approve":true\|false,"reason"?}` | только назначенный согласующий; при отказе `reason` обязателен | `AccessRequest` |
 | `GET /profile/skills?intern_id=` | стажёр — свой, наставник — своих | `SkillProfile` |
+| `POST /profile/skills` `{"intern_id","topic","level":"novice\|familiar\|confident"}` | только наставник этого стажёра (стажёр — `403`, чужие — `404`) | `SkillProfile`; событие `skill_level_changed` (спека 104) |
 | `GET /reminders` | все | `{"reminders":[Reminder]}` — только активные свои |
 | `POST /reminders/{id}/snooze` `{"days":1}` / `POST /reminders/{id}/done` | владелец | `Reminder` |
 | `POST /demo/next-day` `{"intern_id"?}` | любая роль (демо-панель) | `{"days":{"intern-anya":3,…}}`; запускает проверку напоминаний |

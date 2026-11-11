@@ -162,6 +162,31 @@ def test_skill_profile_rights(client):
     assert get(client, "/profile/skills?intern_id=intern-anya", "curator-dmitry").status_code == 404
 
 
+def test_mentor_sets_skill_level(client):
+    body = {"intern_id": "intern-anya", "topic": "git", "level": "familiar"}
+    res = post(client, "/profile/skills", body, "mentor-petr")
+    assert res.status_code == 200 and res.get_json()["skills"]["git"] == "familiar"
+    assert get(client, "/profile/skills").get_json()["skills"]["git"] == "familiar"
+    new_topic = post(client, "/profile/skills", {**body, "topic": "ci", "level": "novice"}, "mentor-petr")
+    assert new_topic.get_json()["skills"]["ci"] == "novice"
+
+
+@pytest.mark.parametrize("user, code", [
+    ("intern-anya", 403),      # стажёр сам себе уровень не ставит
+    ("mentor-maria", 404),     # чужой наставник стажёра не видит
+    ("curator-dmitry", 404),   # куратору карта навыков закрыта
+])
+def test_only_own_mentor_sets_skill_level(client, user, code):
+    res = post(client, "/profile/skills", {"intern_id": "intern-anya", "topic": "git", "level": "confident"}, user)
+    assert res.status_code == code
+    assert get(client, "/profile/skills").get_json()["skills"]["git"] == "novice"
+
+
+def test_skill_level_validation(client):
+    res = post(client, "/profile/skills", {"intern_id": "intern-anya", "topic": "git", "level": "expert"}, "mentor-petr")
+    assert res.status_code == 422
+
+
 def test_next_day_creates_reminders_then_snooze_and_done(client):
     days = post(client, "/demo/next-day", {}, "intern-ivan").get_json()["days"]
     assert days["intern-ivan"] >= 2

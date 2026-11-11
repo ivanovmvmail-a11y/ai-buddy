@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import {
   AccessRequest, Action, ChatResponse, DaysResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
-  Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillProfile, WeeklySummary,
+  Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile, WeeklySummary,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -64,6 +64,8 @@ export const api = {
   decide: (u: string, requestId: string, approve: boolean, reason?: string) =>
     request(`/access/requests/${encodeURIComponent(requestId)}/decide`, AccessRequest, u, post({ approve, reason })),
   profile: (u: string, internId?: string) => request(`/profile/skills${q(internId)}`, SkillProfile, u),
+  setSkill: (u: string, internId: string, topic: string, level: SkillLevel) =>
+    request("/profile/skills", SkillProfile, u, post({ intern_id: internId, topic, level })),
   reminders: (u: string) => request("/reminders", RemindersResponse, u),
   snooze: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/snooze`, Reminder, u, post({ days: 1 })),
   doneReminder: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/done`, Reminder, u, post()),

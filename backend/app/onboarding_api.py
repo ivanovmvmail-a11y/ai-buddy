@@ -5,6 +5,8 @@
 это и есть решение человека. Действия, которые готовит ИИ или кнопка «Сделать за меня», идут через
 черновик и `POST /actions/{id}/confirm`.
 """
+from typing import Literal
+
 from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_core import to_jsonable_python
@@ -119,6 +121,19 @@ def decide(request_id: str):
 @bp.get("/profile/skills")
 def skills():
     return _json(async_runner.run(hiring.get_skill_profile(g.user, _intern_id())))
+
+
+class SkillIn(BaseModel):
+    intern_id: str
+    topic: str = Field(min_length=1, max_length=40)
+    level: Literal["novice", "familiar", "confident"]
+
+
+@bp.post("/profile/skills")
+def set_skill():
+    """Спека 104: уровень меняет только наставник этого стажёра — это решение человека, не ИИ."""
+    body = _body(SkillIn)
+    return _json(async_runner.run(hiring.set_skill_level(g.user, body.intern_id, body.topic, body.level)))
 
 
 @bp.get("/reminders")

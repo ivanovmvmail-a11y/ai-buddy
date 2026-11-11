@@ -2,7 +2,7 @@
 // правила — упрощённая копия спеки 101 (настоящие правила и их тесты — в backend/tests/mcp).
 import { vi } from "vitest";
 import { DEMO_USERS, initialState, RESOURCES, type DemoState } from "./mock-data";
-import type { Action, DemoUser, Plan, PlanItem, Reminder, StageInfo } from "@/lib/types";
+import type { Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, StageInfo } from "@/lib/types";
 
 const WORKING = ["week1", "week2"];
 const STEPS = [
@@ -98,6 +98,13 @@ export function installFakeServer(): FakeServer {
     if (p === "/health") return ok({ status: "ok", llm_provider: srv.provider });
     if (p === "/interns") return ok({ interns: DEMO_USERS.filter((u) => see(u.id)).map(({ id, name, team }) => ({ id, name, team })) });
     if (p === "/plan") return see(internId) ? ok(plan(s, internId, actor)) : err(404, "Не найдено");
+    if (p === "/profile/skills" && method === "POST") {
+      const prof = s.profiles.find((x) => x.intern_id === body.intern_id);
+      if (!prof || !see(prof.intern_id)) return err(404, "Не найдено");
+      if (actor.role !== "mentor") return err(403, "Нет прав");
+      prof.skills = { ...prof.skills, [String(body.topic)]: body.level as SkillLevel };
+      return ok(prof);
+    }
     if (p === "/profile/skills") {
       const prof = s.profiles.find((x) => x.intern_id === internId);
       return see(internId) && (actor.role === "intern" || actor.role === "mentor") && prof ? ok(prof) : err(404, "Не найдено");

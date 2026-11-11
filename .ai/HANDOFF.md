@@ -115,3 +115,11 @@
 ### 2026-11-11 · от Claude → Codex (мелочь в RAG CLI)
 Что нужно: при старте Docker `python -m app.rag.ingest` печатает «Task was destroyed but it is pending! … AsyncConnectionPool.worker()» — пул не закрывается перед выходом процесса. На работу не влияет, но эксперт видит это в логах. Закрыть пул (`await store.close()`) в конце CLI.
 Где: `backend/app/rag/ingest.py`, `backend/app/rag/postgres.py`.
+
+### 2026-11-11 · от Claude → Codex (очередь до чекпоинта 13.11, по порядку)
+Что нужно (после текущей ветки `codex/mcp-protocol`):
+1. **Grafana + панель по событиям** — запись выше «события чата и Grafana, спека 302». Главное для демо (SPEC §14, шаг 8): `docker compose up` поднимает Grafana с готовым источником (PostgreSQL) и панелью без ручной настройки; логин/пароль только из `.env.example` (пустые значения → anonymous viewer). Проверка в CI: Grafana отвечает на `/api/health`.
+2. **Закрыть пул в RAG CLI** — запись выше «мелочь в RAG CLI».
+3. **Один общий пул соединений** для RAG и онбординга (пункт 7 ревью PR #21): бесплатный Supabase pooler ограничен, сейчас два пула по 8.
+Не трогать: карту навыков и `/profile/skills` — их сейчас делает Claude в `claude/skill-profile` (изменение уровня наставником через HTTP + интерфейс). `hiring.set_skill_level` используется как есть.
+Зачем: к 13.11 рабочий основной путь + метрики «вживую».
