@@ -3,7 +3,7 @@ import { initialState } from "./fake/mock-data";
 import { canMarkDone, canRequestAccess, pluralDays, waitedFor } from "@/lib/plan-logic";
 import { findUser, firstName } from "@/lib/users";
 import { actionFor, approverText, explainScripted, greeting } from "@/lib/chat";
-import type { Plan } from "@/lib/types";
+import type { Plan, SkillProfile } from "@/lib/types";
 
 const u = (id: string) => findUser(id)!;
 const items = initialState().items;
@@ -48,6 +48,17 @@ describe("сценарные ответы", () => {
     const msg = explainScripted(item("anya.w1.chats"), undefined);
     expect(msg.content).not.toMatch(/по шагам/);
     expect(msg.sources).toBeUndefined();
+  });
+
+  it("коротко для уверенного: ссылку обещаем, только если есть документ", () => {
+    const base = { ...item("anya.w1.notes"), topic: "git" } as typeof items[number];
+    const profile = { skills: { git: "confident" } } as unknown as SkillProfile;
+    const noDoc = explainScripted({ ...base, doc_source_id: null }, profile);
+    expect(noDoc.content).not.toMatch(/по ссылке ниже/);
+    expect(noDoc.sources).toBeUndefined();
+    const withDoc = explainScripted({ ...base, doc_source_id: "demo:01-first-days.md" }, profile);
+    expect(withDoc.content).toMatch(/по ссылке ниже/);
+    expect(withDoc.sources).toEqual(["01-first-days.md"]);
   });
 
   it("действие для пункта и согласующий", () => {

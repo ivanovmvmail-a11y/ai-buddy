@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | 1 | Каркас проекта (backend + frontend + правила) | Claude | main (init) | готово | — | стартовый коммит |
 | 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | готово | #14 | интервью проведено 10.11; один глубокий сценарий «Первые недели и чек-лист» + профиль стажёра |
-| 3 | Деплой: сайт и backend на Railway (Render/Vercel/Netlify не работают из РФ) (бонус к Docker) | Claude + Миша | claude/deploy | на ревью | #29–#32, след. | Проверено в браузере: план грузится, чат отвечает через GigaChat, база Supabase |
+| 3 | Деплой: сайт и backend на Railway (Render/Vercel/Netlify не работают из РФ) (бонус к Docker) | Claude + Миша | claude/deploy | готово | #29–#32 | Проверено в браузере: план грузится, чат отвечает через GigaChat, база Supabase |
 | 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | готово | #7 | по ТЗ: стек Авито Go / Python+Flask |
 | 5 | Docker: запуск одной командой | Claude | claude/docker | готово | #8 | Docker и тесты проверяет CI на GitHub (локально нет SVM в BIOS) |
 | 6 | Инструменты агента: права + черновик→подтверждение [API] | Claude | claude/agent-tools | готово | #9 | |
@@ -26,17 +26,15 @@
 | 20 | Спека 302 [API]: события чата, «полезно / не полезно», /metrics, частые темы у наставника | Claude | claude/events-metrics | готово | #25 | после #24; backend +22 теста, frontend 39 |
 | 21 | Проверка «как у эксперта» в Docker: сценарный режим по умолчанию, честные источники | Claude | claude/docker-expert-check | готово | | весь маршрут SPEC 14 пройден в чистой копии без ключей |
 | 22 | Спека 104 [API]: наставник меняет уровень навыка стажёра (HTTP + экран наставника) | Claude | claude/skill-profile | готово | #35 | |
-| 23 | Спеки 102 (объяснение под уровень) и 301 (напоминания) — оформить по готовому коду | Claude | claude/specs-102-301 | на ревью | | только документы; найдено отличие от SPEC: нет колокольчика (301-T4) |
-| 24 | Колокольчик напоминаний в шапке (301-T4) + ревью PR #34 Codex | Claude | claude/reminders-bell | на ревью | | |
-| 25 | Спека 103 (заявка на доступ) по готовому коду; 301-T4 отмечена | Claude | claude/spec-103-presentation | на ревью | | только документы |
-
+| 23 | Спеки 102 (объяснение под уровень) и 301 (напоминания) — оформить по готовому коду | Claude | claude/specs-102-301 | готово | #36 | только документы; найдено отличие от SPEC: нет колокольчика (301-T4) |
+| 24 | Колокольчик напоминаний в шапке (301-T4) + ревью PR #34 Codex | Claude | claude/reminders-bell | готово | #37 | |
+| 25 | Спека 103 (заявка на доступ) по готовому коду; 301-T4 отмечена | Claude | claude/spec-103-presentation | готово | #38 | только документы |
 | 26 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | готово | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
-
 | 27 | Grafana: готовая панель метрик из PostgreSQL | Codex | codex/grafana-demo | готово | [#39](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/39) | Docker проверен; PostgreSQL: 612 passed / 98,23%; read-only datasource |
 | 28 | Закрыть пул PostgreSQL в RAG CLI | Codex | codex/rag-cli-close | готово | [#40](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/40) | --rag-postgres: 425 passed / 94,26%; успех/ошибки закрывают пул |
 | 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | готово | [#41](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/41) | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
-
-| 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | на ревью | [#42](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/42) | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен |
+| 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | готово | [#42](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/42) | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен; миграции #39 и #42 применены к Supabase (Claude) |
+| 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | на ревью | | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
 
 ## Блокеры
 _нет_
