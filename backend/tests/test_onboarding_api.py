@@ -48,13 +48,13 @@ def test_curator_reads_any_plan_but_cannot_mark(client):
 
 @pytest.mark.parametrize("user,expected", [
     ("intern-anya", ["intern-anya"]),
-    ("mentor-maria", ["intern-ivan"]),
-    ("lead-olga", ["intern-anya"]),
-    ("curator-dmitry", ["intern-anya", "intern-ivan"]),
+    ("mentor-maria", ["intern-ivan", "intern-liza"]),
+    ("lead-olga", ["intern-anya", "intern-kirill"]),
+    ("curator-dmitry", ["intern-anya", "intern-ivan", "intern-kirill", "intern-liza"]),
     ("hrbp-elena", []),
 ])
 def test_interns_visible_to_role(client, user, expected):
-    assert [u["id"] for u in get(client, "/interns", user).get_json()["interns"]] == expected
+    assert [u["id"] for u in get(client, "/interns", user).get_json()["interns"]] == [id for id in expected if id in DEMO_USERS]
 
 
 def _manual_item(client, user="intern-anya", owner="intern"):

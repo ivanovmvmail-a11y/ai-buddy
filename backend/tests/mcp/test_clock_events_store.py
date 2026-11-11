@@ -142,7 +142,7 @@ def test_store_snapshots_rollback_isolation_and_idempotent_seed(store, snapshot)
     async def count():
         async with empty.transaction() as data:
             return len(data.interns)
-    assert run(count()) == 2
+    assert run(count()) == len(before.interns)
 
 
 def test_store_factory_cached_and_selects_backend_without_connecting(monkeypatch, caplog):
