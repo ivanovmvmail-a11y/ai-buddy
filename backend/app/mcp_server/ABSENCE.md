@@ -30,3 +30,12 @@ MCP: `absence_draft_request`, `absence_draft_decision`, `absence_get_request`,
 PUBLIC, существующие anon/authenticated и identity sequences.
 Seed двух команд — `seed/absence.json`, хранение — InMemory или PostgreSQL
 через общий OnboardingStore. Полный контракт интеграции — `.ai/HANDOFF.md`.
+
+## Уведомления и сроки (чекпоинт 1)
+Примените также `20261111161000_reminder_kinds.sql`. Подтверждение заявки уведомляет
+руководителя (`absence_new`); через два виртуальных дня ожидания стажёр получает
+`absence_pending`. Решение завершает оба ожидания и создаёт `absence_decided` автору.
+При согласовании наставник получает только `absence_fact`: дату, без причины и ссылки на заявку.
+В согласованный день появляется `absence_today`; сроки незакрытых пунктов сдвигаются на +1
+ровно один раз. Cron и advance_day используют виртуальный день стажёра, Event.ts — реальные часы.
+Сохранённые напоминания обеспечивают дедупликацию и после перезапуска.

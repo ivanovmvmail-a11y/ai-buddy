@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import pytest
 from pydantic import ValidationError
 from app import async_runner
-from app.agent.users import DEMO_USERS
+from app.agent.users import DEMO_USERS, Role
 from app.mcp_server import absence, clock, drafts, storage
 from app.mcp_server.errors import Conflict, NotFound
 from app.mcp_server.postgres import PostgresStore
@@ -42,7 +42,7 @@ def test_no_delivery_before_confirm_owner_drafts_and_idempotency(store, snapshot
     facts = run(absence.list_absence_facts(PETR, ANYA))
     assert any(f.day == DAY for f in facts)
     assert all(set(f.model_dump()) == {'intern_id', 'day'} for f in facts)
-    assert all(set(e.payload) == {'status'} for e in snapshot().events if e.type.startswith('absence_'))
+    assert all(set(e.payload) <= {'status', 'day'} for e in snapshot().events if e.type.startswith('absence_'))
     approved.reason = 'study'
     assert run(absence.get_request(ANYA, result.id)).reason == 'family'
 
@@ -56,7 +56,7 @@ def test_all_roles_and_same_not_found_for_foreign_missing(store, user):
         with pytest.raises(NotFound) as foreign: run(absence.get_request(user, q.id))
         with pytest.raises(NotFound) as missing: run(absence.get_request(user, 'missing'))
         assert str(foreign.value) == str(missing.value)
-        if user in ('intern-ivan', 'lead-sergey'):
+        if DEMO_USERS[user].role in (Role.INTERN, Role.LEAD):
             assert q.id not in {r.id for r in run(absence.list_requests(user))}
         else:
             with pytest.raises(NotFound): run(absence.list_requests(user))

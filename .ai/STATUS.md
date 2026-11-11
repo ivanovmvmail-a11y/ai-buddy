@@ -54,7 +54,7 @@
 | 48 | Ревью Codex #59 (повторно), #61, #62; поддельный сервер фронта — новые документы пунктов, как в #62 | Claude | claude/mock-howto-links | на ревью | | frontend 64 |
 | 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | на ревью | | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
 
-| 51 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | в работе | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | возобновлён после аудита; main влит |
+| 51 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 836 passed / 98,14%; main влит; уведомления и +1 день сроков |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).

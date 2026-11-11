@@ -17,7 +17,7 @@ MIGRATION = Path(__file__).resolve().parents[3] / "supabase/migrations/202611110
 def apply_onboarding_migrations(connection):
     """Базовая схема и добавочные сервисные миграции, без Grafana/RAG."""
     connection.execute(MIGRATION.read_text(encoding="utf-8"))
-    for pattern in ("*_service_drafts.sql", "*_mentor_inbox.sql", "*_absence.sql", "*_self_check.sql"):
+    for pattern in ("*_service_drafts.sql", "*_mentor_inbox.sql", "*_absence.sql", "*_self_check.sql", "*_reminder_kinds.sql"):
         for path in sorted(MIGRATION.parent.glob(pattern)):
             connection.execute(path.read_text(encoding="utf-8"))
 

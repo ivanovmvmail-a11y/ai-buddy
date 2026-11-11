@@ -7,6 +7,7 @@ from ._domain import intern
 from .absence_models import AbsenceFact, AbsenceInput, AbsenceReason, AbsenceRequest, DecisionInput
 from .errors import Conflict, NotFound
 from .models import ActionDraft
+from .notifications import notify, complete
 
 
 def _student(data, user):
@@ -69,6 +70,8 @@ async def confirm_absence(user_id: str, draft_id: str) -> AbsenceRequest:
         data.absence_requests[request.id] = request
         drafts.finish(draft, request.id)
         events._record(data, user, 'absence_requested', {'status': 'pending'})
+        notify(data, request.lead_id, request.intern_id, 'absence_new', request.id,
+               f"Новая заявка на отгул на {request.day:%d.%m}", 'absence_request', absence_request_id=request.id)
         return request.model_copy(deep=True)
 
 
@@ -115,7 +118,17 @@ async def confirm_decision(user_id: str, draft_id: str) -> AbsenceRequest:
             request.status = 'approved' if draft.payload['approve'] else 'rejected'
             request.decided_day = data.interns[request.intern_id].current_day
             drafts.finish(draft, request.id)
-            events._record(data, user, 'absence_decided', {'status': request.status})
+            events._record(data, user, 'absence_decided', {'status': request.status, 'day': request.decided_day})
+            complete(data, request.id, {'absence_new', 'absence_pending'})
+            result = 'согласован' if request.status == 'approved' else 'отклонён'
+            notify(data, request.intern_id, request.intern_id, 'absence_decided', request.id,
+                   f"Отгул на {request.day:%d.%m} {result}", 'absence_request', absence_request_id=request.id)
+            target = intern(data, request.intern_id)
+            if request.status == 'approved' and target.mentor_id:
+                # Наставник видит только факт и дату, без причины и id заявки.
+                notify(data, target.mentor_id, target.id, 'absence_fact', request.id,
+                       f"{target.name} отсутствует {request.day:%d.%m}", 'intern')
+            _tick_absences(data, intern_ids={request.intern_id})
         return request.model_copy(deep=True)
 
 
@@ -127,3 +140,33 @@ async def list_absence_facts(user_id: str, intern_id: str) -> list[AbsenceFact]:
             raise NotFound()
         return [AbsenceFact(intern_id=target.id, day=r.day) for r in data.absence_requests.values()
                 if r.intern_id == target.id and r.team == target.team and r.status == 'approved']
+
+
+
+def _tick_absences(data, day=None, intern_ids=None):
+    from .notifications import notification_id
+    created = []
+    for request in data.absence_requests.values():
+        if intern_ids is not None and request.intern_id not in intern_ids:
+            continue
+        state = data.interns[request.intern_id]
+        current_day = day if day is not None else state.current_day
+        today = state.start_date + timedelta(days=current_day - 1)
+        if request.status == 'pending' and current_day - request.created_day >= 2:
+            reminder = notify(data, request.intern_id, request.intern_id, 'absence_pending', request.id,
+                'Заявка на отгул ждёт решения 2 дня — напомнить руководителю?',
+                'absence_request', absence_request_id=request.id, day=current_day)
+            if reminder: created.append(reminder)
+        if request.status == 'approved' and request.day == today:
+            key = notification_id('absence_today', request.intern_id, request.id)
+            if key in data.reminders:
+                continue
+            for item in data.items.values():
+                if item.intern_id == request.intern_id and item.status != 'done' and item.due_day is not None:
+                    item.due_day += 1
+            reminder = notify(data, request.intern_id, request.intern_id, 'absence_today', request.id,
+                'Сегодня ты отсутствуешь, сроки незакрытых пунктов сдвинуты на день',
+                'plan', absence_request_id=request.id, day=current_day)
+            created.append(reminder)
+            events._record(data, drafts.actor(request.intern_id), 'absence_deadlines_shifted', {'day': current_day})
+    return created

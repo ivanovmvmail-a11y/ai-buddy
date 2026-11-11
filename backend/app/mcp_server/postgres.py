@@ -89,6 +89,8 @@ class PostgresStore(PostgresPoolOwner):
             for key in removed:
                 await connection.execute(sql.SQL("DELETE FROM {} WHERE {} = %s").format(
                     sql.Identifier("public", table), sql.Identifier(key_column)), (key,))
+        cursor = await connection.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='reminders'")
+        reminder_columns = {row["column_name"] for row in await cursor.fetchall()}
         for field, table, _, key_column in TABLES:
             if table in OPTIONAL_TABLES and table not in available:
                 if getattr(data, field) and not missing_ok:
@@ -101,6 +103,11 @@ class PostgresStore(PostgresPoolOwner):
                 if table == "reminders" and "mentor_questions" not in available:
                     if values.pop("mentor_question_id", None) is not None:
                         raise Conflict("Сервис пока недоступен: примените новые миграции базы данных")
+                if table == "reminders":
+                    unavailable = set(values) - reminder_columns
+                    if unavailable and record.kind not in {"plan_item", "access_request"}:
+                        raise Conflict("Уведомления пока недоступны: примените новые миграции базы данных")
+                    values = {key: value for key, value in values.items() if key in reminder_columns}
                 columns = list(values)
                 query = sql.SQL("INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}").format(
                     sql.Identifier("public", table),
@@ -110,7 +117,7 @@ class PostgresStore(PostgresPoolOwner):
                     sql.SQL(",").join(sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(name), sql.Identifier(name))
                                       for name in columns if name != key_column),
                 )
-                await connection.execute(query, tuple(Jsonb(values[name]) if name in JSON_FIELDS else values[name]
+                await connection.execute(query, tuple(Jsonb(values[name]) if (name in JSON_FIELDS or (table == "reminders" and name == "action")) and values[name] is not None else values[name]
                                                       for name in columns))
 
     @asynccontextmanager
