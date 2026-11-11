@@ -80,6 +80,8 @@ export type FakeServer = {
   feedback: Array<{ answer_id: string; useful: boolean }>;
   explainFails?: boolean;
   metrics: Record<string, unknown> | null;
+  /** Код-слово демо-кнопок, как DEMO_KEY на сервере; не задано — кнопки открыты. */
+  demoKey?: string;
 };
 
 export function installFakeServer(): FakeServer {
@@ -89,7 +91,7 @@ export function installFakeServer(): FakeServer {
   let reqN = 1003;
   let actN = 1;
 
-  function handle(method: string, path: string, actor: DemoUser, body: Record<string, unknown>): Route {
+  function handle(method: string, path: string, actor: DemoUser, body: Record<string, unknown>, demoKey?: string): Route {
     const s = srv.state;
     const url = new URL(path, "http://x");
     const p = url.pathname;
@@ -184,6 +186,9 @@ export function installFakeServer(): FakeServer {
       action.result = { status: "created", request: req };
       return ok(action);
     }
+    if (p.startsWith("/demo/") && srv.demoKey && decodeURIComponent(demoKey ?? "") !== srv.demoKey) {
+      return err(403, "Нужно код-слово демо");
+    }
     if (p === "/demo/next-day") {
       for (const k of Object.keys(s.days)) s.days[k] += 1;
       return ok({ days: s.days });
@@ -196,7 +201,17 @@ export function installFakeServer(): FakeServer {
     if (m && method === "POST") {
       if (srv.explainFails) return err(500, "Ошибка");
       if (!s.items.some((i) => i.id === m![1])) return err(404, "Не найдено");
-      return { status: 201, body: { answer_id: `ans_explain_${m[1]}` } };
+      const item = s.items.find((i) => i.id === m![1])!;
+      const kind = String(body.kind ?? "explain");
+      const text = kind === "steps" ? `По шагам: ${item.title}` : kind === "who" ? `К кому идти: ${item.title}` : `Из документа: ${item.summary}`;
+      const chips = ["Как это сделать по шагам?", "К кому идти, если не получается?"].filter((_, n) => kind !== ["steps", "who"][n]);
+      return {
+        status: 201,
+        body: {
+          answer_id: `ans_${kind}_${m[1]}`, text, chips,
+          source: item.doc_source_id ? { title: "Первые дни стажёра", url: "https://example.org/doc" } : null,
+        },
+      };
     }
     if (p === "/feedback") {
       if (String(body.answer_id) === "ans_fail") return err(500, "Ошибка");
@@ -229,7 +244,7 @@ export function installFakeServer(): FakeServer {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     const method = init?.method ?? "GET";
     srv.calls.push({ method, path, user: actor.id, body });
-    const route = handle(method, path, actor, body);
+    const route = handle(method, path, actor, body, headers["X-Demo-Key"]);
     const payload = route.status === 204 ? null : JSON.stringify(route.body);
     return new Response(payload, { status: route.status, headers: { "Content-Type": "application/json" } });
   });

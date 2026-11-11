@@ -5,14 +5,48 @@ import { useEffect, useState } from "react";
 import { askBot, ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
 import { ReminderBell } from "@/components/ReminderBell";
-import { api } from "@/lib/api";
+import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  accessDraftParams, explainQuestion, explainScripted, greeting, msgId, reminderMsg, useChat, type BotAction,
+  accessDraftParams, actionFor, explainScripted, followupQuestion, followupsFor, greeting, msgId, reminderMsg, useChat,
+  type BotAction, type Msg,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { useSession } from "@/lib/store";
-import type { AccessRequest, DemoUser, Plan, PlanItem, Reminder } from "@/lib/types";
+import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
+
+const DEMO_KEY_STORAGE = "ai-buddy-demo-key";
+
+function storedDemoKey(): string | undefined {
+  try {
+    return sessionStorage.getItem(DEMO_KEY_STORAGE) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Демо-кнопка на публичном сайте: если сервер просит код-слово — спросить один раз за вкладку (аудит D6). */
+async function withDemoKey<T>(call: (key?: string) => Promise<T>): Promise<T> {
+  const needsKey = (err: unknown) => err instanceof ApiError && err.status === 403 && err.message === DEMO_KEY_REQUIRED;
+  try {
+    return await call(storedDemoKey());
+  } catch (err) {
+    if (!needsKey(err)) throw err;
+  }
+  const key = window.prompt("Код-слово для демо-кнопок")?.trim();
+  if (!key) throw new ApiError("Без код-слова демо-кнопки на этом сайте не работают.", 403);
+  try {
+    const result = await call(key);
+    try {
+      sessionStorage.setItem(DEMO_KEY_STORAGE, key);
+    } catch {
+      /* приватное окно — спросим снова в следующий раз */
+    }
+    return result;
+  } catch (err) {
+    throw needsKey(err) ? new ApiError("Код-слово не подошло.", 403) : err;
+  }
+}
 
 export default function Home() {
   const userId = useSession((s) => s.userId);
@@ -71,16 +105,34 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  async function onExplain(item: PlanItem) {
+  const ASKED: Record<ExplainKind, (item: PlanItem) => string> = {
+    explain: (item) => `Объясни пункт «${item.title}»`,
+    steps: () => "Как это сделать по шагам?",
+    who: () => "К кому идти, если не получается?",
+  };
+
+  async function onExplain(item: PlanItem, kind: ExplainKind = "explain") {
     setTab("chat");
-    if (!scriptedMode) return askBot(actor, explainQuestion(item));
-    const profile = await client
-      .fetchQuery({ queryKey: keys.profile(actor.id, item.intern_id), queryFn: () => api.profile(actor.id, item.intern_id) })
-      .catch(() => undefined);
-    // Записываем объяснение в события (метрики, «полезно / не полезно»); сбой записи объяснению не мешает.
-    const recorded = await api.explained(actor.id, item.id, item.intern_id).catch(() => undefined);
-    say({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` },
-      { ...explainScripted(item, profile), answerId: recorded?.answer_id });
+    if (!scriptedMode) return askBot(actor, followupQuestion(item, kind));
+    const asked: Msg = { id: msgId(), role: "user", kind: "text", content: ASKED[kind](item) };
+    try {
+      // Без модели ответ строит сервер по документу пункта и записывает в события (метрики, «полезно»).
+      const res = await api.explained(actor.id, item.id, item.intern_id, kind);
+      say(asked, {
+        id: msgId(), role: "assistant", kind: "text", scripted: true, content: res.text, answerId: res.answer_id,
+        sources: res.source ? [res.source] : undefined, followups: followupsFor(item, res.chips),
+        actions: kind === "explain" && item.resource_id && item.status !== "done" && item.status !== "waiting" ? [actionFor(item)] : undefined,
+      });
+    } catch {
+      if (kind !== "explain") {
+        say(asked, { id: msgId(), role: "assistant", kind: "error", content: "Не получилось связаться с сервером." });
+        return;
+      }
+      const profile = await client
+        .fetchQuery({ queryKey: keys.profile(actor.id, item.intern_id), queryFn: () => api.profile(actor.id, item.intern_id) })
+        .catch(() => undefined);
+      say(asked, explainScripted(item, profile));
+    }
   }
 
   async function onDo(item: PlanItem) {
@@ -105,7 +157,7 @@ export default function Home() {
     const item = plan?.items.find((i) => i.id === a.itemId);
     if (!item) return;
     if (a.kind === "do") await onDo(item);
-    else await onExplain(item);
+    else await onExplain(item, a.kind);
   }
 
   /** Из колокольчика: показать напоминание в чате с кнопками действия. */
@@ -118,7 +170,7 @@ export default function Home() {
   async function nextDay() {
     setDemoError(null);
     try {
-      await api.nextDay(actor.id);
+      await withDemoKey((key) => api.nextDay(actor.id, key));
       await refresh();
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
       const shown = await showReminders(actor, plan);
@@ -131,7 +183,7 @@ export default function Home() {
   async function reset() {
     setDemoError(null);
     try {
-      await api.reset(actor.id);
+      await withDemoKey((key) => api.reset(actor.id, key));
       await client.invalidateQueries();
       await welcome();
     } catch (err) {
