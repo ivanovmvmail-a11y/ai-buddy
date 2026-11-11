@@ -8,15 +8,15 @@ from .models import SkillLevel, SkillProfile
 
 
 async def get_skill_profile(actor: User, intern_id: str) -> SkillProfile:
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().read() as data:
         require_intern(data, actor, intern_id, private=True)
         if intern_id not in data.profiles:
             raise NotFound()
-        return data.profiles[intern_id]
+        return data.profiles[intern_id].model_copy(deep=True)
 
 
 async def set_skill_level(actor: User, intern_id: str, topic: str, level: SkillLevel) -> SkillProfile:
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         require_intern(data, actor, intern_id, private=True)
         if actor.role != Role.MENTOR:
             raise Forbidden()
@@ -34,4 +34,4 @@ async def set_skill_level(actor: User, intern_id: str, topic: str, level: SkillL
                 "intern_id": intern_id, "topic": topic, "from": previous, "to": level,
                 "day": data.interns[intern_id].current_day,
             })
-        return profile
+        return profile.model_copy(deep=True)

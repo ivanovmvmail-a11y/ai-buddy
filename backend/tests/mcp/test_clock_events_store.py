@@ -140,16 +140,23 @@ def test_store_snapshots_rollback_isolation_and_idempotent_seed(store, snapshot)
     assert run(count()) == 2
 
 
-def test_store_factory_cached_and_warns_without_touching_database(monkeypatch, caplog):
+def test_store_factory_cached_and_selects_backend_without_connecting(monkeypatch, caplog):
     # Этот тест использует настоящую фабрику, а не фикстуру store.
     from app.config import settings
     storage.get_store.cache_clear()
-    monkeypatch.setattr(settings, "database_url", "postgresql://must-not-connect.invalid/db")
+    from app.mcp_server.postgres import PostgresStore
+    monkeypatch.setattr(settings, "database_url", "")
     try:
         first = storage.get_store()
         assert storage.get_store() is first
         assert isinstance(first, storage.InMemoryStore)
-        assert "lost on restart" in caplog.text and "T3" in caplog.text
+        assert "lost on restart" in caplog.text
+        storage.get_store.cache_clear()
+        monkeypatch.setattr(settings, "database_url", "postgresql://must-not-connect.invalid/db")
+        postgres = storage.get_store()
+        assert isinstance(postgres, storage.DemoStore) and storage.get_store() is postgres
+        assert isinstance(postgres.primary, PostgresStore)
+        assert postgres.primary._pool is None
     finally:
         storage.get_store.cache_clear()
 
@@ -158,7 +165,8 @@ def test_store_factory_cached_and_warns_without_touching_database(monkeypatch, c
 def test_seed_cli_explicitly_reports_memory_only(store, capsys, args):
     main(args)
     output = capsys.readouterr().out
-    assert ("process-local memory only" if args else "T1 validation only") in output
+    assert ("seed reset" if args else "existing data preserved") in output
+    assert type(store).__name__ in output
 
 
 def test_public_service_contracts_are_async_and_actor_first():

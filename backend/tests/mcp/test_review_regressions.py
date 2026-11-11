@@ -153,9 +153,9 @@ def test_r5_cli_validation_does_not_initialize_or_mutate_store(store, snapshot, 
     def fail():
         pytest.fail("Validation-only CLI must not initialize a store")
     monkeypatch.setattr(storage, "get_store", fail)
-    main([])
+    main(["--validate"])
     output = capsys.readouterr().out
-    assert "Seed validated" in output and "T1 validation only" in output
+    assert "Seed validated" in output and "validation only" in output
     assert "no server or database was populated" in output
     assert snapshot() == before
 
