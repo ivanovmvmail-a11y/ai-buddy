@@ -201,7 +201,17 @@ export function installFakeServer(): FakeServer {
     if (m && method === "POST") {
       if (srv.explainFails) return err(500, "Ошибка");
       if (!s.items.some((i) => i.id === m![1])) return err(404, "Не найдено");
-      return { status: 201, body: { answer_id: `ans_explain_${m[1]}` } };
+      const item = s.items.find((i) => i.id === m![1])!;
+      const kind = String(body.kind ?? "explain");
+      const text = kind === "steps" ? `По шагам: ${item.title}` : kind === "who" ? `К кому идти: ${item.title}` : `Из документа: ${item.summary}`;
+      const chips = ["Как это сделать по шагам?", "К кому идти, если не получается?"].filter((_, n) => kind !== ["steps", "who"][n]);
+      return {
+        status: 201,
+        body: {
+          answer_id: `ans_${kind}_${m[1]}`, text, chips,
+          source: item.doc_source_id ? { title: "Первые дни стажёра", url: "https://example.org/doc" } : null,
+        },
+      };
     }
     if (p === "/feedback") {
       if (String(body.answer_id) === "ans_fail") return err(500, "Ошибка");
