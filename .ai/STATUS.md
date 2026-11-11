@@ -55,13 +55,13 @@
 | 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | готово | #64, #65 | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
 | 50 | План: метки «для всех / для тебя», «почему», «ты это умеешь — коротко» (SPEC 3.1) | Claude | claude/plan-labels | на ревью | | frontend 70; персональные пункты придут от сервера после каталога Codex |
 
-| 51 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
+| C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 
-| 53 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | 828 passed / 97,85%; зависит от #67; решение только наставником |
+| C1.2 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | 828 passed / 97,85%; зависит от #67; решение только наставником |
 
-| 52 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 836 passed / 98,14%; main влит; уведомления и +1 день сроков |
+| C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 836 passed / 98,14%; main влит; уведомления и +1 день сроков |
 
-| 54 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | в работе | — | навыки, персональные пункты и предложения; зависимости #67/#46/#68 |
+| C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | в работе | — | навыки, персональные пункты и предложения; зависимости #67/#46/#68 |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
