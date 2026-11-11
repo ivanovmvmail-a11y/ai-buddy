@@ -86,9 +86,13 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
 - Золотой набор (37 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md)
 
-## Облако (бонус): Railway + Netlify
-Render, `*.vercel.app` (не открываются из России) и Koyeb (закрыл бесплатную регистрацию) не подошли.
-- **Сайт:** Netlify, настройки сборки в `netlify.toml`; в панели — переменная `NEXT_PUBLIC_API_URL` = адрес backend.
-- **Backend:** https://ai-buddy-production-9970a770.up.railway.app (`/health`). Railway → New Project → GitHub repo; Settings: Root Directory `/backend`, Healthcheck Path `/health`, Generate Domain (порт 8000). Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта.
-- **База:** Supabase (миграции уже применены).
-- Пробный период Railway — 30 дней / $5. Оба сервиса пересобираются сами при мерже в `main`.
+## Облако (бонус): всё на Railway
+- **Сайт:** https://ai-buddy-site-production.up.railway.app
+- **Backend:** https://ai-buddy-production-9970a770.up.railway.app (`/health`)
+- **База:** Supabase (миграции уже применены), подключение через Session pooler.
+
+Оба сервиса в одном проекте Railway, собираются из Docker-файлов и сами обновляются при мерже в `main`.
+- `ai-buddy` (backend): Root Directory `/backend`, Healthcheck `/health`, домен на порт 8000. Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта.
+- `ai-buddy-site` (frontend): Root Directory `/frontend`, домен на порт 3000. Variables: `NEXT_PUBLIC_API_URL` = адрес backend, `PORT=3000`.
+
+Почему не другие хостинги (проверено из России 11.11.2026): Render, `*.onrender.com` и `*.vercel.app` не открываются; Koyeb закрыл бесплатную регистрацию; Netlify отдаёт файлы больше ~14 КБ с зависанием, и сайт не загружается. Пробный период Railway — 30 дней / $5.

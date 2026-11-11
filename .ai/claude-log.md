@@ -126,3 +126,6 @@
 - Дальше: Миша создаёт Blueprint на Render и проект на Vercel; проверить GigaChat с Render (если недоступен — LLM_PROVIDER=scenario).
 - Koyeb после перехода к Mistral не даёт новым аккаунтам создавать сервисы → backend на Railway (пробный 30 дней / $5). Проверено: /health ok, /chat отвечает GigaChat, база Supabase через Session pooler.
 - Netlify сначала выложил исходники без сборки и был Private → добавлен `netlify.toml` (base frontend, npm run build, publish .next), видимость — Public.
+- Netlify: Next.js 15.5.4 заблокирован (CVE-2025-55182) → обновлены Next 15.5.28 / React 19.1.10 (#32). Но из России файлы Netlify >14 КБ зависают, и сайт не грузится → сайт перенесён на Railway (второй сервис, Docker из `frontend/`), `netlify.toml` и плагин убраны.
+- Итог: https://ai-buddy-site-production.up.railway.app — план и чат (GigaChat) проверены в браузере.
+- Остались замечания `npm audit`: критические только у vitest (dev). Обновление vitest до мажорной версии — отдельная задача.
