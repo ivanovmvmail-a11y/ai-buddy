@@ -1,7 +1,7 @@
 // Поддельный backend для тестов интерфейса: те же адреса и формы ответов, что в docs/API.md,
 // правила — упрощённая копия спеки 101 (настоящие правила и их тесты — в backend/tests/mcp).
 import { vi } from "vitest";
-import { DEMO_USERS, initialState, RESOURCES, type DemoState } from "./mock-data";
+import { addKirill, DEMO_USERS as BASE_USERS, initialState, KIRILL, RESOURCES, type DemoState } from "./mock-data";
 import type { Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, StageInfo } from "@/lib/types";
 
 const WORKING = ["week1", "week2"];
@@ -11,6 +11,8 @@ const STEPS = [
   { title: "Месяц 2", stages: ["month2"] },
   { title: "После 3 месяцев", stages: ["after3m"] },
 ];
+// Кирилл появляется только в тестах, которые вызвали srv.addKirill() (в seed backend его пока нет).
+let DEMO_USERS: DemoUser[] = [...BASE_USERS];
 const user = (id: string) => DEMO_USERS.find((u) => u.id === id)!;
 
 function visible(actor: DemoUser): string[] {
@@ -87,12 +89,20 @@ export type FakeServer = {
   metrics: Record<string, unknown> | null;
   /** Код-слово демо-кнопок, как DEMO_KEY на сервере; не задано — кнопки открыты. */
   demoKey?: string;
+  /** Сервер ещё не умеет предложения и сравнение (как настоящий до работ Codex) — 404. */
+  noAdaptive?: boolean;
+  addKirill: () => void;
 };
 
 export function installFakeServer(): FakeServer {
   const srv: FakeServer = {
     state: initialState(), actions: [], history: {}, provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null,
+    addKirill: () => {
+      DEMO_USERS = [...BASE_USERS, KIRILL];
+      addKirill(srv.state);
+    },
   };
+  DEMO_USERS = [...BASE_USERS];
   let reqN = 1003;
   let actN = 1;
 
@@ -158,6 +168,49 @@ export function installFakeServer(): FakeServer {
       const item = s.items.find((i) => i.id === req.plan_item_id);
       if (item) { item.status = body.approve ? "done" : "in_progress"; item.status_reason = body.approve ? null : String(body.reason); }
       return ok(req);
+    }
+    if (p === "/skills/suggestions") {
+      if (srv.noAdaptive || actor.role !== "mentor") return err(404, "Не найдено");
+      return ok({ suggestions: s.suggestions.filter((x) => see(x.intern_id) && x.status === "pending") });
+    }
+    m = p.match(/^\/skills\/suggestions\/(.+)\/decide$/);
+    if (m) {
+      const sug = s.suggestions.find((x) => x.id === m![1]);
+      if (!sug || actor.role !== "mentor" || !see(sug.intern_id)) return err(404, "Не найдено");
+      if (sug.status !== "pending") return err(409, "Уже решено");
+      sug.status = body.accept ? "accepted" : "dismissed";
+      if (body.accept) {
+        const prof = s.profiles.find((x) => x.intern_id === sug.intern_id)!;
+        prof.skills = { ...prof.skills, [sug.topic]: sug.to_level };
+        // пересборка (SPEC 3.1): незакрытый персональный пункт по теме снимается, закрытые остаются
+        s.items = s.items.filter((i) => !(i.intern_id === sug.intern_id && i.kind === "personal" && i.topic === sug.topic && i.status !== "done"));
+      }
+      return ok(sug);
+    }
+    if (p === "/plan/compare") {
+      const ids = (url.searchParams.get("intern_ids") ?? "").split(",");
+      if (srv.noAdaptive || actor.role !== "mentor" || !ids.every(see)) return err(404, "Не найдено");
+      if (ids.length !== 2) return err(422, "Нужно два стажёра");
+      const plans = ids.map((id) => plan(s, id, actor));
+      const keyOf = (i: PlanItem) => i.id.slice(i.id.indexOf(".") + 1);
+      const level = (internId: string, topic: string | null) =>
+        topic ? s.profiles.find((x) => x.intern_id === internId)?.skills[topic] ?? null : null;
+      const commonKeys = plans[0].items.filter((i) => i.kind === "common").map(keyOf)
+        .filter((k) => plans[1].items.some((j) => j.kind === "common" && keyOf(j) === k));
+      return ok({
+        interns: ids.map((id) => ({ id, name: user(id).name })),
+        common: commonKeys.map((k) => {
+          const first = plans[0].items.find((i) => keyOf(i) === k)!;
+          return {
+            key: k, title: first.title, stage: first.stage, topic: first.topic,
+            by_intern: Object.fromEntries(plans.map((pl) => {
+              const it = pl.items.find((i) => keyOf(i) === k)!;
+              return [pl.intern_id, { status: it.status, skill_level: level(pl.intern_id, it.topic) }];
+            })),
+          };
+        }),
+        personal: Object.fromEntries(plans.map((pl) => [pl.intern_id, pl.items.filter((i) => i.kind === "personal")])),
+      });
     }
     if (p === "/chat/history") return ok({ messages: srv.history[actor.id] ?? [] });
     if (p === "/actions" && method === "GET") return ok({ actions: srv.actions.filter((a) => a.user_id === actor.id) });
