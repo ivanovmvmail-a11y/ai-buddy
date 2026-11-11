@@ -33,8 +33,8 @@ Grafana читает три представления grafana_answers/grafana_f
 ai_buddy_grafana только SELECT этих представлений, без доступа к исходным таблицам и без BYPASSRLS.
 Default transaction read-only дополнителен к SQL-grants; даже отключение этого флага не даёт права записи.
 Миграция `20261111103913_grafana_revoke_api_roles.sql` отдельно отзывает все прямые grants
-на эти представления у существующих anon/authenticated: default privileges Supabase не снимаются
-через REVOKE FROM PUBLIC. Доступ ai_buddy_grafana сохраняется. К облачной БД миграцию применяет
+на эти представления у существующих anon/authenticated: прямые grants от default privileges
+Supabase не снимаются через REVOKE FROM PUBLIC. Доступ ai_buddy_grafana сохраняется. К облачной БД миграцию применяет
 Claude после мержа; повторный CREATE OR REPLACE VIEW в grafana-init сохраняет закрытые ACL.
 
 Одноразовый grafana-init использует только локальный Docker PostgreSQL, применяет идемпотентную
