@@ -2,6 +2,8 @@
 from datetime import date, datetime
 from typing import Literal
 
+from .absence_models import AbsenceRequest
+
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
 
 from app.agent.users import Role, User
@@ -145,6 +147,7 @@ class OnboardingData(Model):
     interns: dict[str, InternState] = Field(default_factory=dict)
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)
+    absence_requests: dict[str, AbsenceRequest] = Field(default_factory=dict)
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
     profiles: dict[str, SkillProfile] = Field(default_factory=dict)
     reminders: dict[str, Reminder] = Field(default_factory=dict)

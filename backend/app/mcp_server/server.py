@@ -1,4 +1,5 @@
 """MCP/stdio: один пользователь на процесс, права проверяют сервисы онбординга."""
+from datetime import date
 import argparse
 import logging
 import os
@@ -7,6 +8,10 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import StrictBool, ValidationError
+
+from . import absence, drafts
+from .absence_models import AbsenceFact, AbsenceReason, AbsenceRequest
+from .models import ActionDraft
 
 from app.agent.users import DEMO_USERS
 from app.async_runner import run
@@ -53,6 +58,36 @@ def create_server(user_id: str) -> FastMCP:
     async def set_item_status(item_id: str, status: ItemStatus, reason: str | None = None) -> PlanItem:
         """Изменить свой ручной пункт; наставнику вернуть закрытый пункт с причиной."""
         return await call(checklist.set_item_status, item_id, status, reason)
+
+    @server.tool(annotations=CREATE)
+    async def absence_draft_request(day: date, reason: AbsenceReason) -> ActionDraft:
+        """Черновик отгула на один день, без медицинских деталей; отправка после подтверждения UI."""
+        return await call(drafts.invoke_by_id, absence.draft_absence, day, reason)
+
+    @server.tool(annotations=READ)
+    async def absence_get_request(request_id: str) -> AbsenceRequest:
+        """Заявка стажёра доступна ему и назначенному руководителю команды."""
+        return await call(drafts.invoke_by_id, absence.get_request, request_id)
+
+    @server.tool(annotations=READ)
+    async def absence_list_requests() -> list[AbsenceRequest]:
+        """Свои заявки стажёра либо входящие руководителя команды."""
+        return await call(drafts.invoke_by_id, absence.list_requests)
+
+    @server.tool(annotations=CREATE)
+    async def absence_draft_decision(request_id: str, approve: StrictBool) -> ActionDraft:
+        """Руководитель готовит решение; исполнение только после подтверждения человеком в UI."""
+        return await call(drafts.invoke_by_id, absence.draft_decision, request_id, approve)
+
+    @server.tool(annotations=READ)
+    async def absence_list_facts(intern_id: str) -> list[AbsenceFact]:
+        """Наставнику: только даты согласованных отгулов своего стажёра, без причин."""
+        return await call(drafts.invoke_by_id, absence.list_absence_facts, intern_id)
+
+    @server.tool(annotations=READ)
+    async def absence_get_draft(draft_id: str) -> ActionDraft:
+        """Только собственный сохранённый черновик."""
+        return await call(drafts.invoke_by_id, drafts.get_draft, draft_id)
 
     @server.tool(annotations=READ)
     async def list_resources() -> list[AccessResource]:

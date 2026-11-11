@@ -2,6 +2,7 @@
 from contextlib import asynccontextmanager
 
 from psycopg import sql
+from .absence_models import AbsenceRequest
 from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
@@ -14,6 +15,7 @@ TABLES = (
     ("interns", "intern_state", InternState, "intern_id"),
     ("resources", "access_resources", AccessResource, "id"),
     ("items", "plan_items", PlanItem, "id"),
+    ("absence_requests", "absence_requests", AbsenceRequest, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
     ("reminders", "reminders", Reminder, "id"),

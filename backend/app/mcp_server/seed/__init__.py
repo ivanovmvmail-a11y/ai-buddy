@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from ..absence_models import AbsenceRequest
+
 from app.agent.users import DEMO_USERS, User
 
 from .. import checklist, events, storage
@@ -18,6 +20,10 @@ def load_seed() -> OnboardingData:
     for resource in source["resources"]:
         model = AccessResource.model_validate({"fields": source["request_fields"], **resource})
         data.resources[model.id] = model
+    for entry in json.loads(SEED_PATH.with_name("absence.json").read_text(encoding="utf-8"))["requests"]:
+        user = DEMO_USERS[entry["intern_id"]]
+        request = AbsenceRequest(**entry, lead_id=user.lead_id, team=user.team)
+        data.absence_requests[request.id] = request
     for entry in source["interns"]:
         user = DEMO_USERS[entry["id"]]
         state = InternState(intern_id=user.id, start_date=entry["start_date"], current_day=entry["current_day"])
