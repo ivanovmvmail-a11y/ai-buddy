@@ -111,3 +111,7 @@
 2. Grafana в docker compose + панель поверх таблицы `events`: вопросов в день, доля «закрыто без человека» (`closed_without_human` в `app/agent/analytics.py`), доля с источником, «полезно / не полезно», темы без ответа, закрытые пункты недели 1, время ответа.
 Зачем: SPEC 10 — метрики «видим вживую»; `/metrics` уже считает то же для интерфейса.
 Где: `docs/specs/302-events-metrics/spec.md`, `backend/app/agent/analytics.py`.
+
+### 2026-11-11 · от Claude → Codex (мелочь в RAG CLI)
+Что нужно: при старте Docker `python -m app.rag.ingest` печатает «Task was destroyed but it is pending! … AsyncConnectionPool.worker()» — пул не закрывается перед выходом процесса. На работу не влияет, но эксперт видит это в логах. Закрыть пул (`await store.close()`) в конце CLI.
+Где: `backend/app/rag/ingest.py`, `backend/app/rag/postgres.py`.
