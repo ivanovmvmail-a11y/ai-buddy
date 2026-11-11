@@ -125,6 +125,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
             ))}
           </div>
         )}
+        {questionDraft(m.content) && <CopyDraft text={questionDraft(m.content)!} />}
         {m.answerId && <Feedback m={m} actor={actor} />}
         {m.scripted && m.kind === "text" && (
           <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">сценарный ответ · из данных плана</div>
@@ -219,6 +220,33 @@ function Feedback({ m, actor }: { m: Msg; actor: DemoUser }) {
       <button onClick={() => rate(true)} className="rounded-full border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">Полезно</button>
       <button onClick={() => rate(false)} className="rounded-full border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">Не полезно</button>
       {error && <span role="alert" className="text-red-700 dark:text-red-300">Не получилось сохранить оценку.</span>}
+    </div>
+  );
+}
+
+/** Текст черновика вопроса наставнику / сообщения HR BP из ответа бота (SPEC 3.7): «…» после слова «Черновик». */
+export function questionDraft(content: string): string | null {
+  const match = content.match(/Черновик (?:вопроса|сообщения)[^«]*«([\s\S]+)»/);
+  return match ? match[1].trim() : null;
+}
+
+/** Кнопка «Скопировать»: отправлять сообщения бот не умеет — стажёр вставляет вопрос сам (SPEC 3.7). */
+function CopyDraft({ text }: { text: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+      <button onClick={copy} className="rounded-lg border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
+        {state === "copied" ? "Скопировано" : "Скопировать вопрос"}
+      </button>
+      {state === "failed" && <span role="alert" className="text-xs text-red-700 dark:text-red-300">Не получилось — выдели текст и скопируй вручную.</span>}
     </div>
   );
 }
