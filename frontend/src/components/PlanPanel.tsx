@@ -7,6 +7,7 @@ import { canMarkDone, canRequestAccess, isWorking, STAGE_TITLES, waitedFor } fro
 import { useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import { InternCards } from "./InternCards";
+import { ComparePlans, SkillSuggestions } from "./MentorTools";
 import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
@@ -62,6 +63,8 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
       {actor.role !== "intern" && <InternCards actor={actor} />}
 
       {actor.role === "mentor" && <Approvals actor={actor} />}
+      {actor.role === "mentor" && <SkillSuggestions actor={actor} />}
+      {actor.role === "mentor" && <ComparePlans actor={actor} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
