@@ -2,7 +2,7 @@
 // правила — упрощённая копия спеки 101 (настоящие правила и их тесты — в backend/tests/mcp).
 import { vi } from "vitest";
 import { addKirill, DEMO_USERS as BASE_USERS, initialState, KIRILL, RESOURCES, type DemoState } from "./mock-data";
-import type { Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, StageInfo } from "@/lib/types";
+import type { AbsenceRequest, Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, StageInfo } from "@/lib/types";
 
 const WORKING = ["week1", "week2"];
 const STEPS = [
@@ -169,6 +169,26 @@ export function installFakeServer(): FakeServer {
       if (item) { item.status = body.approve ? "done" : "in_progress"; item.status_reason = body.approve ? null : String(body.reason); }
       return ok(req);
     }
+    if (p === "/absence/requests" && method === "GET") {
+      if (srv.noAdaptive || !["intern", "lead"].includes(actor.role)) return err(404, "Не найдено");
+      const mine = s.absences.filter((r) => (actor.role === "intern" ? r.intern_id === actor.id : r.lead_id === actor.id));
+      return ok({ requests: [...mine].reverse() });
+    }
+    m = p.match(/^\/absence\/requests\/(.+)\/decide$/);
+    if (m) {
+      const req = s.absences.find((r) => r.id === m![1]);
+      if (!req || req.lead_id !== actor.id) return err(404, "Не найдено");
+      if (req.status !== "pending") return err(409, "Заявка уже рассмотрена");
+      req.status = body.approve ? "approved" : "rejected";
+      req.decided_day = s.days[req.intern_id];
+      return ok(req);
+    }
+    if (p === "/absence/facts") {
+      const target = DEMO_USERS.find((u) => u.id === internId);
+      if (srv.noAdaptive || actor.role !== "mentor" || target?.mentor_id !== actor.id) return err(404, "Не найдено");
+      return ok({ facts: s.absences.filter((r) => r.intern_id === internId && r.status === "approved")
+        .map((r) => ({ intern_id: r.intern_id, day: r.day })) });
+    }
     if (p === "/skills/suggestions") {
       if (srv.noAdaptive || actor.role !== "mentor") return err(404, "Не найдено");
       return ok({ suggestions: s.suggestions.filter((x) => see(x.intern_id) && x.status === "pending") });
@@ -230,6 +250,21 @@ export function installFakeServer(): FakeServer {
       const action = srv.actions.find((a) => a.id === m![1] && a.user_id === actor.id);
       if (!action) return err(404, "Действие не найдено");
       if (m[2] === "cancel") { action.status = "cancelled"; return ok(action); }
+      if (action.tool === "create_absence_request") {
+        const ap = action.params as { day: string; reason: AbsenceRequest["reason"] };
+        if (s.absences.some((r) => r.intern_id === actor.id && r.day === ap.day && r.status !== "rejected")) {
+          action.status = "failed"; action.error = "Отгул на этот день уже запрошен"; return ok(action);
+        }
+        const req: AbsenceRequest = {
+          id: `ABS-${reqN++}`, intern_id: actor.id, intern_name: actor.name, lead_id: actor.lead_id ?? "", day: ap.day,
+          reason: ap.reason, reason_title: { personal: "Личные дела", family: "Семейные дела", study: "Учебные дела" }[ap.reason],
+          status: "pending", created_day: s.days[actor.id], decided_day: null,
+        };
+        s.absences.push(req);
+        action.status = "done";
+        action.result = { status: "created", request: req };
+        return ok(action);
+      }
       const params = action.params as { resource_id: string; justification: string; level?: "read" | "edit" | "admin" };
       const level = params.level ?? "read";
       const res = RESOURCES.find((r) => r.id === params.resource_id)!;

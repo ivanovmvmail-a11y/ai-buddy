@@ -1,7 +1,7 @@
 // Данные поддельного сервера для тестов интерфейса (бывший макет T2). Настоящие данные — seed имитаций
 // сервисов на backend. Всё синтетическое.
 import { DEMO_USERS } from "@/lib/users";
-import type { SkillSuggestion } from "@/lib/types";
+import type { AbsenceRequest, SkillSuggestion } from "@/lib/types";
 import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "@/lib/types";
 
 export { DEMO_USERS };
@@ -131,6 +131,7 @@ export type DemoState = {
   profiles: SkillProfile[];
   dismissedReminders: string[];
   suggestions: SkillSuggestion[];
+  absences: AbsenceRequest[];
 };
 
 /** Второй стажёр Петра (SPEC 3.1, решение 11.11) — только для тестов экрана сравнения: в seed backend его пока нет. */
@@ -176,5 +177,6 @@ export function initialState(): DemoState {
     ],
     dismissedReminders: [],
     suggestions: [],
+    absences: [],
   };
 }
