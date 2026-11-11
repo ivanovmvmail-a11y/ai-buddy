@@ -3,6 +3,8 @@ import json
 import logging
 from pathlib import Path
 
+from ..absence_models import AbsenceRequest
+
 from app.agent.users import DEMO_USERS, User
 
 from .. import checklist, events, storage
@@ -22,6 +24,10 @@ def load_seed() -> OnboardingData:
     for resource in source["resources"]:
         model = AccessResource.model_validate({"fields": source["request_fields"], **resource})
         data.resources[model.id] = model
+    for entry in json.loads(SEED_PATH.with_name("absence.json").read_text(encoding="utf-8"))["requests"]:
+        user = DEMO_USERS[entry["intern_id"]]
+        request = AbsenceRequest(**entry, lead_id=user.lead_id, team=user.team)
+        data.absence_requests[request.id] = request
     for entry in source["interns"]:
         user = DEMO_USERS.get(entry["id"])
         if user is None:
@@ -63,8 +69,9 @@ def load_seed() -> OnboardingData:
 
 async def reset_demo(actor: User) -> None:
     known_actor(actor)
-    seed = load_seed()
-    async with storage.get_store().transaction() as data:
+    store = storage.get_store()
+    seed = await store.seed_for_schema(load_seed())
+    async with store.transaction() as data:
         for field in OnboardingData.model_fields:
             setattr(data, field, getattr(seed, field))
         events._record(data, actor, "demo_reset", {})

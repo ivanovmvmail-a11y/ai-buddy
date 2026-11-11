@@ -15,9 +15,13 @@ MIGRATION = Path(__file__).resolve().parents[3] / "supabase/migrations/202611110
 
 
 def apply_onboarding_migrations(connection):
+    """Сервисные SQL по времени, без отдельных RAG/Grafana-миграций."""
     connection.execute(MIGRATION.read_text(encoding="utf-8"))
-    connection.execute(MIGRATION.with_name("20261111160000_personal_plan.sql").read_text(encoding="utf-8"))
-    connection.execute(MIGRATION.with_name("20261111162000_skill_suggestions.sql").read_text(encoding="utf-8"))
+    suffixes = ("_service_drafts.sql", "_mentor_inbox.sql", "_absence.sql", "_self_check.sql",
+                "_personal_plan.sql", "_reminder_kinds.sql", "_skill_suggestions.sql", "_notification_links.sql")
+    for path in sorted(MIGRATION.parent.glob("*.sql")):
+        if path.name.endswith(suffixes):
+            connection.execute(path.read_text(encoding="utf-8"))
 
 
 def pytest_generate_tests(metafunc):
