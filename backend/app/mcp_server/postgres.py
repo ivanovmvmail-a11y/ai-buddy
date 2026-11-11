@@ -30,7 +30,10 @@ LOCK_ID = 101003  # Общая блокировка записи/seed/reset он
 
 
 def _dump(model):
-    return model.model_dump(mode="json", exclude=DERIVED_FIELDS)
+    values = model.model_dump(mode="json", exclude=DERIVED_FIELDS)
+    if isinstance(model, Reminder):
+        values["mentor_question_id"] = model.mentor_question_id
+    return values
 
 
 class PostgresStore(PostgresPoolOwner):

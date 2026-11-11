@@ -112,7 +112,7 @@ class Reminder(Model):
     user_id: str
     plan_item_id: str | None = None
     request_id: str | None = None
-    mentor_question_id: str | None = None
+    mentor_question_id: str | None = Field(default=None, exclude=True)
     text: str
     status: Literal["active", "snoozed", "done"] = "active"
     created_day: int = Field(ge=1)

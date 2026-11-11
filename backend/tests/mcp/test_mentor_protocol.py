@@ -44,6 +44,25 @@ def test_stdio_owner_also_closes_publication_store(store, monkeypatch):
     instance = server.create_server('intern-anya')
     monkeypatch.setattr(instance, 'run_stdio_async', AsyncMock())
     monkeypatch.setattr(server, 'create_server', lambda user_id: instance)
-    monkeypatch.setattr(rag, 'get_service', lambda: publication)
+    monkeypatch.setattr(rag, 'cached_service', lambda: publication)
     server.main(['--user', 'intern-anya'])
     publication.store.close.assert_awaited_once()
+
+def test_shutdown_does_not_create_rag_and_logs_actual_bonus_operation(store,monkeypatch,caplog):
+    from functools import cache
+    from unittest.mock import AsyncMock
+    from app import rag
+    @cache
+    def fail(): raise AssertionError('RAG must not start during shutdown')
+    monkeypatch.setattr(rag,'get_service',fail)
+    instance=server.create_server('intern-anya')
+    monkeypatch.setattr(instance,'run_stdio_async',AsyncMock())
+    monkeypatch.setattr(server,'create_server',lambda user_id:instance)
+    server.main(['--user','intern-anya'])
+    async def draft_question(*args): raise RuntimeError('PRIVATE')
+    monkeypatch.setattr(inbox,'draft_question',draft_question)
+    async def exercise():
+        async with connected(instance) as client:
+            assert (await client.call_tool('mentor_draft_question',{'text':'Демо'})).isError
+    run(exercise())
+    assert 'draft_question' in caplog.text and 'invoke_by_id' not in caplog.text and 'PRIVATE' not in caplog.text

@@ -37,10 +37,15 @@ def get_service() -> RAGService | None:
     return RAGService(make_embedder(), PostgresDocumentStore(settings.database_url))
 
 
+def cached_service() -> RAGService | None:
+    """Посмотреть кэш без создания сервиса при завершении процесса."""
+    return get_service() if get_service.cache_info().currsize else None
+
+
 @cache
 def get_memory_service() -> RAGService:
     """Локальный индекс подтверждённых ответов в демо без DATABASE_URL."""
-    return RAGService(DeterministicEmbedder(), InMemoryDocumentStore())
+    return RAGService(DeterministicEmbedder(), InMemoryDocumentStore(min_similarity=0.15))
 
 
 def make_embedder() -> Embedder:

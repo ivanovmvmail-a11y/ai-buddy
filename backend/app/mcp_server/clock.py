@@ -86,10 +86,11 @@ async def cron_tick(actor: Actor, day: int | None = None) -> list[Reminder]:
         return _tick(data, day)
 
 
-async def list_reminders(actor: User) -> list[Reminder]:
+async def list_reminders(actor: User, *, include_mentor: bool = False) -> list[Reminder]:
     known_actor(actor)
     async with storage.get_store().read() as data:
-        return [reminder.model_copy(deep=True) for reminder in data.reminders.values() if reminder.user_id == actor.id]
+        return [reminder.model_copy(deep=True) for reminder in data.reminders.values() if reminder.user_id == actor.id
+                and (include_mentor or reminder.mentor_question_id is None)]
 
 
 def _reminder_context(data: OnboardingData, reminder: Reminder) -> dict:

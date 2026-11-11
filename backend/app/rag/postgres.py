@@ -11,6 +11,10 @@ def _vector_literal(embedding: list[float]) -> str:
 
 
 class PostgresDocumentStore(PostgresPoolOwner):
+    async def delete(self, source_id: str) -> None:
+        async with (await self._get_pool()).connection() as connection:
+            await connection.execute("DELETE FROM public.rag_documents WHERE source_id=%s", (source_id,))
+
     async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
         vectors = [_vector_literal(chunk.embedding) for chunk in chunks]
         async with (await self._get_pool()).connection() as connection:

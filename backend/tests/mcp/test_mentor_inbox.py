@@ -160,11 +160,11 @@ def test_reminder_threshold_once_snooze_complete(store, snapshot):
     with pytest.raises(NotFound): run(clock.done_reminder(DEMO_USERS[ANYA], rem.id))
     snoozed = run(clock.snooze_reminder(DEMO_USERS[PETR], rem.id, 2))
     run(clock.cron_tick(SYSTEM_ACTOR, snoozed.snooze_until_day - 1))
-    assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR])) if r.id == rem.id).status == 'snoozed'
+    assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR], include_mentor=True)) if r.id == rem.id).status == 'snoozed'
     run(clock.cron_tick(SYSTEM_ACTOR, snoozed.snooze_until_day))
-    assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR])) if r.id == rem.id).status == 'active'
+    assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR], include_mentor=True)) if r.id == rem.id).status == 'active'
     answer(q)
-    assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR])) if r.id == rem.id).status == 'done'
+    assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR], include_mentor=True)) if r.id == rem.id).status == 'done'
     assert all('intern_id' not in e.payload for e in snapshot().events if e.type.startswith('mentor_'))
     other = send('intern-ivan')
     run(clock.advance_day(DEMO_USERS[ANYA], ANYA))
@@ -179,7 +179,9 @@ def test_persistence_and_postgres_rag(store, monkeypatch):
     from pathlib import Path
     from app.rag.postgres import PostgresDocumentStore
     migration = next((Path(__file__).resolve().parents[3] / 'supabase/migrations').glob('*_rag_documents.sql'))
-    with psycopg.connect(store.database_url, autocommit=True) as connection: connection.execute(migration.read_text())
+    with psycopg.connect(store.database_url, autocommit=True) as connection:
+        if connection.execute("SELECT to_regclass('public.rag_documents')").fetchone()[0] is None:
+            connection.execute(migration.read_text())
     service = RAGService(DeterministicEmbedder(), PostgresDocumentStore(store.database_url))
     monkeypatch.setattr(rag, 'get_service', lambda: service)
     q = answer(send(), publish=True)

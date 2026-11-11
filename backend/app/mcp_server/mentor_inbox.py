@@ -44,11 +44,16 @@ def _question(data, user, question_id, *, answering=False):
 
 def _public_text(answer):
     # Только ответ, без вопроса/связи со стажёром; известные демо-имена и контакты удаляются.
+    irregular = {'Аня': r'Ан(?:я|и|е|ю|ей|ею)', 'Пётр': r'П[её]тр[а-яё]*'}
     for user in DEMO_USERS.values():
+        answer = re.sub(re.escape(user.id), '[идентификатор удалён]', answer, flags=re.IGNORECASE)
         for part in user.name.split():
-            answer = re.sub(r'\b' + re.escape(part) + r'\b', '[имя удалено]', answer, flags=re.IGNORECASE)
+            stem = part[:-1] if part.endswith(('а', 'я')) else part
+            pattern = irregular.get(part, re.escape(stem).replace('ё', '[её]') + r'[а-яё]*')
+            answer = re.sub(r'\b(?:' + pattern + r')\b', '[имя удалено]', answer, flags=re.IGNORECASE)
     answer = re.sub(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', '[контакт удалён]', answer)
-    return re.sub(r'(?<!\w)\+?\d[\d ()-]{8,}\d(?!\w)', '[контакт удалён]', answer)
+    return re.sub(r'(?<!\w)(?:\+?7|8)[ -]?(?:\(\d{3}\)|\d{3})[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)',
+                  '[контакт удалён]', answer)
 
 
 async def draft_question(user_id: str, text: str) -> ActionDraft:
@@ -120,7 +125,7 @@ async def confirm_answer(user_id: str, draft_id: str) -> MentorQuestion:
             question.answered_at = datetime.now(timezone.utc)
             if draft.payload['publish']:
                 question.public_content = draft.payload['public_content']
-                question.publication_status, question.source_id = 'pending', f'mentor-answer:{question.id}'
+                question.publication_status, question.source_id = 'pending', f'mentor-answer:{uuid4().hex}'
             for reminder in data.reminders.values():
                 if reminder.mentor_question_id == question.id and reminder.status != 'done':
                     reminder.status, reminder.snooze_until_day = 'done', None
@@ -149,7 +154,7 @@ async def confirm_publication(user_id: str, draft_id: str) -> MentorQuestion:
             drafts.pending(draft)
             if question.status != 'answered' or question.publication_status != 'not_requested':
                 raise Conflict("Публикация недоступна")
-            question.publication_status, question.source_id = 'pending', f'mentor-answer:{question.id}'
+            question.publication_status, question.source_id = 'pending', f'mentor-answer:{uuid4().hex}'
             question.public_content = draft.payload['public_content']
             drafts.finish(draft, question.id)
         question_id = question.id
@@ -174,28 +179,36 @@ async def retry_publication(user_id: str, question_id: str) -> MentorQuestion:
         log.warning('Mentor knowledge publication pending (%s)', type(error).__name__)
         return question
     async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
-        current = _question(data, user, question_id, answering=True)
-        if current.publication_status != 'published':
-            current.publication_status = 'published'
-            events._record(data, user, 'mentor_answer_published', {'status': 'published'})
-        return current.model_copy(deep=True)
+        current = data.mentor_questions.get(question_id)
+        stale = current is None or current.source_id != question.source_id
+        if not stale:
+            current = _question(data, user, question_id, answering=True)
+            if current.publication_status != 'published':
+                current.publication_status = 'published'
+                events._record(data, user, 'mentor_answer_published', {'status': 'published'})
+            result = current.model_copy(deep=True)
+    if stale:
+        await service.store.delete(question.source_id)
+        raise NotFound()
+    return result
 
 
 def tick_questions(data, day=None, intern_ids=None):
     created = []
+    by_question = {r.mentor_question_id: r for r in data.reminders.values() if r.mentor_question_id}
     for question in data.mentor_questions.values():
         if intern_ids is not None and question.intern_id not in intern_ids:
             continue
         if question.status != 'pending':
             continue
         current = day if day is not None else data.interns[question.intern_id].current_day
-        reminder = next((r for r in data.reminders.values() if r.mentor_question_id == question.id), None)
+        reminder = by_question.get(question.id)
         if reminder is not None:
             if reminder.status == 'snoozed' and reminder.snooze_until_day is not None and current >= reminder.snooze_until_day:
                 reminder.status, reminder.snooze_until_day = 'active', None
                 events._record(data, SYSTEM_ACTOR, 'mentor_question_reminder_reactivated', {'kind': 'mentor_question'})
             continue
-        if question.status != 'pending' or current - question.created_day <= 1:
+        if current - question.created_day <= 1:
             continue
         reminder = Reminder(id=f'REM-{uuid4().hex}', user_id=question.mentor_id, mentor_question_id=question.id,
                             text='Во входящих есть вопрос без ответа больше дня.', created_day=current)

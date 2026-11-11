@@ -43,7 +43,8 @@ def create_server(user_id: str) -> FastMCP:
         except ValidationError:
             raise ToolError("Некорректные параметры") from None
         except Exception as error:
-            log.warning("MCP service %s failed (%s)", operation.__name__, type(error).__name__)
+            name = args[0].__name__ if operation is drafts.invoke_by_id else operation.__name__
+            log.warning("MCP service %s failed (%s)", name, type(error).__name__)
             raise ToolError("Сервис временно недоступен") from None
 
     @server.tool(annotations=READ)
@@ -84,7 +85,7 @@ def create_server(user_id: str) -> FastMCP:
     @server.tool(annotations=READ)
     async def list_reminders() -> list[Reminder]:
         """Только активные личные напоминания пользователя, как HTTP /reminders."""
-        return [reminder for reminder in await call(clock.list_reminders) if reminder.status == "active"]
+        return [reminder for reminder in await call(clock.list_reminders, include_mentor=True) if reminder.status == "active"]
 
     @server.tool(annotations=CREATE)
     async def mentor_draft_question(text: str) -> ActionDraft:
@@ -134,7 +135,7 @@ def main(argv=None):
         try:
             run(storage.get_store().close())
         finally:
-            service = rag.get_service()
+            service = rag.cached_service()
             if service is not None:
                 run(service.store.close())
 

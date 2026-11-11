@@ -63,6 +63,16 @@ async def reset_demo(actor: User) -> None:
     known_actor(actor)
     seed = load_seed()
     async with storage.get_store().transaction() as data:
+        sources = [q.source_id for q in data.mentor_questions.values() if q.source_id]
+        if sources:
+            from app import rag
+            from ..errors import Conflict
+            try:
+                service = rag.get_service() or rag.get_memory_service()
+                for source_id in sources:
+                    await service.store.delete(source_id)
+            except Exception:
+                raise Conflict("Не удалось очистить опубликованные ответы; повторите сброс после восстановления RAG") from None
         for field in OnboardingData.model_fields:
             setattr(data, field, getattr(seed, field))
         events._record(data, actor, "demo_reset", {})
