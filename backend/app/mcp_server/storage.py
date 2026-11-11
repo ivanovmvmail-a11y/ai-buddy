@@ -54,6 +54,8 @@ class OnboardingStore(Protocol):
         """Доверенный сервис читает доменные данные и может дописать события просмотра."""
         ...
 
+    async def seed_for_schema(self, data: OnboardingData) -> OnboardingData: ...
+
     async def initialize(self, data: OnboardingData, *, reset: bool = False) -> None: ...
 
     async def close(self) -> None: ...
@@ -96,6 +98,9 @@ class InMemoryStore:
             else:
                 if len(view.events) != count:
                     raise RuntimeError("Historical reads must not append events")
+
+    async def seed_for_schema(self, data: OnboardingData) -> OnboardingData:
+        return data
 
     async def initialize(self, data: OnboardingData, *, reset: bool = False) -> None:
         async with self._lock:
@@ -173,6 +178,9 @@ class DemoStore:
         backend = await self._backend()
         async with backend.read(include_events=include_events) as data:
             yield data
+
+    async def seed_for_schema(self, data):
+        return await (await self._backend()).seed_for_schema(data)
 
     async def initialize(self, data, *, reset=False):
         async with self._lock:

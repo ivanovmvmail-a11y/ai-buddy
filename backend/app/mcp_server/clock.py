@@ -16,7 +16,7 @@ def _tick(data: OnboardingData, day: int | None = None, intern_ids: set[str] | N
         if item.stage not in WORK_STAGES or (intern_ids is not None and item.intern_id not in intern_ids):
             continue
         current_day = day if day is not None else data.interns[item.intern_id].current_day
-        existing = next((reminder for reminder in data.reminders.values() if reminder.plan_item_id == item.id), None)
+        existing = next((reminder for reminder in data.reminders.values() if reminder.plan_item_id == item.id and reminder.kind in {"plan_item", "access_request"}), None)
         if existing:
             if item.status == "done" and existing.status != "done":
                 existing.status, existing.snooze_until_day = "done", None
@@ -40,16 +40,29 @@ def _tick(data: OnboardingData, day: int | None = None, intern_ids: set[str] | N
             continue
         if ready:
             approver = DEMO_USERS[pending.approver_id].name
-            text = f"Заявка {pending.id} ждёт {approver}. Напомнить наставнику?"
+            text = f"Заявка {pending.id} ждёт решения наставника ({approver}). Напомнить наставнику?"
         else:
             text = f"У пункта «{item.title}» прошёл срок. Можно вернуться к нему или обсудить препятствие."
         reminder = Reminder(id=f"REM-{uuid4().hex}", user_id=item.intern_id if ready else owner_id(item),
                             plan_item_id=item.id, request_id=pending.id if ready else None,
-                            text=text, created_day=current_day)
+                            kind="access_request" if ready else "plan_item",
+                            action={"label": "Открыть", "target": "access_request" if ready else "plan_item"},
+                            intern_id=item.intern_id, text=text, created_day=current_day)
         data.reminders[reminder.id] = reminder
         created.append(reminder)
         events._record(data, SYSTEM_ACTOR, "reminder_created", {"intern_id": item.intern_id, "reminder_id": reminder.id,
                       "item_id": item.id, "day": current_day})
+    from .absence import _tick_absences
+    created.extend(_tick_absences(data, day, intern_ids))
+    for reminder in data.reminders.values():
+        if reminder.kind in {"plan_item", "access_request"} or reminder.status != "snoozed":
+            continue
+        state = data.interns.get(reminder.intern_id)
+        if state is None or (intern_ids is not None and state.intern_id not in intern_ids):
+            continue
+        current = day if day is not None else state.current_day
+        if current >= reminder.snooze_until_day:
+            reminder.status, reminder.snooze_until_day = "active", None
     return [reminder.model_copy(deep=True) for reminder in created]
 
 
@@ -93,7 +106,7 @@ async def list_reminders(actor: User) -> list[Reminder]:
 def _reminder_context(data: OnboardingData, reminder: Reminder) -> dict:
     item = data.items.get(reminder.plan_item_id)
     request = data.requests.get(reminder.request_id)
-    intern_id = item.intern_id if item else (request.intern_id if request else reminder.user_id)
+    intern_id = reminder.intern_id or (item.intern_id if item else (request.intern_id if request else reminder.user_id))
     state = data.interns.get(intern_id)
     # Все напоминания плана имеют стажёра; для несвязанного личного напоминания
     # сотрудника не подставляем id чужого стажёра.
