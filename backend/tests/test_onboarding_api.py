@@ -1,6 +1,6 @@
 """Сквозные тесты T4: HTTP-эндпоинты онбординга и инструменты агента поверх имитаций сервисов (спека 101)."""
 import pytest
-from conftest import as_user, text_reply, tool_reply
+from .conftest import as_user, text_reply, tool_reply
 
 from app import async_runner
 from app.agent import onboarding_tools
