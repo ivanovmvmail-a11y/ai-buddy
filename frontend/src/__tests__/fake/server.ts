@@ -98,6 +98,17 @@ export function installFakeServer(): FakeServer {
       const prof = s.profiles.find((x) => x.intern_id === internId);
       return see(internId) && (actor.role === "intern" || actor.role === "mentor") && prof ? ok(prof) : err(404, "Не найдено");
     }
+    if (p === "/plan/summary") {
+      if (!see(internId)) return err(404, "Не найдено");
+      const own = s.items.filter((i) => i.intern_id === internId && WORKING.includes(i.stage));
+      return ok({
+        intern_id: internId, week: Number(url.searchParams.get("week") ?? 1),
+        closed: own.filter((i) => i.status === "done").map((i) => ({ item_id: i.id, title: i.title, day: 1 })),
+        access_granted: s.requests.filter((r) => r.intern_id === internId && r.status === "granted")
+          .map((r) => ({ request_id: r.id, resource_id: r.resource_id, day: 1 })),
+        carry_over: own.filter((i) => i.status !== "done").map((i) => derived(s, i)),
+      });
+    }
     if (p === "/access/resources") return ok({ resources: RESOURCES });
     if (p === "/access/requests") {
       const mine = s.requests.filter((r) => see(r.intern_id));
