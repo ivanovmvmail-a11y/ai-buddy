@@ -57,11 +57,8 @@
 | 51 | Экран наставника: «Бот предлагает поднять уровень» и сравнение двух планов (SPEC 4, 5) | Claude | claude/mentor-suggestions-compare | на ревью | | frontend 77; на поддельном сервере, на настоящем появится после Codex (п. 0–2 HANDOFF) |
 
 | C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
-
+| C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
 | C1.2 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | 828 passed / 97,85%; зависит от #67; решение только наставником |
-
-| C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 836 passed / 98,14%; main влит; уведомления и +1 день сроков |
-
 | C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | [#70](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/70) | 893 passed / 98,29%; зависит от #67/#46/#68; /health=200 |
 
 ## Блокеры
