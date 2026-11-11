@@ -32,7 +32,7 @@
 
 | 26 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | на ревью | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
 
-| 27 | Grafana: готовая панель метрик из PostgreSQL | Codex | codex/grafana-demo | на ревью | | Docker проверен; PostgreSQL: 612 passed / 98,23%; read-only datasource |
+| 27 | Grafana: готовая панель метрик из PostgreSQL | Codex | codex/grafana-demo | на ревью | [#39](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/39) | Docker проверен; PostgreSQL: 612 passed / 98,23%; read-only datasource |
 
 ## Блокеры
 _нет_
