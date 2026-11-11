@@ -14,6 +14,12 @@ from app.mcp_server.seed import load_seed
 MIGRATION = Path(__file__).resolve().parents[3] / "supabase/migrations/20261111010000_onboarding.sql"
 
 
+def apply_onboarding_migrations(connection):
+    connection.execute(MIGRATION.read_text(encoding="utf-8"))
+    connection.execute(MIGRATION.with_name("20261111160000_personal_plan.sql").read_text(encoding="utf-8"))
+    connection.execute(MIGRATION.with_name("20261111162000_skill_suggestions.sql").read_text(encoding="utf-8"))
+
+
 def pytest_generate_tests(metafunc):
     if "store" in metafunc.fixturenames:
         backends = ["memory", "postgres"] if metafunc.config.getoption("--mcp-postgres") else ["memory"]
@@ -43,7 +49,7 @@ def onboarding_dsn(request):
         while True:
             try:
                 with psycopg.connect(dsn, autocommit=True) as connection:
-                    connection.execute(MIGRATION.read_text(encoding="utf-8"))
+                    apply_onboarding_migrations(connection)
                 break
             except psycopg.OperationalError:
                 if time.monotonic() >= deadline:
