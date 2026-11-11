@@ -62,7 +62,7 @@
 
 | C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 836 passed / 98,14%; main влит; уведомления и +1 день сроков |
 
-| C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | — | 893 passed / 98,29%; зависит от #67/#46/#68; /health=200 |
+| C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | [#70](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/70) | 893 passed / 98,29%; зависит от #67/#46/#68; /health=200 |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
