@@ -1,0 +1,6 @@
+# Netlify: сайт AI-buddy (Next.js) из папки frontend/. Настройки здесь важнее, чем в панели Netlify.
+# Адрес backend задаётся в панели Netlify: переменная NEXT_PUBLIC_API_URL (см. README → «Облако»).
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"

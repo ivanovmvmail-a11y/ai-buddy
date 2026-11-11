@@ -124,3 +124,5 @@
 - Dockerfile: gunicorn и HEALTHCHECK слушают `$PORT` (по умолчанию 8000 — Docker и CI не меняются).
 - Миграции в Supabase уже применены (rag_documents, onboarding).
 - Дальше: Миша создаёт Blueprint на Render и проект на Vercel; проверить GigaChat с Render (если недоступен — LLM_PROVIDER=scenario).
+- Koyeb после перехода к Mistral не даёт новым аккаунтам создавать сервисы → backend на Railway (пробный 30 дней / $5). Проверено: /health ok, /chat отвечает GigaChat, база Supabase через Session pooler.
+- Netlify сначала выложил исходники без сборки и был Private → добавлен `netlify.toml` (base frontend, npm run build, publish .next), видимость — Public.

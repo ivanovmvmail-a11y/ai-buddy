@@ -86,8 +86,9 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
 - Золотой набор (37 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md)
 
-## Облако (бонус): Koyeb + Netlify
-Render и `*.vercel.app` из России не открываются (проверено 11.11), поэтому backend — на Koyeb, сайт — на Netlify.
-- **Backend → Koyeb:** Create Web Service → GitHub → этот репозиторий, ветка `main`; Builder = Dockerfile, Work directory = `backend`; порт 8000 (HTTP, путь `/`), health check HTTP `/health`. Переменные: `LLM_PROVIDER=gigachat`, `GIGACHAT_CREDENTIALS` (секрет), `DATABASE_URL` (секрет, Supabase → Connect → Session pooler), `EMBEDDINGS_PROVIDER=fake`, `FRONTEND_ORIGINS` = адрес сайта на Netlify.
-- **Frontend → Netlify:** Add new project → Import from GitHub → этот репозиторий; Base directory = `frontend`; переменная `NEXT_PUBLIC_API_URL` = адрес backend на Koyeb.
-- Бесплатный Koyeb засыпает без запросов: первый ответ после сна — несколько секунд.
+## Облако (бонус): Railway + Netlify
+Render, `*.vercel.app` (не открываются из России) и Koyeb (закрыл бесплатную регистрацию) не подошли.
+- **Сайт:** Netlify, настройки сборки в `netlify.toml`; в панели — переменная `NEXT_PUBLIC_API_URL` = адрес backend.
+- **Backend:** https://ai-buddy-production-9970a770.up.railway.app (`/health`). Railway → New Project → GitHub repo; Settings: Root Directory `/backend`, Healthcheck Path `/health`, Generate Domain (порт 8000). Variables: `PORT=8000`, `LLM_PROVIDER=gigachat`, `EMBEDDINGS_PROVIDER=fake`, `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Direct → Session pooler), `FRONTEND_ORIGINS` = адрес сайта.
+- **База:** Supabase (миграции уже применены).
+- Пробный период Railway — 30 дней / $5. Оба сервиса пересобираются сами при мерже в `main`.
