@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { askBot, ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
+import { ProfilePanel } from "@/components/ProfilePanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
@@ -53,6 +54,7 @@ export default function Home() {
   const setUser = useSession((s) => s.setUser);
   const actor = findUser(userId)!;
   const [tab, setTab] = useState<"plan" | "chat">("plan");
+  const [view, setView] = useState<"plan" | "profile">("plan"); // левая колонка стажёра: план или «Мой профиль»
   const client = useQueryClient();
   const refresh = useRefresh();
   const health = useHealth(userId);
@@ -241,7 +243,24 @@ export default function Home() {
 
       <main className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className={`min-h-0 overflow-y-auto overscroll-contain border-black/10 md:block md:border-r dark:border-white/10 ${tab === "plan" ? "block" : "hidden"}`}>
-          <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} />
+          {actor.role === "intern" && (
+            <div className="flex gap-1 px-4 pt-4 sm:px-5" role="tablist" aria-label="Левая колонка">
+              {([["plan", "Мой план"], ["profile", "Мой профиль"]] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === v ? "bg-black/5 dark:bg-white/10" : "text-black/55 hover:bg-black/5 dark:text-white/55 dark:hover:bg-white/10"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {actor.role === "intern" && view === "profile"
+            ? <ProfilePanel actor={actor} />
+            : <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} />}
         </div>
         <div className={`min-h-0 md:block ${tab === "chat" ? "block" : "hidden"}`}>
           <ChatPanel actor={actor} onAction={onAction} />
