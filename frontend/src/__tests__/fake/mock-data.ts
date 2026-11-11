@@ -51,19 +51,19 @@ const COMMON: ItemSeed[] = [
 const TEAM: Record<string, ItemSeed[]> = {
   "Платформа объявлений": [
     { key: "w1.access-team", stage: "week1", owner: "intern", due: 5, topic: "git", resource: "bitbucket-platform",
-      doc: "demo:05-platform-sandbox.md", title: "Запросить доступ в пространство команды и изучить его",
+      doc: "demo:13-team-space-access.md", title: "Запросить доступ в пространство команды и изучить его",
       summary: "Репозитории команды в Bitbucket. Доступ одобряет наставник.",
       practice: "Склонируй учебный репозиторий и найди, где описан запуск сервиса." },
-    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:05-platform-sandbox.md",
+    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:17-platform-sandbox-setup.md",
       title: "Поднять песочницу Платформы объявлений", summary: "Локальный стенд с учебными объявлениями.",
       practice: "Создай в песочнице объявление «Картонный дирижабль» и найди его поиском." },
   ],
   "Авито Доставка": [
     { key: "w1.access-team", stage: "week1", owner: "intern", due: 5, topic: "git", resource: "bitbucket-delivery",
-      doc: "demo:08-delivery-sandbox.md", title: "Запросить доступ в пространство команды и изучить его",
+      doc: "demo:13-team-space-access.md", title: "Запросить доступ в пространство команды и изучить его",
       summary: "Репозитории команды в Bitbucket. Доступ одобряет наставник.",
       practice: "Склонируй учебный репозиторий и найди, где описаны статусы отправления." },
-    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:08-delivery-sandbox.md",
+    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:20-delivery-sandbox-setup.md",
       title: "Поднять учебный стенд Доставки", summary: "Стенд с вымышленными пунктами выдачи.",
       practice: "Создай отправление «Бирюзовый пакет» и проверь его статус." },
   ],
