@@ -21,7 +21,7 @@ export default function Home() {
   const client = useQueryClient();
   const refresh = useRefresh();
   const health = useHealth(userId);
-  const scriptedMode = health.data?.llm_provider === "echo";
+  const scriptedMode = ["scenario", "echo"].includes(health.data?.llm_provider ?? "");
   const [demoError, setDemoError] = useState<string | null>(null);
 
   const say = useChat((s) => s.push);
