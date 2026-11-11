@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from app.llm import Message, get_llm
 from app.rag import retrieve
 
-from .actions import Action, ActionStore
+from .actions import Action, ActionStore, InMemoryActionStore
 from .demo_tools import register_demo_tools
 from .onboarding_tools import plan_context, register_onboarding_tools
 from .prompts import SYSTEM_PROMPT, user_context
@@ -117,7 +117,7 @@ class Agent:
                 used.append(call.name)
                 refused = refused or result.get("error") == "forbidden"
                 if result.get("status") == "awaiting_confirmation":
-                    action = self.store.get(result["action_id"])
+                    action = await self.store.get(result["action_id"])
                     if action:
                         created.append(action)
                 messages.append(
@@ -127,23 +127,32 @@ class Agent:
         log.warning("tool step limit reached user=%s", user.id)
         return AgentResult(reply=STEP_LIMIT_REPLY, sources=[], actions=created, tools=used, refused=refused)
 
-    def _own_pending(self, user: User, action_id: str) -> Action:
-        action = self.store.get(action_id)
+    async def _claim(self, user: User, action_id: str) -> Action:
+        """Атомарно забрать свой черновик в работу: из одновременных подтверждений выполняет один (аудит D1)."""
+        action = await self.store.claim(action_id, user.id)
+        if action is not None:
+            return action
+        existing = await self.store.get(action_id)
         # чужой черновик для пользователя «не существует» — не раскрываем даже факт его наличия
-        if action is None or action.user_id != user.id:
+        if existing is None or existing.user_id != user.id:
             raise ActionNotFound("Действие не найдено")
-        if action.status != "pending":
-            raise ActionConflict(f"Действие уже в статусе {action.status}")
-        return action
+        raise ActionConflict(f"Действие уже в статусе {existing.status}")
+
+    async def _release(self, action: Action) -> None:
+        """Выполнение не началось (инструмент пропал, нет прав) — черновик снова ждёт решения."""
+        action.status = "pending"
+        await self.store.save(action)
 
     async def confirm(self, user: User, action_id: str) -> Action:
         """Выполнить черновик по подтверждению пользователя. Права проверяются повторно."""
-        action = self._own_pending(user, action_id)
+        action = await self._claim(user, action_id)
         tool = self.registry.get(action.tool)
         if tool is None:
+            await self._release(action)
             raise ActionConflict("Инструмент больше недоступен")
         args = tool.args_model.model_validate(action.params)
         if not check_access(user, tool, args):
+            await self._release(action)
             raise ActionForbidden("Нет прав на это действие")
         try:
             result = await tool.handler(user, args)
@@ -158,9 +167,9 @@ class Agent:
             log.exception("action failed user=%s action=%s", user.id, action.id)
             action.status = "failed"
             action.error = f"Сервис вернул ошибку: {exc}"
-        return self.store.save(action)
+        return await self.store.save(action)
 
-    def draft(self, user: User, tool_name: str, params: dict) -> Action:
+    async def draft(self, user: User, tool_name: str, params: dict) -> Action:
         """Черновик по кнопке интерфейса («Сделать за меня») — без модели, тот же путь подтверждения."""
         tool = self.registry.get(tool_name)
         if tool is None or tool.kind != "write":
@@ -172,22 +181,31 @@ class Agent:
         if not check_access(user, tool, args):
             raise ActionForbidden("Нет прав на это действие")
         title = tool.describe(args) if tool.describe else tool.description
-        return self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
+        return await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
 
-    def cancel(self, user: User, action_id: str) -> Action:
-        action = self._own_pending(user, action_id)
+    async def cancel(self, user: User, action_id: str) -> Action:
+        action = await self._claim(user, action_id)
         action.status = "cancelled"
-        return self.store.save(action)
+        return await self.store.save(action)
 
-    def list_actions(self, user: User) -> list[Action]:
-        return self.store.list_for(user.id)
+    async def list_actions(self, user: User) -> list[Action]:
+        return await self.store.list_for(user.id)
+
+
+def make_action_store() -> ActionStore:
+    """PostgreSQL, если есть база и адаптер (зона Codex: app.db.actions), иначе — в памяти процесса."""
+    try:
+        from app.db.actions import postgres_action_store  # появится в PR Codex
+    except ImportError:
+        return InMemoryActionStore()
+    return postgres_action_store() or InMemoryActionStore()
 
 
 def build_agent() -> Agent:
     registry = ToolRegistry()
     register_demo_tools(registry)
     register_onboarding_tools(registry)
-    return Agent(registry, ActionStore())
+    return Agent(registry, make_action_store())
 
 
 agent = build_agent()

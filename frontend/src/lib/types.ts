@@ -118,7 +118,7 @@ export const Action = z.object({
   tool: z.string(),
   title: z.string(),
   params: z.record(z.string(), z.unknown()),
-  status: z.enum(["pending", "done", "failed", "cancelled"]),
+  status: z.enum(["pending", "running", "done", "failed", "cancelled"]), // running — выполняется прямо сейчас
   result: z.record(z.string(), z.unknown()).nullable(),
   error: z.string().nullable(),
 });

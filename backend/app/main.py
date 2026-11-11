@@ -117,7 +117,7 @@ def create_app() -> Flask:
 
     @app.get("/actions")
     def list_actions():
-        return {"actions": [_action_json(a) for a in service.agent.list_actions(g.user)]}
+        return {"actions": [_action_json(a) for a in async_runner.run(service.agent.list_actions(g.user))]}
 
     @app.post("/actions/<action_id>/confirm")
     def confirm_action(action_id: str):
@@ -125,7 +125,7 @@ def create_app() -> Flask:
 
     @app.post("/actions/<action_id>/cancel")
     def cancel_action(action_id: str):
-        return _action_json(service.agent.cancel(g.user, action_id))
+        return _action_json(async_runner.run(service.agent.cancel(g.user, action_id)))
 
     app.register_blueprint(onboarding_bp)
     return app

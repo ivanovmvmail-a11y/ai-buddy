@@ -107,7 +107,7 @@ class ToolExecutor:
 
         if tool.kind == "write":
             title = tool.describe(args) if tool.describe else tool.description
-            action = self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
+            action = await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
             log.info("draft user=%s tool=%s action=%s", user.id, tool.name, action.id)
             return {
                 "status": "awaiting_confirmation",
