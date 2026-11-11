@@ -45,7 +45,6 @@
 | 39 | Аудит S6: итоги недели стажёру в чате (SPEC 3.2) | Claude | claude/intern-weekly | на ревью | | после #53; frontend 58 |
 | 40 | [API] Аудит S6: противоречия в документах — оба варианта с источниками, сигнал наставнику (SPEC 3.7) | Claude | claude/doc-conflicts | на ревью | | после #54; backend 455, золотой 48/48, frontend 58 |
 | 41 | [API] Аудит S6/D1: хранилище действий — асинхронный протокол для PostgreSQL, атомарное подтверждение, «Сброс» очищает черновики | Claude | claude/action-store | на ревью | | после #55; таблица — Codex (HANDOFF) |
-
 | 42 | Аудит S4: повышенные доступы требуют решения наставника | Codex | codex/audit-s4-access-approval | на ревью | [#59](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/59) | 706 passed / 97,97%, PostgreSQL; мерж после комментария человека; бонусы #45/#46/#50 Draft |
 
 ## Блокеры
