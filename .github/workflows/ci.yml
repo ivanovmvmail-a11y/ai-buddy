@@ -65,18 +65,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: docker compose up (демо-режим без ключей)
+      - name: docker compose up (сценарный режим, без ключей)
         run: docker compose up --build --detach --wait --wait-timeout 300
       - name: Backend отвечает
         run: |
           curl --fail --silent --show-error http://localhost:8000/health | tee health.json
           grep -q '"status":"ok"' health.json
-      - name: Чат отвечает (заглушка echo)
+          # без ключей эксперт должен получить сценарный режим, а не заглушку echo (спека 003)
+          grep -q '"llm_provider":"scenario"' health.json
+      - name: Чат отвечает (сценарный режим — следующий шаг из плана в базе)
         run: |
           curl --fail --silent --show-error -X POST http://localhost:8000/chat \
-            -H 'Content-Type: application/json' \
-            -d '{"messages":[{"role":"user","content":"ping"}]}' | tee chat.json
-          grep -q 'ping' chat.json
+            -H 'Content-Type: application/json' -H 'X-User-Id: intern-anya' \
+            -d '{"messages":[{"role":"user","content":"Что мне делать дальше?"}]}' | tee chat.json
+          grep -q 'Следующий шаг' chat.json
       - name: Сайт открывается
         run: |
           for i in $(seq 1 30); do
