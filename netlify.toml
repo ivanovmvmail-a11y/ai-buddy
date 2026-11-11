@@ -4,3 +4,7 @@
   base = "frontend"
   command = "npm run build"
   publish = ".next"
+
+# Модуль Netlify для Next.js: без него сайт собирается, но все страницы отвечают 404
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
