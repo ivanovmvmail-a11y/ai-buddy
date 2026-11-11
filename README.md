@@ -74,7 +74,7 @@ backend/app/
   rag/                поиск по документам команды, демо-документы            (Codex)
   mcp_server/         имитации сервисов (план, доступы, найм, события) + MCP (Codex)
   db/                 общий пул PostgreSQL                                    (Codex)
-backend/golden/       золотой набор: 46 контрольных вопросов и прогон
+backend/golden/       золотой набор: 48 контрольных вопросов и прогон
 frontend/src/         Next.js: экран «план + чат», экран наставника         (Claude)
 ops/grafana/          готовая панель метрик
 supabase/migrations/  схема БД
@@ -119,7 +119,7 @@ docs/                 SPEC, API, DECISIONS, specs/ (SDD-спецификации
 - Сценарий целиком — «Маршрут проверки» выше.
 - Тесты backend: `cd backend && uv run --extra mcp pytest --cov=app --cov-report=term-missing`
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
-- Золотой набор (46 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md) (прогон до расширения набора, 37 вопросов)
+- Золотой набор (48 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md) (прогон до расширения набора, 37 вопросов)
 
 ## Облако (бонус): всё на Railway
 - **Сайт:** https://ai-buddy-site-production.up.railway.app

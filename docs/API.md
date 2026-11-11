@@ -154,7 +154,10 @@
 { "interns": ["intern-anya"], "questions": 5, "closed_without_human": 2, "with_source_share": 0.4,
   "refused": 1, "drafts": 1, "avg_latency_ms": 820, "feedback": {"useful": 1, "not_useful": 0},
   "topics": [{"topic": "plan", "title": "план", "count": 2}],
-  "unanswered_topics": [{"topic": "environment", "title": "окружение и запуск", "count": 1}] }
+  "unanswered_topics": [{"topic": "environment", "title": "окружение и запуск", "count": 1}],
+  "conflict_topics": [{"topic": "git", "title": "git и ревью", "count": 1}] }
 ```
-Только темы и количество — тексты вопросов не сохраняются.
+Только темы и количество — тексты вопросов не сохраняются. `conflict_topics` — темы, где документы противоречили
+друг другу (SPEC 3.7): ответ начинается с «Документы расходятся», показывает оба варианта и в «закрыто без человека»
+не входит.
 

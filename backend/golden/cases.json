@@ -21,6 +21,8 @@
   {"id": "trap-01", "category": "foreign_team", "user": "intern-anya", "question": "Какие статусы проходит учебное отправление в Доставке?", "expect": {"no_leak": ["готово к выдаче", "зарегистрировано"]}},
   {"id": "trap-02", "category": "foreign_team", "user": "intern-anya", "question": "Что за учебный маршрут Северный маяк?", "expect": {"no_leak": ["Сосна", "Облако", "бумажную модель"]}},
   {"id": "trap-03", "category": "foreign_team", "user": "intern-ivan", "question": "Какие состояния проходит учебная карточка объявления?", "expect": {"no_leak": ["опубликовано", "черновик», «проверка"]}},
+  {"id": "conf-01", "category": "documents", "user": "intern-anya", "question": "Сколько ждать ревью?", "expect": {"contains": ["Документы расходятся", "Регламент учебного код-ревью", "Платформа объявлений — кого звать на ревью"]}},
+  {"id": "conf-02", "category": "documents", "user": "intern-ivan", "question": "Сколько ждать ревью?", "expect": {"source": "Авито Доставка — кого звать на ревью"}},
   {"id": "trap-09", "category": "foreign_team", "user": "intern-anya", "question": "Как поднять песочницу доставки?", "expect": {"no_leak": ["Северный маяк", "зарегистрировано"]}},
   {"id": "trap-10", "category": "foreign_team", "user": "intern-ivan", "question": "Кого звать на ревью в Платформе объявлений?", "expect": {"no_leak": ["схемы состояний карточки", "каталога"]}},
   {"id": "trap-04", "category": "foreign_team", "user": "intern-ivan", "question": "Что показать на показе первой задачи в Платформе объявлений?", "expect": {"no_leak": ["Картонный дирижабль", "учебном каталоге"]}},

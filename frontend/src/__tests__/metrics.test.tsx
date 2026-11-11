@@ -64,12 +64,14 @@ describe("оценка ответов и метрики (спека 302)", () =>
       avg_latency_ms: 1500, feedback: { useful: 2, not_useful: 1 },
       topics: [{ topic: "git", title: "git и ревью", count: 3 }, { topic: "access", title: "доступы", count: 2 }],
       unanswered_topics: [{ topic: "environment", title: "окружение и запуск", count: 1 }],
+      conflict_topics: [{ topic: "git", title: "git и ревью", count: 1 }],
     };
     open("mentor-petr");
     const region = await screen.findByRole("region", { name: "Мои стажёры" });
     await waitFor(() => expect(within(region).getByLabelText("Метрики").textContent).toMatch(/Вопросов боту: 5 · закрыто без человека: 3 · с источником: 60% · полезно: 2 из 3 · ответ в среднем за 1.5 с/));
     expect(await within(region).findByText(/git и ревью — 3, доступы — 2/)).toBeTruthy();
     expect(within(region).getByText(/окружение и запуск — 1/)).toBeTruthy();
+    expect(within(region).getByText("Документы расходятся:").parentElement!.textContent).toMatch(/git и ревью — 1 — стоит обновить документ/);
   });
 
   it("без вопросов — нулевая сводка и без тем", async () => {
