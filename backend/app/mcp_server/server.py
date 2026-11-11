@@ -1,8 +1,4 @@
 """MCP/stdio: один пользователь на процесс, права проверяют сервисы онбординга."""
-from . import drafts, self_check
-from .self_check_models import Index, Question, SelfCheckResult, Topic
-from .models import ActionDraft
-
 import argparse
 import logging
 import os
@@ -33,6 +29,11 @@ def create_server(user_id: str) -> FastMCP:
     if actor is None:
         raise ValueError("Неизвестный пользователь MCP; используйте id из DEMO_USERS")
     server = FastMCP("AI-buddy onboarding")
+
+    from . import drafts, self_check
+    from .self_check_models import Index, Question, SelfCheckResult, Topic
+    from .models import ActionDraft
+
 
     async def call(operation, *args, **kwargs):
         try:
