@@ -141,6 +141,13 @@ class PostgresStore(PostgresPoolOwner):
                 raise RuntimeError("Historical reads must not append events")
             await self._insert_events(connection, data.events[count:])
 
+    async def seed_for_schema(self, data):
+        """Сброс основного демо не требует ещё не созданных таблиц бонусов."""
+        async with (await self._get_pool()).connection() as connection:
+            available = await self._available_tables(connection)
+        return data.model_copy(update={field: {} for field, table, *_ in TABLES
+                                       if table in OPTIONAL_TABLES and table not in available})
+
     async def initialize(self, data, *, reset=False):
         async with (await self._get_pool()).connection() as connection:
             await connection.execute("SELECT pg_advisory_xact_lock(%s)", (LOCK_ID,))
