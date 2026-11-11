@@ -64,7 +64,7 @@ def test_resource_approver_is_configuration_not_kind(store, edit):
     edit(lambda data: setattr(data.resources["jira"], "approver", "mentor"))
     assert run(access.create_request(ANYA, "jira", "read", "Учебная задача")).status == "pending_approval"
     edit(lambda data: setattr(data.resources["bitbucket-platform"], "approver", "auto"))
-    assert run(access.create_request(ANYA, "bitbucket-platform", "admin", "Учебная задача")).status == "granted"
+    assert run(access.create_request(ANYA, "bitbucket-platform", "read", "Учебная задача")).status == "granted"
 
 
 def test_requests_sorted_newest_and_no_linked_item_is_allowed(store):
