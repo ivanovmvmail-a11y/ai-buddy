@@ -1,11 +1,13 @@
 """Прямой PostgreSQL: один ленивый async-пул и атомарный unit of work."""
 from contextlib import asynccontextmanager
+import logging
 from .self_check_models import SelfCheckResult
 
 from psycopg import sql
 from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
+from .errors import Conflict
 from .models import (AccessRequest, AccessResource, ActionDraft, Event, InternState, OnboardingData,
                      PlanItem, Reminder, SkillProfile)
 
@@ -22,6 +24,8 @@ TABLES = (
 )
 JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload", "review"}
 DERIVED_FIELDS = {"overdue", "waiting_days"}
+OPTIONAL_TABLES = {"service_drafts", "mentor_questions", "absence_requests", "self_check_attempts"}
+log = logging.getLogger("ai_buddy.onboarding")
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
 
 
@@ -30,9 +34,25 @@ def _dump(model):
 
 
 class PostgresStore(PostgresPoolOwner):
+    def __init__(self, database_url):
+        super().__init__(database_url)
+        self._missing_warned = set()
+
+    async def _available_tables(self, connection):
+        cursor = await connection.execute("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public'")
+        available = {row["tablename"] for row in await cursor.fetchall()}
+        missing = {table for _, table, *_ in TABLES if table in OPTIONAL_TABLES and table not in available}
+        if missing - self._missing_warned:
+            log.warning("Дополнительные таблицы %s пока не созданы: примените новые миграции. Основной онбординг продолжает работать в PostgreSQL.", ", ".join(sorted(missing)))
+            self._missing_warned.update(missing)
+        return available
+
     async def _load(self, connection, *, include_events):
         data = OnboardingData()
+        available = await self._available_tables(connection)
         for field, table, model, key in TABLES:
+            if table in OPTIONAL_TABLES and table not in available:
+                continue
             cursor = await connection.execute(sql.SQL("SELECT * FROM {} ORDER BY seq").format(
                 sql.Identifier("public", table)))
             for row in await cursor.fetchall():
@@ -60,17 +80,27 @@ class PostgresStore(PostgresPoolOwner):
                 [(event.ts, event.user_id, str(event.role), event.team, event.type, Jsonb(event.payload)) for event in events],
             )
 
-    async def _save(self, connection, data, baseline):
+    async def _save(self, connection, data, baseline, *, missing_ok=False):
+        available = await self._available_tables(connection)
         for field, table, _, key_column in reversed(TABLES):
+            if table in OPTIONAL_TABLES and table not in available:
+                continue
             removed = set(baseline[field]) - set(getattr(data, field))
             for key in removed:
                 await connection.execute(sql.SQL("DELETE FROM {} WHERE {} = %s").format(
                     sql.Identifier("public", table), sql.Identifier(key_column)), (key,))
         for field, table, _, key_column in TABLES:
+            if table in OPTIONAL_TABLES and table not in available:
+                if getattr(data, field) and not missing_ok:
+                    raise Conflict("Сервис пока недоступен: примените новые миграции базы данных")
+                continue
             for key, record in getattr(data, field).items():
                 values = _dump(record)
                 if baseline[field].get(key) == values:
                     continue
+                if table == "reminders" and "mentor_questions" not in available:
+                    if values.pop("mentor_question_id", None) is not None:
+                        raise Conflict("Сервис пока недоступен: примените новые миграции базы данных")
                 columns = list(values)
                 query = sql.SQL("INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}").format(
                     sql.Identifier("public", table),
@@ -116,15 +146,19 @@ class PostgresStore(PostgresPoolOwner):
     async def initialize(self, data, *, reset=False):
         async with (await self._get_pool()).connection() as connection:
             await connection.execute("SELECT pg_advisory_xact_lock(%s)", (LOCK_ID,))
+            available = await self._available_tables(connection)
+            active_tables = [table for _, table, *_ in TABLES if table not in OPTIONAL_TABLES or table in available]
             cursor = await connection.execute(sql.SQL("SELECT EXISTS ({}) AS populated").format(
                 sql.SQL(" UNION ALL ").join(sql.SQL("SELECT 1 FROM {}").format(sql.Identifier("public", table))
-                                             for table in [entry[1] for entry in TABLES] + ["events"])))
+                                             for table in active_tables + ["events"])))
             populated = (await cursor.fetchone())["populated"]
             if populated and not reset:
                 return
             if reset:
                 await connection.execute("DELETE FROM public.events")
                 for _, table, *_ in reversed(TABLES):
+                    if table in OPTIONAL_TABLES and table not in available:
+                        continue
                     await connection.execute(sql.SQL("DELETE FROM {}").format(sql.Identifier("public", table)))
-            await self._save(connection, data, {field: {} for field, *_ in TABLES})
+            await self._save(connection, data, {field: {} for field, *_ in TABLES}, missing_ok=True)
             await self._insert_events(connection, data.events)
