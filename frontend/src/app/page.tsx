@@ -77,7 +77,10 @@ export default function Home() {
     const profile = await client
       .fetchQuery({ queryKey: keys.profile(actor.id, item.intern_id), queryFn: () => api.profile(actor.id, item.intern_id) })
       .catch(() => undefined);
-    say({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` }, explainScripted(item, profile));
+    // Записываем объяснение в события (метрики, «полезно / не полезно»); сбой записи объяснению не мешает.
+    const recorded = await api.explained(actor.id, item.id, item.intern_id).catch(() => undefined);
+    say({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` },
+      { ...explainScripted(item, profile), answerId: recorded?.answer_id });
   }
 
   async function onDo(item: PlanItem) {

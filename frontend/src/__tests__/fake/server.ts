@@ -78,6 +78,7 @@ export type FakeServer = {
   chatReplies: Array<{ reply: string; actions?: Action[]; answerId?: string } | "fail" | "502">;
   calls: Array<{ method: string; path: string; user: string; body: unknown }>;
   feedback: Array<{ answer_id: string; useful: boolean }>;
+  explainFails?: boolean;
   metrics: Record<string, unknown> | null;
 };
 
@@ -190,6 +191,12 @@ export function installFakeServer(): FakeServer {
     if (p === "/demo/reset") {
       srv.state = initialState();
       return ok({ status: "reset" });
+    }
+    m = p.match(/^\/plan\/items\/(.+)\/explained$/);
+    if (m && method === "POST") {
+      if (srv.explainFails) return err(500, "Ошибка");
+      if (!s.items.some((i) => i.id === m![1])) return err(404, "Не найдено");
+      return { status: 201, body: { answer_id: `ans_explain_${m[1]}` } };
     }
     if (p === "/feedback") {
       if (String(body.answer_id) === "ans_fail") return err(500, "Ошибка");

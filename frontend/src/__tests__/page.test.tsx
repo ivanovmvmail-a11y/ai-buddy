@@ -122,6 +122,25 @@ describe("экран «план + чат» на API", () => {
     expect(await screen.findByText(/Ты в этой теме уверенно/)).toBeTruthy();
   });
 
+  it("без ключа объяснение записывается в события и его можно оценить", async () => {
+    open();
+    const row = (await screen.findByText("Завести конспект встреч с наставником")).closest("li")!;
+    await waitFor(() => expect(screen.getByText(/сценарный режим/)).toBeTruthy());
+    await click(within(row).getByRole("button", { name: "Объяснить" }));
+    await click(await screen.findByRole("button", { name: "Полезно" }));
+    await waitFor(() => expect(srv.feedback).toEqual([{ answer_id: "ans_explain_anya.w1.notes", useful: true }]));
+  });
+
+  it("сбой записи события не мешает сценарному объяснению", async () => {
+    srv.explainFails = true;
+    open();
+    const row = (await screen.findByText("Завести конспект встреч с наставником")).closest("li")!;
+    await waitFor(() => expect(screen.getByText(/сценарный режим/)).toBeTruthy());
+    await click(within(row).getByRole("button", { name: "Объяснить" }));
+    expect(await screen.findByText(/Объясни пункт «Завести конспект/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Полезно" })).toBeNull();
+  });
+
   it("с моделью объяснение уходит вопросом в /chat", async () => {
     srv.provider = "gigachat";
     open();

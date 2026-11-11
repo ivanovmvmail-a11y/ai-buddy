@@ -5,6 +5,7 @@
 это и есть решение человека. Действия, которые готовит ИИ или кнопка «Сделать за меня», идут через
 черновик и `POST /actions/{id}/confirm`.
 """
+import time
 from typing import Literal
 
 from flask import Blueprint, g, jsonify, request
@@ -169,6 +170,22 @@ def feedback():
     body = _body(FeedbackIn)
     async_runner.run(analytics.record_feedback(g.user, body.answer_id, body.useful))
     return "", 204
+
+
+@bp.post("/plan/items/<item_id>/explained")
+def item_explained(item_id: str):
+    """Без модели объяснение пункта собирает интерфейс; записываем его в события, чтобы метрики его видели."""
+    started = time.perf_counter()
+    plan = async_runner.run(checklist.get_plan(g.user, _intern_id()))
+    item = next((i for i in plan.items if i.id == item_id), None)
+    if item is None:
+        raise NotFound()  # чужой и несуществующий пункт неразличимы
+    answer_id = analytics.new_answer_id()
+    async_runner.run(analytics.record_explained(
+        g.user, answer_id=answer_id, title=item.title, with_source=bool(item.doc_source_id),
+        latency_ms=round((time.perf_counter() - started) * 1000),
+    ))
+    return jsonify(answer_id=answer_id), 201
 
 
 @bp.get("/metrics")
