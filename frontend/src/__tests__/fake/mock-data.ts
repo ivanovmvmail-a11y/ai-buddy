@@ -69,14 +69,33 @@ const TEAM: Record<string, ItemSeed[]> = {
   ],
 };
 
+// Персональные пункты из каталога (SPEC 3.1): тема в карте навыков «новичок» → учебный пункт «для тебя».
+const PERSONAL: Record<string, Array<ItemSeed & { reason: string }>> = {
+  "intern-anya": [
+    { key: "p.git", stage: "week1", owner: "intern", due: 6, topic: "git", doc: "demo:11-git-workflow.md",
+      title: "Практикум: ветки и pull request", summary: "Учебный pull request в песочнице команды.",
+      reason: "в карте навыков Git — новичок" },
+  ],
+  "intern-ivan": [
+    { key: "p.sql", stage: "week2", owner: "intern", due: 10, topic: "sql", doc: "demo:09-delivery-statuses.md",
+      title: "Практикум: запросы к учебной базе доставок", summary: "Три запроса к вымышленным отправлениям.",
+      reason: "в карте навыков SQL — новичок" },
+  ],
+};
+
 const STAGE_ORDER: Stage[] = ["week1", "week2", "month1", "month2", "after3m"];
 
 function buildItems(intern: DemoUser): PlanItem[] {
-  const seeds = [...COMMON, ...(TEAM[intern.team] ?? [])];
+  const personal = PERSONAL[intern.id] ?? [];
+  const seeds: Array<ItemSeed & { reason?: string }> = [...COMMON, ...(TEAM[intern.team] ?? []), ...personal];
   const short = intern.id.replace("intern-", "");
   return seeds
     .sort((a, b) => STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage))
     .map((s, i) => ({
+      kind: s.reason ? ("personal" as const) : ("common" as const),
+      reason: s.reason ?? null,
+      known_marked: false,
+      catalog_key: s.reason ? `${short}.${s.key}` : null,
       id: `${short}.${s.key}`,
       intern_id: intern.id,
       stage: s.stage,
