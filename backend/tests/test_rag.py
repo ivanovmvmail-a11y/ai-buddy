@@ -1,5 +1,6 @@
 """Офлайн-проверки загрузки, поиска и изоляции команд, без PostgreSQL/ключей."""
 import math
+import asyncio
 from dataclasses import replace
 from unittest.mock import Mock
 
@@ -339,3 +340,38 @@ def test_cli_uses_shared_async_runner(service, monkeypatch, capsys):
     monkeypatch.setattr("app.rag.ingest.get_service", lambda: service)
     main(["--directory", str(DEMO_DOCS)])
     assert "Loaded 10 documents, 10 chunks" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("stage", ["success", "metadata", "embedder", "storage"])
+def test_cli_closes_store_on_same_loop_after_success_or_failure(service, monkeypatch, capsys, tmp_path, stage):
+    closed, embedded = [], []
+    original_embed = service.embedder.embed
+    async def embed(texts):
+        embedded.append(asyncio.get_running_loop())
+        if stage == "embedder":
+            raise RuntimeError("embedding failed")
+        return await original_embed(texts)
+    async def close():
+        closed.append(asyncio.get_running_loop())
+    async def failed_storage(*args):
+        raise RuntimeError("storage failed")
+    monkeypatch.setattr(service.embedder, "embed", embed)
+    monkeypatch.setattr(service.store, "close", close)
+    monkeypatch.setattr("app.rag.ingest.get_service", lambda: service)
+    directory = DEMO_DOCS
+    if stage == "metadata":
+        (tmp_path / "invalid.md").write_text("no metadata", encoding="utf-8")
+        directory = tmp_path
+    if stage == "storage":
+        monkeypatch.setattr(service.store, "upsert", failed_storage)
+    if stage == "success":
+        main(["--directory", str(directory)])
+        assert "Loaded 10 documents" in capsys.readouterr().out
+    else:
+        with pytest.raises(ValueError if stage == "metadata" else RuntimeError):
+            main(["--directory", str(directory)])
+        assert "Loaded" not in capsys.readouterr().out
+    async def loop():
+        return asyncio.get_running_loop()
+    assert closed == [run(loop())]
+    assert all(item is closed[0] for item in embedded)

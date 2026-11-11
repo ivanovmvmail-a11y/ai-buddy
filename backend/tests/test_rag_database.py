@@ -5,6 +5,7 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 from uuid import uuid4
 
@@ -21,6 +22,28 @@ from app.rag.postgres import PostgresDocumentStore
 from app.rag.service import RAGService
 
 MIGRATION = Path(__file__).resolve().parents[2] / "supabase/migrations/20261110120000_rag_documents.sql"
+
+
+@pytest.mark.parametrize("schema_exists", [True, False])
+def test_cli_process_exits_without_pending_pool_workers(postgres_cluster, schema_exists):
+    params = postgres_cluster
+    database = f"rag_cli_{uuid4().hex}"
+    with psycopg.connect(**params, dbname="postgres", autocommit=True) as admin:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database)))
+        try:
+            if schema_exists:
+                with psycopg.connect(**params, dbname=database, autocommit=True) as owner:
+                    owner.execute(MIGRATION.read_text(encoding="utf-8"))
+            environment = {**os.environ, "DATABASE_URL": make_conninfo(**params, dbname=database),
+                           "LLM_PROVIDER": "echo", "EMBEDDINGS_PROVIDER": "fake"}
+            result = subprocess.run([sys.executable, "-m", "app.rag.ingest"],
+                cwd=Path(__file__).resolve().parents[1], env=environment, capture_output=True, text=True, timeout=30)
+            assert result.returncode == (0 if schema_exists else 1), result.stderr
+            assert ("Loaded 10 documents" in result.stdout) == schema_exists
+            assert "Task was destroyed" not in result.stderr
+            assert "AsyncConnectionPool.worker" not in result.stderr
+        finally:
+            admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(database)))
 
 
 @pytest.fixture(scope="module")

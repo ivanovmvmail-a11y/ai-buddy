@@ -111,3 +111,8 @@ LLM_PROVIDER=echo uv run --frozen --offline pytest --rag-postgres --cov=app --co
 Они сами создают и удаляют временный контейнер, проверяют миграцию с отсутствующими и
 существующими API-ролями, default privileges, схемы расширения, пул и сброс RLS-контекста.
 Образ не скачивается тестом, реальная база и DATABASE_URL окружения не используются.
+
+CLI загрузки закрывает DocumentStore.close() в finally после успешной загрузки и после ошибок
+метаданных, эмбеддера или PostgreSQL. Загрузка и закрытие выполняются одним вызовом app.async_runner.run,
+на одном event loop; только затем процесс завершает работу. InMemoryDocumentStore.close — no-op.
+Это убирает предупреждения pending AsyncConnectionPool.worker при старте Docker.

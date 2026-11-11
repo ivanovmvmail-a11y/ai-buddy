@@ -59,7 +59,13 @@ def main(argv: list[str] | None = None) -> None:
     service = get_service()
     if service is None:
         parser.error("Set DATABASE_URL before loading documents")
-    documents, chunks = run(ingest_directory(service, args.directory))
+    async def ingest_and_close():
+        try:
+            return await ingest_directory(service, args.directory)
+        finally:
+            await service.store.close()
+
+    documents, chunks = run(ingest_and_close())
     print(f"Loaded {documents} documents, {chunks} chunks (embedder: {type(service.embedder).__name__})")
 
 
