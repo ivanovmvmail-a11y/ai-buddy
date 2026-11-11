@@ -32,9 +32,11 @@
 
 | 26 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | готово | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
 
-| 27 | Grafana: готовая панель метрик из PostgreSQL | Codex | codex/grafana-demo | на ревью | [#39](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/39) | Docker проверен; PostgreSQL: 612 passed / 98,23%; read-only datasource |
-| 28 | Закрыть пул PostgreSQL в RAG CLI | Codex | codex/rag-cli-close | на ревью | [#40](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/40) | --rag-postgres: 425 passed / 94,26%; успех/ошибки закрывают пул |
-| 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | на ревью | [#41](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/41) | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
+| 27 | Grafana: готовая панель метрик из PostgreSQL | Codex | codex/grafana-demo | готово | [#39](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/39) | Docker проверен; PostgreSQL: 612 passed / 98,23%; read-only datasource |
+| 28 | Закрыть пул PostgreSQL в RAG CLI | Codex | codex/rag-cli-close | готово | [#40](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/40) | --rag-postgres: 425 passed / 94,26%; успех/ошибки закрывают пул |
+| 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | готово | [#41](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/41) | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
+
+| 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | на ревью | | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен |
 
 ## Блокеры
 _нет_
