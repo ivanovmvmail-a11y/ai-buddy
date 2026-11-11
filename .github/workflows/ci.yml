@@ -88,6 +88,11 @@ jobs:
           grep -q 'AI-buddy' page.html
       - name: База работает и pgvector доступен
         run: docker compose exec -T db psql -U buddy -d ai_buddy -c "create extension if not exists vector; select extversion from pg_extension where extname = 'vector';"
+      - name: Grafana — здоровье, готовая панель и источник PostgreSQL
+        run: |
+          curl --fail --silent --show-error http://localhost:3002/api/health
+          curl --fail --silent --show-error http://localhost:3002/api/dashboards/uid/ai-buddy-demo | grep -q 'ai-buddy-demo'
+          curl --fail --silent --show-error http://localhost:3002/api/datasources/uid/ai-buddy-postgres/health | grep -q 'OK'
       - name: Логи контейнеров
         if: failure()
         run: docker compose logs --no-color

@@ -30,7 +30,11 @@
 | 24 | Колокольчик напоминаний в шапке (301-T4) + ревью PR #34 Codex | Claude | claude/reminders-bell | на ревью | | |
 | 25 | Спека 103 (заявка на доступ) по готовому коду; 301-T4 отмечена | Claude | claude/spec-103-presentation | на ревью | | только документы |
 
-| 25 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | на ревью | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
+| 26 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | готово | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
+
+| 27 | Grafana: готовая панель метрик из PostgreSQL | Codex | codex/grafana-demo | на ревью | [#39](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/39) | Docker проверен; PostgreSQL: 612 passed / 98,23%; read-only datasource |
+| 28 | Закрыть пул PostgreSQL в RAG CLI | Codex | codex/rag-cli-close | на ревью | [#40](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/40) | --rag-postgres: 425 passed / 94,26%; успех/ошибки закрывают пул |
+| 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | на ревью | [#41](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/41) | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
 
 ## Блокеры
 _нет_

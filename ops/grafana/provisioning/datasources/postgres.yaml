@@ -1,0 +1,19 @@
+apiVersion: 1
+datasources:
+  - name: AI-buddy metrics
+    uid: ai-buddy-postgres
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: db:5432
+    user: ai_buddy_grafana
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ai_buddy
+      sslmode: disable
+      postgresVersion: 1700
+      maxOpenConns: 2
+      maxIdleConns: 1
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: $GRAFANA_SQL_PASSWORD
