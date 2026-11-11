@@ -22,7 +22,7 @@
 | 16 | 101-T3: PostgreSQL-хранилище онбординга, миграция, seed и оптимизация чтения | Codex | codex/onboarding-postgres | готово | [#21](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/21) | Ревью 1–4, 8 исправлено; 5–7 → HANDOFF; PostgreSQL: 507 passed / 98,32%; офлайн: 336 passed / 93,47% |
 | 17 | Спека 003: сценарный режим без ключа (LLM_PROVIDER=scenario по умолчанию) | Claude | claude/scenario-mode | готово | #22 | 337 тестов backend; проверено на демо-документах |
 | 18 | Спека 201: экран наставника — карточки стажёров, что зависло, итоги недели | Claude | claude/mentor-screen | готово | #23 | после #22; 34 теста Vitest |
-| 19 | Спека 004: золотой набор (37 вопросов) + отчёты; промпт против выдумок | Claude | claude/golden-set | готово | #24 | сценарный 37/37, GigaChat 37/37, утечек 0 |
+| 19 | Спека 004: золотой набор (37 вопросов) + отчёты; промпт против выдумок | Claude | claude/golden-set | готово | #24 | сценарный 37/37, GigaChat 36/37 (отчёт docs/golden-report-gigachat.md), утечек 0 |
 | 20 | Спека 302 [API]: события чата, «полезно / не полезно», /metrics, частые темы у наставника | Claude | claude/events-metrics | готово | #25 | после #24; backend +22 теста, frontend 39 |
 | 21 | Проверка «как у эксперта» в Docker: сценарный режим по умолчанию, честные источники | Claude | claude/docker-expert-check | готово | | весь маршрут SPEC 14 пройден в чистой копии без ключей |
 | 22 | Спека 104 [API]: наставник меняет уровень навыка стажёра (HTTP + экран наставника) | Claude | claude/skill-profile | готово | #35 | |
@@ -36,6 +36,8 @@
 | 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | готово | [#42](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/42) | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен; миграции #39 и #42 применены к Supabase (Claude) |
 | 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | готово | #43 | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
 | 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | готово | #44 | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
+| 33 | Аудит 11.11, B2: маршрут проверки в README (шаги, кнопки), версии, порты, структура | Claude | claude/readme-expert-route | готово | #47 | шаги сверены в браузере без ключа |
+| 34 | Аудит 11.11: D3 журнал сервера (LOG_LEVEL), D5 статусы спецификаций, очередь S2–S4 для Codex в HANDOFF | Claude | claude/audit-hardening | на ревью | | 426 passed |
 | 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | на ревью | | backend 428, frontend 49 / 98% |
 
 ## Блокеры

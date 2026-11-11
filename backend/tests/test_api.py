@@ -155,3 +155,19 @@ def test_failed_service_marks_action_failed(client, use_llm, agent, monkeypatch)
     assert res.status_code == 200
     assert res.get_json()["status"] == "failed"
     assert "лежит" in res.get_json()["error"]
+
+
+def test_configure_logging_adds_one_stdout_handler_and_level(monkeypatch):
+    """Аудит D3: INFO-строки агента (forbidden/draft) должны доходить до журнала контейнера."""
+    import logging
+
+    from app.main import configure_logging
+
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(root, "level", logging.WARNING)
+    configure_logging("info")
+    configure_logging("info")  # повторный вызов не дублирует вывод
+    assert len(root.handlers) == 1 and root.level == logging.INFO
+    configure_logging("нет-такого")
+    assert root.level == logging.INFO

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
 
+    # Журнал сервера: DEBUG | INFO | WARNING. INFO — видно права, черновики и вызовы инструментов (без текстов вопросов).
+    log_level: str = "INFO"
+
     # Код-слово для демо-кнопок «Сброс» и «Следующий день» (заголовок X-Demo-Key).
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.
     demo_key: str = ""
