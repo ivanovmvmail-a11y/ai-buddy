@@ -30,9 +30,10 @@ class User(BaseModel):
 # (свой стажёр, свой пункт, назначенный согласующий) делают имитации сервисов в app/mcp_server.
 _BASE = frozenset({"profile:read", "reminders:write"})
 ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
-    Role.INTERN: _BASE | {"plan:read", "plan:write", "access:request", "access:read", "skills:read"},
+    Role.INTERN: _BASE | {"plan:read", "plan:write", "access:request", "access:read", "skills:read",
+                          "absence:request", "absence:read"},
     Role.MENTOR: _BASE | {"interns:read", "plan:read", "plan:write", "access:read", "access:approve", "skills:read"},
-    Role.LEAD: _BASE | {"interns:read", "plan:read", "plan:write"},
+    Role.LEAD: _BASE | {"interns:read", "plan:read", "plan:write", "absence:read"},
     Role.HRBP: _BASE | {"interns:read"},
     Role.CURATOR: _BASE | {"interns:read", "plan:read"},
 }
