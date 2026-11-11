@@ -134,7 +134,7 @@ def test_ac10_ladder_progress_and_remaining_count(store, edit):
 def test_ac11_advance_and_reset_restore_initial_states(store, snapshot):
     initial = snapshot()
     run(checklist.set_item_status(ANYA, "anya.w1.notes", "done"))
-    assert run(clock.advance_day(ANYA)) == {ANYA.id: 3, IVAN.id: 9}
+    assert run(clock.advance_day(ANYA)) == {id: state.current_day + 1 for id, state in initial.interns.items()}
     assert run(clock.advance_day(ANYA, ANYA.id)) == {ANYA.id: 4}
     plan = run(checklist.get_plan(ANYA, ANYA.id))
     assert next(item for item in plan.items if item.id == "anya.w1.access-base").overdue
