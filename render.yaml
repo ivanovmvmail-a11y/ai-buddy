@@ -1,0 +1,32 @@
+# Render Blueprint: backend AI-buddy в облаке (бонус к docker compose, см. docs/DECISIONS.md).
+# Render → New → Blueprint → этот репозиторий. Секреты (sync: false) вводятся в панели Render, не здесь.
+services:
+  - type: web
+    name: ai-buddy-backend
+    runtime: docker
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8000"
+      # gigachat — живая нейросеть; если GigaChat недоступен с Render, поставьте scenario
+      - key: LLM_PROVIDER
+        value: gigachat
+      - key: GIGACHAT_CREDENTIALS
+        sync: false
+      - key: GIGACHAT_SCOPE
+        value: GIGACHAT_API_PERS
+      - key: GIGACHAT_MODEL
+        value: GigaChat-2
+      - key: EMBEDDINGS_PROVIDER
+        value: fake
+      # Supabase → Connect → Session pooler (порт 5432, IPv4): у Render нет IPv6 для прямого адреса
+      - key: DATABASE_URL
+        sync: false
+      # адрес сайта на Vercel (через запятую, если несколько)
+      - key: FRONTEND_ORIGINS
+        sync: false

@@ -85,3 +85,8 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 - Тесты backend: `cd backend && uv run pytest --cov=app --cov-report=term-missing`
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
 - Золотой набор (37 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md)
+
+## Облако (бонус): Render + Vercel
+- **Backend → Render:** New → Blueprint → этот репозиторий (настройки в `render.yaml`). В панели заполнить секреты: `GIGACHAT_CREDENTIALS`, `DATABASE_URL` (Supabase → Connect → Session pooler), `FRONTEND_ORIGINS` (адрес сайта на Vercel). Проверка: `https://<сервис>.onrender.com/health`.
+- **Frontend → Vercel:** Add New → Project → этот репозиторий, Root Directory = `frontend`, переменная `NEXT_PUBLIC_API_URL` = адрес backend на Render.
+- Бесплатный Render засыпает через 15 минут без запросов: первый ответ после сна ~1 минута. UptimeRobot раз в 5 минут дёргает `/health`, чтобы сервер не засыпал.

@@ -27,9 +27,9 @@ USER buddy
 EXPOSE 8000
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('PORT', '8000')}/health\", timeout=2)"
 
 # 1 процесс (общий event loop для LLM-клиентов, см. app/async_runner.py) + потоки для параллельных запросов
 # Seed заполняет только пустую базу. Ошибка не блокирует сервер: при первом обращении
 # он повторит инициализацию и при недоступной схеме/БД продолжит с демо в памяти.
-CMD ["sh", "-c", "(python -m app.mcp_server.seed || echo 'WARNING: onboarding seed failed; server will use lazy demo initialization') && (python -m app.rag.ingest || echo 'WARNING: demo documents were not loaded') && exec gunicorn --bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 180 app.main:app"]
+CMD ["sh", "-c", "(python -m app.mcp_server.seed || echo 'WARNING: onboarding seed failed; server will use lazy demo initialization') && (python -m app.rag.ingest || echo 'WARNING: demo documents were not loaded') && exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 8 --timeout 180 app.main:app"]
