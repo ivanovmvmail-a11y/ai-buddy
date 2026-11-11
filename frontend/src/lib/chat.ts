@@ -187,7 +187,10 @@ export function accessDraftParams(item: PlanItem, actor: DemoUser) {
   };
 }
 
-export function approverText(resource: AccessResource | undefined, actor: DemoUser): string {
+/** Кто согласует: автоматически выдаётся только чтение, повышенные права — всегда наставник (аудит S4). */
+export function approverText(resource: AccessResource | undefined, actor: DemoUser, level = "read"): string {
   if (!resource) return "—";
-  return resource.approver === "auto" ? "выдаётся автоматически" : findUser(actor.mentor_id)?.name ?? "наставник";
+  return resource.approver === "auto" && level === "read"
+    ? "выдаётся автоматически"
+    : findUser(actor.mentor_id)?.name ?? "наставник";
 }

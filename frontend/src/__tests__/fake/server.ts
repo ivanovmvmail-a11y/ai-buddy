@@ -177,15 +177,16 @@ export function installFakeServer(): FakeServer {
       const action = srv.actions.find((a) => a.id === m![1] && a.user_id === actor.id);
       if (!action) return err(404, "Действие не найдено");
       if (m[2] === "cancel") { action.status = "cancelled"; return ok(action); }
-      const params = action.params as { resource_id: string; justification: string };
+      const params = action.params as { resource_id: string; justification: string; level?: "read" | "edit" | "admin" };
+      const level = params.level ?? "read";
       const res = RESOURCES.find((r) => r.id === params.resource_id)!;
       const item = s.items.find((i) => i.intern_id === actor.id && i.resource_id === res.id)!;
       if (s.requests.some((r) => r.resource_id === res.id && r.intern_id === actor.id && r.status !== "rejected")) {
         action.status = "failed"; action.error = "Заявка на этот ресурс уже есть"; return ok(action);
       }
-      const auto = res.approver === "auto";
+      const auto = res.approver === "auto" && level === "read"; // повышенные права — всегда наставнику (S4)
       const req = {
-        id: `REQ-${reqN++}`, intern_id: actor.id, resource_id: res.id, level: "read" as const, justification: params.justification,
+        id: `REQ-${reqN++}`, intern_id: actor.id, resource_id: res.id, level, justification: params.justification,
         status: auto ? ("granted" as const) : ("pending_approval" as const), approver_id: auto ? null : actor.mentor_id ?? null,
         reject_reason: null, plan_item_id: item.id, created_day: s.days[actor.id],
       };
