@@ -38,7 +38,7 @@ def _set_level(data, actor, profile, topic, level):
         profile.skills[topic] = level
         profile.updated_by = actor.id
         profile.updated_at = timestamp(data, intern_id)
-        checklist._rebuild_personal(data, actor, intern_id)
+        checklist._rebuild_personal(data, actor, intern_id, topic=topic)
         events._record(data, actor, "skill_level_changed", {
             "intern_id": intern_id, "topic": topic, "from": previous, "to": level,
             "day": data.interns[intern_id].current_day,
