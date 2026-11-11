@@ -45,6 +45,13 @@ export const PlanItem = z.object({
   overdue: z.boolean(),
   waiting_for: z.string().nullable(),
   waiting_days: z.number().nullable(),
+  // SPEC 3.1, docs/API.md (11.11): общий пункт («для всех») или персональный («для тебя») с подписью «почему».
+  // Сервер может ещё не присылать эти поля — тогда пункт общий, а уровень берётся из карты навыков.
+  kind: z.enum(["common", "personal"]).default("common"),
+  reason: z.string().nullable().default(null),
+  skill_level: SkillLevel.nullable().optional(),
+  known_marked: z.boolean().default(false),
+  catalog_key: z.string().nullable().default(null),
 });
 export type PlanItem = z.infer<typeof PlanItem>;
 

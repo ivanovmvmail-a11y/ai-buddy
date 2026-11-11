@@ -27,7 +27,7 @@ describe("экран наставника (спека 201)", () => {
     open("mentor-petr");
     const region = await cards();
     expect(within(region).getAllByRole("listitem").filter((li) => li.parentElement?.parentElement === region)).toHaveLength(1);
-    await waitFor(() => expect(within(region).getByText(/Недели 1–2: закрыто 1 из 10/)).toBeTruthy());
+    await waitFor(() => expect(within(region).getByText(/Недели 1–2: закрыто 1 из 11/)).toBeTruthy());
     expect(within(region).getByText("Ничего не зависло.")).toBeTruthy();
     await waitFor(() => expect(within(region).getByText(/Сильные стороны:/)).toBeTruthy());
     expect(within(region).getByText(/Темы для роста:/)).toBeTruthy();
