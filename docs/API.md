@@ -179,3 +179,130 @@
 друг другу (SPEC 3.7): ответ начинается с «Документы расходятся», показывает оба варианта и в «закрыто без человека»
 не входит.
 
+---
+
+# Персональный план, предложения по уровню, сравнение, отгул (SPEC 3.1, 3.6, 3.8, 4, 5 — правка 11.11)
+**Статус: контракт согласуется** — эндпоинты ниже ещё не реализованы. Интерфейс сначала делается на поддельном
+сервере по этому описанию, затем подключается к настоящему API. Сервисные функции под ними — у Codex (`.ai/HANDOFF.md`,
+запись 11.11 «чекпоинт 1»). Ошибки — как в разделе «Онбординг»: `404` — нет объекта **или нет доступа**, `403` — объект
+виден, действие запрещено, `409` — неверный переход или повтор, `422` — неверные данные.
+
+Новые демо-пользователи (стажёры): `intern-kirill` — Кирилл, «Платформа объявлений», наставник `mentor-petr`;
+`intern-liza` — Лиза, «Авито Доставка», наставник `mentor-maria`. Нужны для экрана сравнения: у каждого наставника два стажёра.
+
+## PlanItem — новые поля
+```json
+{ "id": "anya.p.git", "kind": "personal", "reason": "в карте навыков Git — новичок",
+  "skill_level": "novice", "known_marked": false, "catalog_key": "platform.git" }
+```
+(плюс все прежние поля пункта)
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| `kind` | `"common"` \| `"personal"` | общий пункт («для всех», у всех стажёров команды одинаковый) или персональный («для тебя», из каталога) |
+| `reason` | `string \| null` | подпись «почему» — только у `personal`: «в карте навыков Git — новичок» или «добавил наставник» |
+| `skill_level` | `"novice"` \| `"familiar"` \| `"confident"` \| `null` | уровень стажёра в теме пункта (`topic`); `null`, если темы нет. `confident` у общего пункта → метка «ты это умеешь — коротко» и сжатое объяснение |
+| `known_marked` | `bool` | стажёр отметил «это я уже знаю» (пункт при этом не закрыт) |
+| `catalog_key` | `string \| null` | ключ записи каталога — только у `personal` |
+
+Снятые персональные пункты (уровень вырос, наставник убрал) в `Plan` не возвращаются; закрытые (`done`) остаются.
+Общие пункты не снимаются никогда. Старый клиент, не знающий новых полей, продолжает работать.
+
+## Каталог и правка персональных пунктов (наставник)
+| Метод и путь | Кто | Ответ |
+|---|---|---|
+| `GET /plan/catalog?intern_id=` | наставник этого стажёра | `{"items":[CatalogItem]}` — каталог команды стажёра; у каждого `in_plan: bool` |
+| `POST /plan/items` `{"intern_id","catalog_key"}` | наставник этого стажёра | `201 PlanItem` (`kind: "personal"`, `reason: "добавил наставник"`); ключ чужой команды — `404`; уже в плане — `409` |
+| `DELETE /plan/items/{id}?intern_id=` | наставник этого стажёра | `204`; общий пункт — `403`; закрытый — `409` |
+| `POST /plan/items/{id}/known` `{"known": true\|false}` | стажёр, свой пункт с темой | `PlanItem`; может создать предложение по уровню (ниже). Пункт без темы — `422` |
+
+```json
+{ "key": "platform.git", "team": "Платформа объявлений", "topic": "git", "topic_title": "Git",
+  "level": "novice", "title": "Пройти практикум по веткам и pull request", "summary": "…",
+  "doc_source_id": "demo:15-…", "stage": "week1", "in_plan": true }
+```
+(`CatalogItem`.) Стажёр, руководитель, куратор, HR BP: `404` на эндпоинты наставника. События:
+`personal_item_added` / `personal_item_removed` (payload без текстов).
+
+## Предложения по уровню (SPEC 4)
+Бот **предлагает**, наставник **решает**. Стажёр предложений не видит — ни до решения, ни после отказа; он видит
+только результат (новый уровень в `/profile/skills` и уведомление).
+
+| Метод и путь | Кто | Ответ |
+|---|---|---|
+| `GET /skills/suggestions?intern_id=&status=pending` | наставник — своих стажёров (без `intern_id` — всех своих) | `{"suggestions":[SkillSuggestion]}`, новые сверху. Остальным ролям, включая стажёра, — `404` |
+| `POST /skills/suggestions/{id}/decide` `{"accept": true\|false}` | наставник этого стажёра | `SkillSuggestion`. `accept: true` меняет уровень как `POST /profile/skills` и пересобирает персональные пункты; уже решено — `409` |
+
+```json
+{ "id": "sug_…", "intern_id": "intern-anya", "intern_name": "Аня Смирнова", "topic": "git",
+  "topic_title": "Git", "from_level": "novice", "to_level": "familiar",
+  "basis": "закрыла 2 пункта по Git", "created_day": 4,
+  "status": "pending", "decided_day": null }
+```
+(`SkillSuggestion`; `status`: `pending` | `accepted` | `dismissed`.) Поводы: закрыто ≥ 2 пунктов по теме или «это я уже
+знаю». Не больше одного `pending` на пару стажёр + тема. Смена уровня и решение по предложению — **не инструменты
+агента**: решает только человек кнопкой.
+
+## Сравнение двух стажёров (SPEC 5)
+`GET /plan/compare?intern_ids=intern-anya,intern-kirill` — только наставник, ровно два **своих** стажёра (чужой —
+`404`; не два id — `422`). Это не рейтинг: без процентов и сортировки по успехам.
+```json
+{ "interns": [ {"id": "intern-anya", "name": "Аня Смирнова"}, {"id": "intern-kirill", "name": "Кирилл …"} ],
+  "common": [ { "key": "w1.access-base", "title": "Запросить базовые доступы", "stage": "week1", "topic": null,
+                "by_intern": { "intern-anya": {"status": "done", "skill_level": null},
+                               "intern-kirill": {"status": "in_progress", "skill_level": null} } } ],
+  "personal": { "intern-anya": [ "<PlanItem>" ], "intern-kirill": [ "<PlanItem>" ] } }
+```
+`common` — общие пункты, сопоставленные по `key` (часть id после имени стажёра); `personal` — персональные пункты
+каждого с `reason`.
+
+## Отгул на один день (SPEC 3.8; сервис — PR #46, `backend/app/mcp_server/ABSENCE.md`)
+Причина — только закрытый список: `personal` (личные дела), `family` (семейные дела), `study` (учебные дела).
+Свободного текста и медицинских полей нет. Решает **руководитель** стажёра; наставник видит только факт.
+
+| Метод и путь | Кто | Ответ |
+|---|---|---|
+| `POST /actions` `{"tool":"create_absence_request","params":{"day":"2026-11-14","reason":"personal"}}` | стажёр | `201 <Action>` (`pending`) — та же карточка черновика; `confirm` создаёт заявку `pending` у руководителя. День раньше текущего дня стажировки или уже есть заявка на этот день — `Action.status = "failed"`, текст в `error` |
+| `GET /absence/requests` | стажёр — свои; руководитель — своей команды | `{"requests":[AbsenceRequest]}`, новые сверху; остальным — `404` |
+| `POST /absence/requests/{id}/decide` `{"approve": true\|false}` | только назначенный руководитель | `AbsenceRequest`; уже решено — `409`. Кнопка руководителя и есть решение человека |
+| `GET /absence/facts?intern_id=` | наставник своего стажёра | `{"facts":[{"intern_id","day"}]}` — только согласованные, без причины и id заявки |
+
+```json
+{ "id": "ABS-…", "intern_id": "intern-anya", "intern_name": "Аня Смирнова", "lead_id": "lead-olga",
+  "day": "2026-11-14", "reason": "personal", "reason_title": "Личные дела",
+  "status": "pending", "created_day": 4, "decided_day": null }
+```
+(`AbsenceRequest`; `status`: `pending` | `approved` | `rejected`. После `rejected` на тот же день можно подать снова.)
+
+Агент: при намерении «отгул» («мне завтра к врачу», «как отпроситься») отвечает по регламенту с источником и
+возвращает в `actions` черновик `create_absence_request` (день — по фразе, по умолчанию завтра; причина — `personal`).
+Подтверждает только человек. Больничный и отпуск — к HR BP, черновик не создаётся.
+Инструменты агента: `create_absence_request` (write, право `absence:request`, стажёр), `list_absence_requests`
+(read, `absence:read`, стажёр и руководитель). Решение руководителя — не инструмент.
+
+## Напоминания и уведомления — новые типы (SPEC 3.6)
+`Reminder` получает поля `kind`, `action` и необязательные ссылки:
+```json
+{ "id": "rem_…", "user_id": "intern-anya", "kind": "skill_changed",
+  "text": "Наставник отметил: Git — уверенно. План обновился",
+  "action": { "label": "Открыть план", "target": "plan" },
+  "plan_item_id": null, "request_id": null, "suggestion_id": null, "absence_request_id": null,
+  "status": "active", "created_day": 4, "snooze_until_day": null }
+```
+| `kind` | Кому | Повод | `action.target` |
+|---|---|---|---|
+| `plan_item` | стажёр | пункт просрочен (было) | `plan_item` |
+| `access_request` | стажёр | заявка на доступ ждёт ≥ 2 дней (было) | `access_request` |
+| `skill_changed` | стажёр | наставник изменил уровень (сам или по предложению) | `plan` |
+| `personal_item_added` | стажёр | в план добавлен персональный пункт | `plan_item` |
+| `absence_pending` | стажёр | заявка на отгул ждёт решения ≥ 2 дней — «напомнить руководителю?» | `absence_request` |
+| `absence_decided` | стажёр | отгул согласован / отклонён | `absence_request` |
+| `absence_today` | стажёр | сегодня отгул, сроки сдвинуты | `plan` |
+| `skill_suggestion` | наставник | бот предлагает поднять уровень | `skill_suggestion` |
+| `absence_fact` | наставник | согласован отгул стажёра (только дата) | `intern` |
+| `absence_new` | руководитель | новая заявка на отгул | `absence_request` |
+
+Старые напоминания без `kind` считаются `plan_item` или `access_request` по заполненной ссылке. Одно активное
+напоминание на один повод. `GET /reminders`, `snooze`, `done` — без изменений; наставник и руководитель получают свои
+через тот же `GET /reminders`. Отклонённое предложение по уровню стажёру уведомлением не приходит.
+
