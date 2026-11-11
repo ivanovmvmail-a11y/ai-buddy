@@ -18,8 +18,8 @@ COPY certs ./certs
 COPY app ./app
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    # без backend/.env работает демо-режим: LLM-заглушка, ключи не нужны
-    LLM_PROVIDER=echo
+    # без backend/.env — сценарный режим (спека 003): весь маршрут демо без ключей
+    LLM_PROVIDER=scenario
 
 RUN useradd --create-home --uid 10001 buddy
 USER buddy

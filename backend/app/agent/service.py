@@ -1,5 +1,6 @@
 """Агент: собирает промпт, подтягивает контекст из RAG, вызывает LLM и инструменты в цикле."""
 import logging
+import re
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
@@ -27,6 +28,35 @@ class AgentResult:
     actions: list[Action] = field(default_factory=list)  # черновики, созданные в этом ответе
     tools: list[str] = field(default_factory=list)  # какие инструменты вызывались (для аналитики, спека 302)
     refused: bool = False  # хотя бы один инструмент отказал по правам
+
+
+_WORD = re.compile(r"[a-zа-яё0-9]{5,}")
+
+
+def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict]:
+    """Источники — только документы, на которые ответ действительно опирается.
+
+    Поиск всегда возвращает top-k фрагментов, но ответ «следующий шаг по плану» или «в базе этого нет»
+    на них не основан — показывать их источником нечестно (и завышает метрику «ответы с источником»).
+    Если ответ называет документ в «кавычках» — источник только он. Иначе документ — источник, если ответ
+    совпадает с фрагментом хотя бы по четырём значимым словам, не считая слов из самого вопроса
+    (ответ «в базе нет» повторяет вопрос и не должен выглядеть как ответ по документу).
+    """
+    titled = {d["title"] for d in docs if f"«{d['title']}»" in reply}
+    asked = set(_WORD.findall(question.lower().replace("ё", "е")))
+    words = set(_WORD.findall(reply.lower().replace("ё", "е"))) - asked
+    cited: list[dict] = []
+    for doc in docs:
+        title = doc["title"]
+        if any(c["title"] == title for c in cited):
+            continue
+        if titled:
+            used = title in titled
+        else:
+            used = len(words & set(_WORD.findall(doc["content"].lower().replace("ё", "е")))) >= 4
+        if used:
+            cited.append({"title": title, "url": doc.get("url")})
+    return cited
 
 
 class ActionError(Exception):
@@ -69,7 +99,6 @@ class Agent:
 
         messages = [Message(role="system", content=system), *history]
         specs = [t.spec() for t in self.registry.available_for(user)]
-        sources = [{"title": d["title"], "url": d.get("url")} for d in docs]
         created: list[Action] = []
         used: list[str] = []
         refused = False
@@ -78,7 +107,8 @@ class Agent:
         for _ in range(MAX_TOOL_STEPS):
             reply = await llm.chat(messages, specs or None)
             if not reply.tool_calls:
-                return AgentResult(reply=reply.content, sources=sources, actions=created, tools=used, refused=refused)
+                return AgentResult(reply=reply.content, sources=cited_sources(reply.content, docs, question), actions=created,
+                                   tools=used, refused=refused)
             messages.append(Message(role="assistant", content=reply.content, tool_calls=reply.tool_calls))
             for call in reply.tool_calls:
                 result = await self.executor.call(user, call)
@@ -93,7 +123,7 @@ class Agent:
                 )
 
         log.warning("tool step limit reached user=%s", user.id)
-        return AgentResult(reply=STEP_LIMIT_REPLY, sources=sources, actions=created, tools=used, refused=refused)
+        return AgentResult(reply=STEP_LIMIT_REPLY, sources=[], actions=created, tools=used, refused=refused)
 
     def _own_pending(self, user: User, action_id: str) -> Action:
         action = self.store.get(action_id)
