@@ -3,6 +3,7 @@ from app.agent.users import DEMO_USERS, Role, User
 from uuid import uuid4
 
 from . import checklist, events, storage
+from .notifications import notify
 from ._domain import known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view
 from .errors import Conflict, Forbidden, NotFound
 from .models import SkillLevel, SkillProfile, SkillSuggestion, PlanItem
@@ -42,6 +43,11 @@ def _set_level(data, actor, profile, topic, level):
             "intern_id": intern_id, "topic": topic, "from": previous, "to": level,
             "day": data.interns[intern_id].current_day,
         })
+        title = next((c.topic_title for c in data.personal_catalog.values()
+                      if c.topic == topic and c.team == DEMO_USERS[intern_id].team), topic)
+        label = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}[level]
+        notify(data, intern_id, intern_id, "skill_changed", uuid4().hex,
+               f"Наставник отметил: {title} — {label}. План обновился", "plan")
 
 
 SUGGESTION_THRESHOLD = 2
@@ -83,6 +89,9 @@ def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None)
     events._record(data, target, "skill_suggestion_created", {
         "intern_id": intern_id, "suggestion_id": suggestion.id, "topic": topic,
     })
+    notify(data, mentor.id, intern_id, "skill_suggestion", suggestion.id,
+           f"Бот предлагает поднять уровень: {target.name}, {title} ({suggestion.basis})",
+           "skill_suggestion", suggestion_id=suggestion.id)
 
 
 def _suggestion_view(data, suggestion):
@@ -127,6 +136,9 @@ async def decide_suggestion(actor: User, suggestion_id: str, accept: bool) -> Sk
             _set_level(data, actor, profile, suggestion.topic, suggestion.to_level)
         suggestion.status = "accepted" if accept else "dismissed"
         suggestion.decided_day = data.interns[suggestion.intern_id].current_day
+        for reminder in data.reminders.values():
+            if reminder.suggestion_id == suggestion.id:
+                reminder.status, reminder.snooze_until_day = "done", None
         events._record(data, actor, "skill_suggestion_decided", {
             "intern_id": suggestion.intern_id, "suggestion_id": suggestion.id,
             "topic": suggestion.topic, "status": suggestion.status,

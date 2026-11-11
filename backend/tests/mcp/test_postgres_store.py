@@ -158,15 +158,15 @@ a = DEMO_USERS['intern-anya']
 p = run(checklist.get_plan(a, a.id))
 print(json.dumps({'day': p.current_day, 'notes': next(i.status for i in p.items if i.id == 'anya.w1.notes'),
  'git': run(hiring.get_skill_profile(a, a.id)).skills['git'],
- 'requests': len(run(access.list_requests(a))), 'reminders': len(run(clock.list_reminders(a)))}))
+ 'requests': len(run(access.list_requests(a))), 'reminders': sorted(r.kind for r in run(clock.list_reminders(a)))}))
 run(storage.get_store().close())
 """
     persisted = json.loads(child(dsn, inspect_code))
-    # Два напоминания: незапрошенный базовый доступ и ожидание пространства команды.
-    assert persisted == {"day": 4, "notes": "done", "git": "familiar", "requests": 1, "reminders": 2}
+    # Два прежних напоминания и уведомление о смене навыка сохраняются после перезапуска.
+    assert persisted == {"day": 4, "notes": "done", "git": "familiar", "requests": 1, "reminders": ["access_request", "plan_item", "skill_changed"]}
     child(dsn, None, "--reset")
     restored = json.loads(child(dsn, inspect_code))
-    assert restored == {"day": 2, "notes": "not_started", "git": "novice", "requests": 0, "reminders": 0}
+    assert restored == {"day": 2, "notes": "not_started", "git": "novice", "requests": 0, "reminders": []}
 
 
 def test_two_pools_serialize_seed_and_duplicate_requests(onboarding_dsn):

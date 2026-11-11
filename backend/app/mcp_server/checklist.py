@@ -153,6 +153,12 @@ def _add_personal(data, actor, intern_id, entry, *, reason=None):
     events._record(data, actor, "personal_item_added", {
         "intern_id": intern_id, "item_id": item.id, "topic": entry.topic, "catalog_key": entry.key,
     })
+    if actor.role == Role.MENTOR:
+        from uuid import uuid4
+        from .notifications import notify
+        notify(data, intern_id, intern_id, "personal_item_added", uuid4().hex,
+               f"В план добавлен пункт для тебя: {item.title} ({item.reason})",
+               "plan_item", plan_item_id=item.id)
     return item
 
 
