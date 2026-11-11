@@ -1,6 +1,7 @@
 // Данные поддельного сервера для тестов интерфейса (бывший макет T2). Настоящие данные — seed имитаций
 // сервисов на backend. Всё синтетическое.
 import { DEMO_USERS } from "@/lib/users";
+import type { SkillSuggestion } from "@/lib/types";
 import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "@/lib/types";
 
 export { DEMO_USERS };
@@ -76,6 +77,11 @@ const PERSONAL: Record<string, Array<ItemSeed & { reason: string }>> = {
       title: "Практикум: ветки и pull request", summary: "Учебный pull request в песочнице команды.",
       reason: "в карте навыков Git — новичок" },
   ],
+  "intern-kirill": [
+    { key: "p.sql", stage: "week2", owner: "intern", due: 10, topic: "sql", doc: "demo:06-platform-lifecycle.md",
+      title: "Практикум: запросы к учебной базе объявлений", summary: "Три запроса к вымышленным объявлениям.",
+      reason: "в карте навыков SQL — новичок" },
+  ],
   "intern-ivan": [
     { key: "p.sql", stage: "week2", owner: "intern", due: 10, topic: "sql", doc: "demo:09-delivery-statuses.md",
       title: "Практикум: запросы к учебной базе доставок", summary: "Три запроса к вымышленным отправлениям.",
@@ -124,7 +130,20 @@ export type DemoState = {
   requests: AccessRequest[];
   profiles: SkillProfile[];
   dismissedReminders: string[];
+  suggestions: SkillSuggestion[];
 };
+
+/** Второй стажёр Петра (SPEC 3.1, решение 11.11) — только для тестов экрана сравнения: в seed backend его пока нет. */
+export const KIRILL: DemoUser = {
+  id: "intern-kirill", name: "Кирилл Егоров", role: "intern", team: "Платформа объявлений", mentor_id: "mentor-petr",
+};
+
+export function addKirill(s: DemoState) {
+  s.days[KIRILL.id] = 3;
+  s.items.push(...buildItems(KIRILL));
+  s.profiles.push({ intern_id: KIRILL.id, skills: { git: "confident", sql: "novice", ci: "familiar", monitoring: "familiar" },
+    strengths: ["Уверенно работает с Git"], growth: ["SQL"] });
+}
 
 export function initialState(): DemoState {
   const anya = DEMO_USERS[0];
@@ -156,5 +175,6 @@ export function initialState(): DemoState {
         strengths: ["Уверенно работает с Git", "Быстро поднимает окружение"], growth: ["SQL и аналитика данных"] },
     ],
     dismissedReminders: [],
+    suggestions: [],
   };
 }
