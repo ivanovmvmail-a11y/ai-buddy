@@ -46,7 +46,7 @@
 | 40 | [API] Аудит S6: противоречия в документах — оба варианта с источниками, сигнал наставнику (SPEC 3.7) | Claude | claude/doc-conflicts | на ревью | | после #54; backend 455, золотой 48/48, frontend 58 |
 | 41 | [API] Аудит S6/D1: хранилище действий — асинхронный протокол для PostgreSQL, атомарное подтверждение, «Сброс» очищает черновики | Claude | claude/action-store | на ревью | | после #55; таблица — Codex (HANDOFF) |
 
-| 43 | Аудит S3: реальные timestamps событий и календарные сутки Grafana | Codex | codex/audit-s3-event-time | на ревью | | 692 passed / 97,87%, PostgreSQL; 30 дней, timezone браузера; мерж после комментария человека |
+| 43 | Аудит S3: реальные timestamps событий и календарные сутки Grafana | Codex | codex/audit-s3-event-time | на ревью | [#61](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/61) | 692 passed / 97,87%, PostgreSQL; 30 дней, timezone браузера; мерж после комментария человека |
 
 ## Блокеры
 _нет_
