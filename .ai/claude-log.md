@@ -120,7 +120,7 @@
 - Что важно знать Codex: Supabase URL/ключ и ключ GigaChat — в backend/.env, получи их у Миши лично. pgvector уже включён (схема extensions).
 
 ## 2026-11-11 — деплой (claude/deploy, PR #29)
-- `render.yaml` (Blueprint): Docker из `backend/`, Франкфурт, free, /health, секреты через панель.
+- Render и *.vercel.app из России недоступны → Koyeb (backend) + Netlify (frontend), инструкция в README. render.yaml убран.
 - Dockerfile: gunicorn и HEALTHCHECK слушают `$PORT` (по умолчанию 8000 — Docker и CI не меняются).
 - Миграции в Supabase уже применены (rag_documents, onboarding).
 - Дальше: Миша создаёт Blueprint на Render и проект на Vercel; проверить GigaChat с Render (если недоступен — LLM_PROVIDER=scenario).
