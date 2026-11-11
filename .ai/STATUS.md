@@ -52,6 +52,7 @@
 | 46 | Аудит S3: реальные timestamps событий и календарные сутки Grafana | Codex | codex/audit-s3-event-time | готово | [#61](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/61) | 700 passed / 97,63%, PostgreSQL; 30 дней, timezone браузера; мерж после комментария человека |
 | 47 | Аудит S2: загрузка how-to документов и изоляция команд | Codex | codex/audit-s2-howto-ingest | на ревью | [#62](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/62) | 698 passed / 97,63%, оба PostgreSQL-флага; 19 документов; мерж после комментария человека |
 | 48 | Ревью Codex #59 (повторно), #61, #62; поддельный сервер фронта — новые документы пунктов, как в #62 | Claude | claude/mock-howto-links | на ревью | | frontend 64 |
+| 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | на ревью | | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
 
 ## Блокеры
-- #62: общая проверка «коротко» not in novice восстановлена; документ 13 содержит «В обосновании коротко напиши…». Нужна правка текста Claude, детали в HANDOFF.
+- нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
