@@ -1,5 +1,5 @@
 """Имитация выдачи доступов: автоматическая либо с решением наставника."""
-from app.agent.users import Role, User
+from app.agent.users import DEMO_USERS, Role, User
 
 from . import checklist, events, storage
 from ._domain import access_level, can_read_private, intern, known_actor, nonempty, strict_bool, timestamp
@@ -33,13 +33,15 @@ async def create_request(actor: User, resource_id: str, level: AccessLevel, just
             raise Conflict("Заявка на этот ресурс уже существует")
         item = next((item for item in data.items.values()
                      if item.intern_id == actor.id and item.resource_id == resource_id), None)
-        approver_id = target.mentor_id if resource.approver == "mentor" else None
-        if resource.approver == "mentor" and approver_id is None:
+        automatic = resource.approver == "auto" and level == "read"
+        approver_id = None if automatic else target.mentor_id
+        approver = DEMO_USERS.get(approver_id)
+        if not automatic and (approver is None or approver.role != Role.MENTOR):
             raise Conflict("Для согласования нужен наставник")
         number = max((int(request.id.removeprefix("REQ-")) for request in data.requests.values()), default=1000) + 1
         request = AccessRequest(
             id=f"REQ-{number}", intern_id=actor.id, resource_id=resource_id, level=level,
-            justification=justification, status="granted" if resource.approver == "auto" else "pending_approval",
+            justification=justification, status="granted" if automatic else "pending_approval",
             approver_id=approver_id, plan_item_id=item.id if item else None,
             created_day=data.interns[actor.id].current_day, created_at=timestamp(data, actor.id),
             updated_at=timestamp(data, actor.id),
