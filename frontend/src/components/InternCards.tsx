@@ -4,10 +4,10 @@
 // стажёров, без сортировки по прогрессу; только факты: что закрыто, что зависло, итоги недели.
 import { useState } from "react";
 import { isWorking, waitedFor } from "@/lib/plan-logic";
-import { useInterns, usePlan, useProfile, useSummary } from "@/lib/queries";
+import { useInterns, useMetrics, usePlan, useProfile, useSummary } from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import { findUser } from "@/lib/users";
-import type { DemoUser } from "@/lib/types";
+import type { DemoUser, Metrics } from "@/lib/types";
 
 type Intern = { id: string; name: string; team: string };
 
@@ -24,6 +24,7 @@ export function InternCards({ actor }: { actor: DemoUser }) {
   return (
     <section aria-label={actor.role === "mentor" ? "Мои стажёры" : "Стажёры"} className="space-y-2">
       <h2 className="text-lg font-semibold">{actor.role === "mentor" ? "Мои стажёры" : "Стажёры"}</h2>
+      <MetricsLine actor={actor} />
       <ul className="grid gap-2 sm:grid-cols-2">
         {list.map((intern) => (
           <InternCard key={intern.id} actor={actor} intern={intern} selected={intern.id === selected} onSelect={() => pickIntern(intern.id)} />
@@ -90,6 +91,8 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
         </>
       )}
 
+      <TopicsLine actor={actor} internId={intern.id} />
+
       {profile.data && (
         <div className="mt-2 grid gap-1">
           <div><span className="font-medium">Сильные стороны:</span> {profile.data.strengths.join(", ") || "—"}</div>
@@ -118,5 +121,37 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
         </div>
       )}
     </li>
+  );
+}
+
+/** Сводка по всем видимым стажёрам (спека 302): метрики «видим вживую» из SPEC 10. */
+function MetricsLine({ actor }: { actor: DemoUser }) {
+  const m = useMetrics(actor).data;
+  if (!m) return null;
+  const rated = m.feedback.useful + m.feedback.not_useful;
+  return (
+    <p className="text-sm text-black/60 dark:text-white/60" aria-label="Метрики">
+      Вопросов боту: {m.questions} · закрыто без человека: {m.closed_without_human} · с источником:{" "}
+      {Math.round(m.with_source_share * 100)}% · полезно: {m.feedback.useful} из {rated}
+      {m.questions ? ` · ответ в среднем за ${(m.avg_latency_ms / 1000).toFixed(1)} с` : ""}
+    </p>
+  );
+}
+
+/** Частые темы и темы без ответа в документах — без текстов вопросов (SPEC 5). */
+function TopicsLine({ actor, internId }: { actor: DemoUser; internId: string }) {
+  const m = useMetrics(actor, internId).data;
+  if (!m || !m.questions) return null;
+  const list = (items: Metrics["topics"]) => items.map((t) => `${t.title} — ${t.count}`).join(", ");
+  return (
+    <div className="mt-2 grid gap-1">
+      <div><span className="font-medium">Частые темы:</span> {list(m.topics)}</div>
+      {m.unanswered_topics.length > 0 && (
+        <div>
+          <span className="font-medium">Нет ответа в документах:</span> {list(m.unanswered_topics)}
+          <span className="text-black/50 dark:text-white/50"> — стоит дописать документ</span>
+        </div>
+      )}
+    </div>
   );
 }

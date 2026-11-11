@@ -25,6 +25,8 @@ class AgentResult:
     reply: str
     sources: list[dict] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)  # черновики, созданные в этом ответе
+    tools: list[str] = field(default_factory=list)  # какие инструменты вызывались (для аналитики, спека 302)
+    refused: bool = False  # хотя бы один инструмент отказал по правам
 
 
 class ActionError(Exception):
@@ -69,15 +71,19 @@ class Agent:
         specs = [t.spec() for t in self.registry.available_for(user)]
         sources = [{"title": d["title"], "url": d.get("url")} for d in docs]
         created: list[Action] = []
+        used: list[str] = []
+        refused = False
         llm = get_llm()
 
         for _ in range(MAX_TOOL_STEPS):
             reply = await llm.chat(messages, specs or None)
             if not reply.tool_calls:
-                return AgentResult(reply=reply.content, sources=sources, actions=created)
+                return AgentResult(reply=reply.content, sources=sources, actions=created, tools=used, refused=refused)
             messages.append(Message(role="assistant", content=reply.content, tool_calls=reply.tool_calls))
             for call in reply.tool_calls:
                 result = await self.executor.call(user, call)
+                used.append(call.name)
+                refused = refused or result.get("error") == "forbidden"
                 if result.get("status") == "awaiting_confirmation":
                     action = self.store.get(result["action_id"])
                     if action:
@@ -87,7 +93,7 @@ class Agent:
                 )
 
         log.warning("tool step limit reached user=%s", user.id)
-        return AgentResult(reply=STEP_LIMIT_REPLY, sources=sources, actions=created)
+        return AgentResult(reply=STEP_LIMIT_REPLY, sources=sources, actions=created, tools=used, refused=refused)
 
     def _own_pending(self, user: User, action_id: str) -> Action:
         action = self.store.get(action_id)

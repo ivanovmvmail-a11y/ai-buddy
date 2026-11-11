@@ -125,6 +125,7 @@ export type Action = z.infer<typeof Action>;
 
 export const Source = z.object({ title: z.string(), url: z.string().nullable() });
 export const ChatResponse = z.object({
+  answer_id: z.string().nullable().optional(), // для оценки «полезно / не полезно» (спека 302)
   reply: z.string(),
   sources: z.array(Source).default([]),
   actions: z.array(Action).default([]),
@@ -148,3 +149,19 @@ export const WeeklySummary = z.object({
   carry_over: z.array(PlanItem),
 });
 export type WeeklySummary = z.infer<typeof WeeklySummary>;
+
+// GET /metrics — только темы и количество, без текстов вопросов (спека 302).
+const TopicCount = z.object({ topic: z.string(), title: z.string(), count: z.number() });
+export const Metrics = z.object({
+  interns: z.array(z.string()),
+  questions: z.number(),
+  closed_without_human: z.number(),
+  with_source_share: z.number(),
+  refused: z.number(),
+  drafts: z.number(),
+  avg_latency_ms: z.number(),
+  feedback: z.object({ useful: z.number(), not_useful: z.number() }),
+  topics: z.array(TopicCount),
+  unanswered_topics: z.array(TopicCount),
+});
+export type Metrics = z.infer<typeof Metrics>;

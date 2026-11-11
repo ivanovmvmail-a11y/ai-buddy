@@ -20,6 +20,8 @@ export type Msg = {
   actions?: BotAction[];
   draft?: Action;
   retry?: string; // текст вопроса для «Повторить»
+  answerId?: string; // ответ модели можно оценить (спека 302)
+  rated?: "useful" | "not_useful";
   scripted?: boolean;
 };
 

@@ -75,12 +75,16 @@ export type FakeServer = {
   state: DemoState;
   actions: Action[];
   provider: string;
-  chatReplies: Array<{ reply: string; actions?: Action[] } | "fail" | "502">;
+  chatReplies: Array<{ reply: string; actions?: Action[]; answerId?: string } | "fail" | "502">;
   calls: Array<{ method: string; path: string; user: string; body: unknown }>;
+  feedback: Array<{ answer_id: string; useful: boolean }>;
+  metrics: Record<string, unknown> | null;
 };
 
 export function installFakeServer(): FakeServer {
-  const srv: FakeServer = { state: initialState(), actions: [], provider: "echo", chatReplies: [], calls: [] };
+  const srv: FakeServer = {
+    state: initialState(), actions: [], provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null,
+  };
   let reqN = 1003;
   let actN = 1;
 
@@ -180,11 +184,25 @@ export function installFakeServer(): FakeServer {
       srv.state = initialState();
       return ok({ status: "reset" });
     }
+    if (p === "/feedback") {
+      if (String(body.answer_id) === "ans_fail") return err(500, "Ошибка");
+      srv.feedback.push(body as { answer_id: string; useful: boolean });
+      return { status: 204, body: null };
+    }
+    if (p === "/metrics") {
+      if (!["mentor", "lead", "curator"].includes(actor.role)) return err(404, "Не найдено");
+      return srv.metrics ? ok(srv.metrics) : ok({
+        interns: visible(actor), questions: 0, closed_without_human: 0, with_source_share: 0, refused: 0, drafts: 0,
+        avg_latency_ms: 0, feedback: { useful: 0, not_useful: 0 }, topics: [], unanswered_topics: [],
+      });
+    }
     if (p === "/chat") {
       const next = srv.chatReplies.shift() ?? { reply: "Ответ модели" };
       if (next === "fail") throw new TypeError("Failed to fetch");
       if (next === "502") return err(502, "Помощник временно недоступен.");
-      return ok({ reply: next.reply, sources: [{ title: "Первые дни", url: null }], actions: next.actions ?? [] });
+      return ok({
+        answer_id: next.answerId ?? "ans_1", reply: next.reply, sources: [{ title: "Первые дни", url: null }], actions: next.actions ?? [],
+      });
     }
     return err(404, "Нет такого адреса");
   }
@@ -198,7 +216,8 @@ export function installFakeServer(): FakeServer {
     const method = init?.method ?? "GET";
     srv.calls.push({ method, path, user: actor.id, body });
     const route = handle(method, path, actor, body);
-    return new Response(JSON.stringify(route.body), { status: route.status, headers: { "Content-Type": "application/json" } });
+    const payload = route.status === 204 ? null : JSON.stringify(route.body);
+    return new Response(payload, { status: route.status, headers: { "Content-Type": "application/json" } });
   });
   return srv;
 }

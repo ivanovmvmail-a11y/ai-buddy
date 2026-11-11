@@ -13,6 +13,7 @@ export const keys = {
   profile: (u: string, intern: string) => ["profile", u, intern] as const,
   reminders: (u: string) => ["reminders", u] as const,
   summary: (u: string, intern: string, week: number) => ["summary", u, intern, week] as const,
+  metrics: (u: string, intern: string) => ["metrics", u, intern] as const,
 };
 
 const PLAN_ROLES = new Set(["intern", "mentor", "lead", "curator"]);
@@ -62,11 +63,18 @@ export const useSummary = (actor: DemoUser, internId: string, week: number, enab
     enabled,
   });
 
+export const useMetrics = (actor: DemoUser, internId?: string) =>
+  useQuery({
+    queryKey: keys.metrics(actor.id, internId ?? ""),
+    queryFn: () => api.metrics(actor.id, internId),
+    enabled: ["mentor", "lead", "curator"].includes(actor.role),
+  });
+
 /** После любого изменения на сервере обновляем всё, что могло измениться. */
 export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile", "summary"].map((k) => client.invalidateQueries({ queryKey: [k] })),
+      ["plan", "requests", "reminders", "profile", "summary", "metrics"].map((k) => client.invalidateQueries({ queryKey: [k] })),
     );
 }
