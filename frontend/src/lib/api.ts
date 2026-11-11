@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
-  AccessRequest, Action, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
+  AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
   Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile, WeeklySummary,
 } from "./types";
 
@@ -76,6 +76,8 @@ export const api = {
   reminders: (u: string) => request("/reminders", RemindersResponse, u),
   snooze: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/snooze`, Reminder, u, post({ days: 1 })),
   doneReminder: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/done`, Reminder, u, post()),
+  history: (u: string) => request("/chat/history", ChatHistory, u),
+  actions: (u: string) => request("/actions", ActionsResponse, u),
   draft: (u: string, tool: string, params: Record<string, unknown>) => request("/actions", Action, u, post({ tool, params })),
   confirm: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/confirm`, Action, u, post()),
   cancel: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/cancel`, Action, u, post()),
