@@ -1,5 +1,5 @@
 """Тесты HTTP API. Работают без ключей: LLM — заглушка echo или поддельная модель."""
-from conftest import as_user, text_reply, tool_reply
+from .conftest import as_user, text_reply, tool_reply
 
 from app.agent import users
 

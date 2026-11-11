@@ -2,7 +2,7 @@
 import json
 
 import pytest
-from conftest import as_user
+from .conftest import as_user
 
 from app import async_runner
 from app.agent import service

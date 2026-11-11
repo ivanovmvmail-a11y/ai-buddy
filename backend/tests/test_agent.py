@@ -1,7 +1,7 @@
 """Агент: цикл инструментов и проверка прав перед каждым вызовом."""
 import json
 
-from conftest import text_reply, tool_reply
+from .conftest import text_reply, tool_reply
 
 from app import async_runner
 from app.agent import service

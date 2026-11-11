@@ -30,5 +30,7 @@
 | 24 | Колокольчик напоминаний в шапке (301-T4) + ревью PR #34 Codex | Claude | claude/reminders-bell | на ревью | | |
 | 25 | Спека 103 (заявка на доступ) по готовому коду; 301-T4 отмечена | Claude | claude/spec-103-presentation | на ревью | | только документы |
 
+| 25 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | на ревью | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
+
 ## Блокеры
 _нет_

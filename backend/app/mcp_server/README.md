@@ -1,8 +1,8 @@
-# Сервисы онбординга (101-T1/T3)
+# Сервисы онбординга (101-T1/T3/T5)
 
 Демо-данные, не регламент Авито. Реализованы обычные async-функции Python с моделями
 из `docs/specs/101-plan-next-step/plan.md` §3.1. Пользователи и связи наставников — только
-из `app.agent.users.DEMO_USERS`. API и инструменты агента подключает Claude (T4), MCP-протокол — T5.
+из `app.agent.users.DEMO_USERS`. HTTP/агент подключены в T4; MCP/stdio реализован в T5.
 
 ## Вызов и хранение
 
@@ -172,11 +172,116 @@ intern_id и виртуальный day, поэтому фильтруются �
 Бизнес-функции сами проверяют права и записывают события в своей транзакции. Изменения сигнатур
 относительно сокращений в plan.md перечислены в HANDOFF. Транспорт не экспортирует приватные функции.
 
+## MCP: один пользователь на stdio-процесс
+
+Официальный SDK mcp/FastMCP установлен только с extra mcp; обычный веб-образ Docker/Railway
+его не включает. Из backend:
+
+```bash
+uv sync --frozen --extra mcp
+uv run --extra mcp python -m app.mcp_server.server --user intern-anya
+```
+
+Вместо --user можно задать MCP_USER_ID в окружении процесса. Флаг --user имеет приоритет;
+пустое/неизвестное значение останавливает процесс с кодом 2 и понятным сообщением в stderr
+до запуска MCP-транспорта. Значение из .env можно загрузить через
+`uv run --env-file .env --extra mcp python -m app.mcp_server.server`.
+
+Личность выбирает человек, который настраивает запуск MCP-клиента. Сервер один раз разрешает
+id по DEMO_USERS: intern-anya, intern-ivan, mentor-petr, mentor-maria, lead-olga, lead-sergey,
+hrbp-elena, curator-dmitry. Все вызовы этого процесса используют того же пользователя;
+аргументов user_id/actor/role/team в инструментах нет. Клиент не может подать заявку как стажёр,
+а затем одобрить её как наставник. Сервис проверяет права привязанного пользователя на объект.
+Это имитация входа для локального демо, не корпоративная аутентификация.
+
+Процесс ждёт MCP JSON-RPC на stdin и отвечает в stdout; диагностика идёт в stderr. SDK и сервисы
+запускаются на общем app.async_runner. Сессии не закрывают общий пул: main закрывает хранилище
+после завершения stdio, включая ошибку транспорта. Отдельный HTTP-порт, ключ LLM и Flask не нужны.
+
+| Инструмент | Аргументы |
+|---|---|
+| get_plan | intern_id |
+| set_item_status | item_id, status, reason? |
+| list_resources | — |
+| create_request | resource_id, level, justification |
+| list_requests | intern_id? (без него — все доступные связанному пользователю заявки) |
+| decide_request | request_id, approve (JSON boolean), reason? (обязателен при отказе) |
+| get_skill_profile | intern_id |
+| list_reminders | — (только активные личные напоминания, как HTTP /reminders) |
+
+status: not_started / in_progress / waiting / done; level: read / edit / admin. Допустимость
+перехода/согласования проверяют сервисы. set_item_status и decide_request имеют destructiveHint=true;
+create_request — destructiveHint=false, idempotentHint=false. Эти инструменты изменяют данные
+при вызове; подтверждение клиента и HTTP-черновики агента — отдельные механизмы.
+SYSTEM_ACTOR, cron_tick, log_event, set_skill_level и административный reset не зарегистрированы.
+
+Ответы — CallToolResult: модели в structuredContent и JSON-представление в content. Списки —
+structuredContent.result. Доменные ошибки дают isError=true; чужой и отсутствующий объект —
+одинаковое «Не найдено». Неожиданные ошибки не раскрывают SQL/реквизиты подключения.
+
+### Claude Desktop
+
+Добавить сервер в claude_desktop_config.json (macOS: ~/Library/Application Support/Claude/;
+Windows: %APPDATA%\Claude\), затем перезапустить Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "ai-buddy-onboarding": {
+      "command": "uv",
+      "args": [
+        "--directory", "/absolute/path/to/ai-buddy/backend",
+        "run", "--frozen", "--extra", "mcp", "python", "-m", "app.mcp_server.server"
+      ],
+      "env": {
+        "MCP_USER_ID": "intern-anya",
+        "DATABASE_URL": "",
+        "LLM_PROVIDER": "echo",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}
+```
+
+Заменить каталог абсолютным путём к backend, а command — путём к uv, если Desktop не видит его
+в PATH. На Windows в JSON используются пути вида C:\\projects\\ai-buddy\\backend.
+Для другого пользователя изменить MCP_USER_ID в настройках запуска и перезапустить процесс.
+DATABASE_URL="" выбирает память, переопределяя .env-БД. Для общего прогресса stdio-процессу
+и Flask нужен один DATABASE_URL с миграцией; память раздельная по процессам и теряется при рестарте.
+
+В любом stdio-клиенте указать те же command/args/env. После initialize и tools/list вызвать
+get_plan с {"intern_id":"intern-anya"}. Пользователь не передаётся через tools/call.
+
+### Пример SDK-клиента
+
+Из backend с extra mcp:
+
+```python
+import sys
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from app.async_runner import run
+
+async def inspect_plan():
+    params = StdioServerParameters(
+        command=sys.executable, args=["-m", "app.mcp_server.server"],
+        env={"MCP_USER_ID": "intern-anya", "DATABASE_URL": "", "LLM_PROVIDER": "echo"},
+    )
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as client:
+            await client.initialize()
+            result = await client.call_tool("get_plan", {"intern_id": "intern-anya"})
+            print(result.structuredContent)
+
+run(inspect_plan())
+```
+
 ## Тесты
 
 ```bash
 cd backend
-LLM_PROVIDER=echo uv run --frozen --offline pytest --cov=app --cov-branch --cov-report=term-missing
+LLM_PROVIDER=echo uv run --extra mcp --frozen --offline pytest --cov=app --cov-branch --cov-report=term-missing
 ```
 
 `tests/mcp/` проверяет прикладную часть AC-1…AC-11, матрицу прав для восьми пользователей,
@@ -184,7 +289,7 @@ LLM_PROVIDER=echo uv run --frozen --offline pytest --cov=app --cov-branch --cov-
 Обычные тесты не требуют ключей, сети, базы или Docker. Для общего набора на обоих хранилищах:
 
 ```bash
-LLM_PROVIDER=echo uv run --frozen --offline pytest --mcp-postgres --cov=app --cov-branch --cov-report=term-missing
+LLM_PROVIDER=echo uv run --extra mcp --frozen --offline pytest --mcp-postgres --cov=app --cov-branch --cov-report=term-missing
 ```
 
 Нужен Docker (включая Docker Desktop) и уже скачанный pgvector/pgvector:pg17; тесты сами не скачивают
@@ -197,3 +302,10 @@ lazy-пул на общем цикле, CLI seed/reset и AC-5 между про
 с настоящей фабрикой на пустых таблицах и БД со старой RAG-схемой; запись прогресса в fallback,
 отсутствие повторной инициализации/перезаписи, порядок записей, запрет append истории при python -O.
 Проверка Linux CMD через /bin/sh пропускается на Windows; остальные проверки и Docker CLI переносимы.
+
+Протокол MCP: tests/mcp/test_protocol.py соединяет ClientSession с FastMCP через память,
+проверяет привязку пользователя к запуску, невозможность смены роли/самосогласования, все 8 ролей,
+активные личные напоминания, одинаковый NotFound, подсказки мутаций и две сессии без закрытия пула.
+Подпроцессы проверяют ошибку запуска без пользователя, приоритет --user над MCP_USER_ID и реальные
+вызовы по stdio. С --mcp-postgres общие сценарии также работают на временном PostgreSQL.
+Без extra mcp протокольный модуль тестов пропускается, остальной backend работает без SDK.
