@@ -61,8 +61,9 @@ def load_seed() -> OnboardingData:
 
 async def reset_demo(actor: User) -> None:
     known_actor(actor)
-    seed = load_seed()
-    async with storage.get_store().transaction() as data:
+    store = storage.get_store()
+    seed = await store.seed_for_schema(load_seed())
+    async with store.transaction() as data:
         for field in OnboardingData.model_fields:
             setattr(data, field, getattr(seed, field))
         events._record(data, actor, "demo_reset", {})
