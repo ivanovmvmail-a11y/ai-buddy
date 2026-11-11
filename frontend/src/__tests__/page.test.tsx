@@ -42,7 +42,7 @@ describe("экран «план + чат» на API", () => {
   it("бот пишет первым: день, прогресс, следующий шаг", async () => {
     open();
     expect(await screen.findByText(/2-й день стажировки/)).toBeTruthy();
-    expect(screen.getByText(/Закрыто 1 из 10/)).toBeTruthy();
+    expect(screen.getByText(/Закрыто 1 из 11/)).toBeTruthy();
     expect(srv.calls.every((c) => c.user === "intern-anya")).toBe(true);
   });
 

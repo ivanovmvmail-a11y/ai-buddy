@@ -52,7 +52,8 @@
 | 46 | Аудит S3: реальные timestamps событий и календарные сутки Grafana | Codex | codex/audit-s3-event-time | готово | [#61](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/61) | 700 passed / 97,63%, PostgreSQL; 30 дней, timezone браузера; мерж после комментария человека |
 | 47 | Аудит S2: загрузка how-to документов и изоляция команд | Codex | codex/audit-s2-howto-ingest | на ревью | [#62](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/62) | 698 passed / 97,63%, оба PostgreSQL-флага; 19 документов; мерж после комментария человека |
 | 48 | Ревью Codex #59 (повторно), #61, #62; поддельный сервер фронта — новые документы пунктов, как в #62 | Claude | claude/mock-howto-links | на ревью | | frontend 64 |
-| 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | на ревью | | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
+| 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | готово | #64, #65 | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
+| 50 | План: метки «для всех / для тебя», «почему», «ты это умеешь — коротко» (SPEC 3.1) | Claude | claude/plan-labels | на ревью | | frontend 70; персональные пункты придут от сервера после каталога Codex |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
