@@ -60,7 +60,9 @@ function reminders(s: DemoState, actor: DemoUser): Reminder[] {
     const id = `rem.${item.id}`;
     if (s.dismissedReminders.includes(id)) return [];
     return [{
-      id, user_id: actor.id, plan_item_id: item.id, request_id: null, status: "active" as const,
+      id, user_id: actor.id, plan_item_id: item.id, status: "active" as const,
+      request_id: waitingLong
+        ? s.requests.find((r) => r.plan_item_id === item.id && r.status === "pending_approval")?.id ?? null : null,
       text: waitingLong ? `Заявка «${item.title}» ждёт. Напомнить наставнику?` : `У пункта «${item.title}» прошёл срок.`,
       created_day: s.days[actor.id], snooze_until_day: null,
     }];
@@ -175,15 +177,16 @@ export function installFakeServer(): FakeServer {
       const action = srv.actions.find((a) => a.id === m![1] && a.user_id === actor.id);
       if (!action) return err(404, "Действие не найдено");
       if (m[2] === "cancel") { action.status = "cancelled"; return ok(action); }
-      const params = action.params as { resource_id: string; justification: string };
+      const params = action.params as { resource_id: string; justification: string; level?: "read" | "edit" | "admin" };
+      const level = params.level ?? "read";
       const res = RESOURCES.find((r) => r.id === params.resource_id)!;
       const item = s.items.find((i) => i.intern_id === actor.id && i.resource_id === res.id)!;
       if (s.requests.some((r) => r.resource_id === res.id && r.intern_id === actor.id && r.status !== "rejected")) {
         action.status = "failed"; action.error = "Заявка на этот ресурс уже есть"; return ok(action);
       }
-      const auto = res.approver === "auto";
+      const auto = res.approver === "auto" && level === "read"; // повышенные права — всегда наставнику (S4)
       const req = {
-        id: `REQ-${reqN++}`, intern_id: actor.id, resource_id: res.id, level: "read" as const, justification: params.justification,
+        id: `REQ-${reqN++}`, intern_id: actor.id, resource_id: res.id, level, justification: params.justification,
         status: auto ? ("granted" as const) : ("pending_approval" as const), approver_id: auto ? null : actor.mentor_id ?? null,
         reject_reason: null, plan_item_id: item.id, created_day: s.days[actor.id],
       };

@@ -11,7 +11,8 @@ import type {
 
 export type BotAction =
   | { label: string; kind: "do" | "explain" | "steps" | "who"; itemId: string; internId: string }
-  | { label: string; kind: "snooze"; reminderId: string };
+  | { label: string; kind: "snooze"; reminderId: string }
+  | { label: string; kind: "nudge"; requestId: string; itemTitle: string };
 
 export type Msg = {
   id: string;
@@ -111,9 +112,21 @@ export function weeklySummaryMsg(s: WeeklySummary, titles: Record<string, string
   return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined });
 }
 
+/** «Написать наставнику» по зависшей заявке: бот не отправляет сообщения сам — готовит текст для копирования. */
+export function nudgeMsg(requestId: string, itemTitle: string): Msg {
+  return scripted(
+    "Черновик сообщения наставнику, можно скопировать:\n\n" +
+      `«Привет! Подскажи, пожалуйста, получится посмотреть мою заявку ${requestId}` +
+      (itemTitle ? ` (пункт плана «${itemTitle}»)` : "") +
+      "? Она ждёт решения уже несколько дней, а без доступа я не могу продолжить. Спасибо!»",
+  );
+}
+
 export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
   const actions: BotAction[] = [];
-  if (item) actions.push({ ...actionFor(item), label: item.resource_id && item.status !== "waiting" ? "Сделать сейчас" : "Объяснить" });
+  if (r.request_id) {
+    actions.push({ label: "Написать наставнику", kind: "nudge", requestId: r.request_id, itemTitle: item?.title ?? "" });
+  } else if (item) actions.push({ ...actionFor(item), label: item.resource_id && item.status !== "waiting" ? "Сделать сейчас" : "Объяснить" });
   actions.push({ label: "Напомнить позже", kind: "snooze", reminderId: r.id });
   return scripted(`🔔 ${r.text}`, { actions });
 }
@@ -174,7 +187,10 @@ export function accessDraftParams(item: PlanItem, actor: DemoUser) {
   };
 }
 
-export function approverText(resource: AccessResource | undefined, actor: DemoUser): string {
+/** Кто согласует: автоматически выдаётся только чтение, повышенные права — всегда наставник (аудит S4). */
+export function approverText(resource: AccessResource | undefined, actor: DemoUser, level = "read"): string {
   if (!resource) return "—";
-  return resource.approver === "auto" ? "выдаётся автоматически" : findUser(actor.mentor_id)?.name ?? "наставник";
+  return resource.approver === "auto" && level === "read"
+    ? "выдаётся автоматически"
+    : findUser(actor.mentor_id)?.name ?? "наставник";
 }
