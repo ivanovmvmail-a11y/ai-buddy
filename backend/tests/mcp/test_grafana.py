@@ -162,7 +162,7 @@ def test_daily_buckets_follow_dashboard_timezone_including_midnight_and_dst(metr
     panel=next(p for p in dashboard['panels'] if p['title']=='Вопросы по дням')
     query=panel['targets'][0]['rawSql'].replace('${__timezone}',zone).replace('$__timeFilter(ts)','true')
     with psycopg.connect(**metrics_database,autocommit=True) as connection:
-        connection.execute(MIGRATION.read_text(encoding="utf-8"))
+        apply_onboarding_migrations(connection)
         connection.execute(METRICS.read_text(encoding="utf-8"))
         connection.execute('SET TIME ZONE UTC')
         for ts in timestamps:
@@ -180,7 +180,7 @@ def test_new_event_with_virtual_future_day_is_visible_in_current_time_window(met
     from app.mcp_server.seed import load_seed
     from psycopg.conninfo import make_conninfo
     with psycopg.connect(**metrics_database,autocommit=True) as connection:
-        connection.execute(MIGRATION.read_text(encoding="utf-8"));connection.execute(METRICS.read_text(encoding="utf-8"))
+        apply_onboarding_migrations(connection);connection.execute(METRICS.read_text(encoding="utf-8"))
     store=PostgresStore(make_conninfo(**metrics_database))
     monkeypatch.setattr(storage,'get_store',lambda:store)
     try:

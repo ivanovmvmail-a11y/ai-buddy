@@ -2,11 +2,10 @@
 from datetime import date, datetime
 from typing import Literal
 
-from .absence_models import AbsenceRequest
-
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from app.agent.users import Role, User
+from .absence_models import AbsenceRequest
 
 Stage = Literal["week1", "week2", "month1", "month2", "after3m"]
 OwnerRole = Literal["intern", "mentor", "lead"]
@@ -40,6 +39,11 @@ class PlanItem(Model):
     title: str
     summary: str
     owner_role: OwnerRole
+    kind: Literal["common", "personal"] = "common"
+    reason: str | None = None
+    skill_level: SkillLevel | None = None
+    known_marked: bool = False
+    catalog_key: str | None = None
     topic: str | None = None
     doc_source_id: str | None = None
     resource_id: str | None = None
@@ -52,6 +56,21 @@ class PlanItem(Model):
     overdue: bool = False
     waiting_for: str | None = None
     waiting_days: int | None = Field(default=None, ge=0)
+
+
+class CatalogItem(Model):
+    key: str
+    team: str
+    topic: str
+    topic_title: str
+    level: Literal["novice"] = "novice"
+    title: str
+    summary: str
+    doc_source_id: str
+    practice: str
+    stage: Literal["week1", "week2"]
+    due_offset: int = Field(ge=1)
+    in_plan: bool = False
 
 
 class StageInfo(Model):
@@ -170,8 +189,9 @@ class OnboardingData(Model):
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)
     absence_requests: dict[str, AbsenceRequest] = Field(default_factory=dict)
+    drafts: dict[str, ActionDraft] = Field(default_factory=dict)
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
     profiles: dict[str, SkillProfile] = Field(default_factory=dict)
     reminders: dict[str, Reminder] = Field(default_factory=dict)
-    drafts: dict[str, ActionDraft] = Field(default_factory=dict)
+    personal_catalog: dict[str, CatalogItem] = Field(default_factory=dict)
     events: list[Event] = Field(default_factory=list)

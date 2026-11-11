@@ -1,5 +1,6 @@
 """События чата, оценка ответов и метрики (спека 302)."""
 import pytest
+from app.agent.users import DEMO_USERS
 from .conftest import as_user, text_reply, tool_reply
 
 from app import async_runner
@@ -55,11 +56,11 @@ def test_ac2_feedback_own_answer_only(scenario):
 
 
 @pytest.mark.parametrize("user,expected", [
-    ("mentor-petr", ["intern-anya"]), ("mentor-maria", ["intern-ivan"]),
-    ("lead-olga", ["intern-anya"]), ("curator-dmitry", ["intern-anya", "intern-ivan"]),
+    ("mentor-petr", ["intern-anya", "intern-kirill"]), ("mentor-maria", ["intern-ivan", "intern-liza"]),
+    ("lead-olga", ["intern-anya", "intern-kirill"]), ("curator-dmitry", ["intern-anya", "intern-ivan", "intern-kirill", "intern-liza"]),
 ])
 def test_ac3_metrics_scope(scenario, user, expected):
-    assert scenario.get("/metrics", headers=as_user(user)).get_json()["interns"] == expected
+    assert scenario.get("/metrics", headers=as_user(user)).get_json()["interns"] == [id for id in expected if id in DEMO_USERS]
 
 
 @pytest.mark.parametrize("user", ["intern-anya", "hrbp-elena"])

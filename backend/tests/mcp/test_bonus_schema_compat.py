@@ -24,7 +24,8 @@ def old_database(dsn):
         try:
             target = make_conninfo(**{**params,'dbname':name})
             with psycopg.connect(target,autocommit=True) as connection:
-                connection.execute(MIGRATION.read_text())
+                connection.execute(MIGRATION.read_text(encoding="utf-8"))
+                connection.execute(MIGRATION.with_name("20261111160000_personal_plan.sql").read_text(encoding="utf-8"))
             yield target
         finally:
             admin.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(name)))
@@ -54,8 +55,8 @@ def test_old_schema_stays_in_postgres_and_recovers_after_live_migration(onboardi
             with psycopg.connect(dsn,autocommit=True) as connection:
                 assert connection.execute("SELECT status FROM plan_items WHERE id='anya.w1.notes'").fetchone()==('done',)
                 # SQL приходит после автодеплоя; пул и процесс не перезапускаются.
-                for pattern in ('*_service_drafts.sql','*_mentor_inbox.sql','*_absence.sql','*_self_check.sql'):
-                    for path in sorted(MIGRATION.parent.glob(pattern)): connection.execute(path.read_text())
+                for pattern in ('*_service_drafts.sql','*_mentor_inbox.sql','*_absence.sql','*_self_check.sql','*_reminder_kinds.sql'):
+                    for path in sorted(MIGRATION.parent.glob(pattern)): connection.execute(path.read_text(encoding="utf-8"))
             draft=run(prepare())
             assert run(drafts.get_draft('intern-anya',draft.id)).status=='pending'
             assert run(checklist.get_plan(DEMO_USERS['intern-anya'],'intern-anya')).current_day==3

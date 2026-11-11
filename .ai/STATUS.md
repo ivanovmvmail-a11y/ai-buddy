@@ -57,7 +57,8 @@
 | 51 | Экран наставника: «Бот предлагает поднять уровень» и сравнение двух планов (SPEC 4, 5) | Claude | claude/mentor-suggestions-compare | готово | #69 | frontend 77; на поддельном сервере, на настоящем появится после Codex (п. 0–2 HANDOFF) |
 | 53 | Отгул в чате: «мне завтра к врачу» → черновик заявления; решение руководителя; наставнику только дата (SPEC 3.8) | Claude | claude/absence-chat | на ревью | | поверх #46 Codex; backend 566 / 95%, frontend 83, золотой набор 52; путь пройден в браузере |
 
-| 52 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 836 passed / 98,14%; main влит; уведомления и +1 день сроков |
+| C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
+| C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).

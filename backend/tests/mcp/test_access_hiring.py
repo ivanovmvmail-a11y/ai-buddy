@@ -118,8 +118,8 @@ def test_atomic_request_plan_and_event_rollback(store, snapshot, monkeypatch):
 def test_skill_profiles_differ_and_only_skill_changes(store, snapshot):
     a = run(hiring.get_skill_profile(ANYA, ANYA.id))
     b = run(hiring.get_skill_profile(IVAN, IVAN.id))
-    assert a.skills == {"git": "novice", "sql": "confident"}
-    assert b.skills == {"git": "confident", "sql": "novice"}
+    assert a.skills == {"git": "novice", "sql": "confident", "ci": "novice"}
+    assert b.skills == {"git": "confident", "sql": "novice", "ci": "novice"}
     updated = run(hiring.set_skill_level(PETR, ANYA.id, "git", "familiar"))
     assert updated.updated_by == PETR.id
     assert updated.strengths == a.strengths and updated.growth == a.growth
