@@ -19,6 +19,16 @@
       "port": 8000
     },
     {
+      "name": "backend-scenario",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set LLM_PROVIDER=scenario&& set EMBEDDINGS_PROVIDER=fake&& uv run --directory backend flask --app app.main run --port 8000"
+      ],
+      "port": 8000,
+      "autoPort": false
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
