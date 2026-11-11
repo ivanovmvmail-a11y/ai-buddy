@@ -14,6 +14,16 @@ from app.mcp_server.seed import load_seed
 MIGRATION = Path(__file__).resolve().parents[3] / "supabase/migrations/20261111010000_onboarding.sql"
 
 
+def apply_onboarding_migrations(connection):
+    """Сервисные SQL по времени, без отдельных RAG/Grafana-миграций."""
+    connection.execute(MIGRATION.read_text(encoding="utf-8"))
+    suffixes = ("_service_drafts.sql", "_mentor_inbox.sql", "_absence.sql", "_self_check.sql",
+                "_personal_plan.sql", "_reminder_kinds.sql", "_skill_suggestions.sql", "_notification_links.sql")
+    for path in sorted(MIGRATION.parent.glob("*.sql")):
+        if path.name.endswith(suffixes):
+            connection.execute(path.read_text(encoding="utf-8"))
+
+
 def pytest_generate_tests(metafunc):
     if "store" in metafunc.fixturenames:
         backends = ["memory", "postgres"] if metafunc.config.getoption("--mcp-postgres") else ["memory"]
@@ -43,7 +53,7 @@ def onboarding_dsn(request):
         while True:
             try:
                 with psycopg.connect(dsn, autocommit=True) as connection:
-                    connection.execute(MIGRATION.read_text(encoding="utf-8"))
+                    apply_onboarding_migrations(connection)
                 break
             except psycopg.OperationalError:
                 if time.monotonic() >= deadline:

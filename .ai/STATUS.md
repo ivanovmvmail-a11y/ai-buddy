@@ -56,5 +56,8 @@
 | 50 | План: метки «для всех / для тебя», «почему», «ты это умеешь — коротко» (SPEC 3.1) | Claude | claude/plan-labels | готово | #66 | frontend 70; персональные пункты придут от сервера после каталога Codex |
 | 51 | Экран наставника: «Бот предлагает поднять уровень» и сравнение двух планов (SPEC 4, 5) | Claude | claude/mentor-suggestions-compare | на ревью | | frontend 77; на поддельном сервере, на настоящем появится после Codex (п. 0–2 HANDOFF) |
 
+| C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
+| C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
+
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).

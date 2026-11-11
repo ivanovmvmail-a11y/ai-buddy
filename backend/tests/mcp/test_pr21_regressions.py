@@ -21,7 +21,7 @@ from app.mcp_server.models import AccessRequest, Reminder
 from app.mcp_server.postgres import PostgresStore, TABLES
 from app.mcp_server.seed import load_seed
 from app.mcp_server.seed.__main__ import main as seed_main
-from .conftest import MIGRATION, docker_command
+from .conftest import apply_onboarding_migrations, MIGRATION, docker_command
 
 run = async_runner.run
 ANYA = DEMO_USERS['intern-anya']
@@ -73,7 +73,7 @@ def test_lazy_bootstrap_failure_keeps_one_seeded_memory_store(error, caplog):
     run(first_reads())
     assert primary.calls == primary.closed == 1
     assert isinstance(store._store, storage.InMemoryStore)
-    assert len(caplog.records) == 1
+    assert len([r for r in caplog.records if r.name == "ai_buddy.onboarding"]) == 1
     assert 'InMemoryStore' in caplog.text and 'private connection details' not in caplog.text
     if isinstance(error, psycopg.errors.UndefinedTable):
         assert 'Таблицы онбординга не найдены' in caplog.text
@@ -204,7 +204,7 @@ def test_first_http_request_bootstraps_empty_tables_or_falls_back_for_existing_v
         with psycopg.connect(dsn, autocommit=True) as connection:
             connection.execute((MIGRATION.parent / '20261110120000_rag_documents.sql').read_text(encoding='utf-8'))
             if has_schema:
-                connection.execute(MIGRATION.read_text(encoding='utf-8'))
+                apply_onboarding_migrations(connection)
                 assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (0,)
         monkeypatch.setattr(settings, 'database_url', dsn)
         storage.get_store.cache_clear()
@@ -227,7 +227,7 @@ def test_first_http_request_bootstraps_empty_tables_or_falls_back_for_existing_v
             assert client.get('/plan?intern_id=intern-ivan', headers=headers).status_code == 404
             if has_schema:
                 with psycopg.connect(dsn) as connection:
-                    assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (2,)
+                    assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (len(load_seed().interns),)
                     assert connection.execute("SELECT status FROM plan_items WHERE id='anya.w1.notes'").fetchone() == ('done',)
                 assert isinstance(store._store, PostgresStore)
                 run(store.close())

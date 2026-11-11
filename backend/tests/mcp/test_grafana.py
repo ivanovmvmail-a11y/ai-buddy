@@ -10,7 +10,7 @@ from psycopg.types.json import Jsonb
 import pytest
 
 from app.agent.analytics import closed_without_human
-from .conftest import MIGRATION
+from .conftest import apply_onboarding_migrations, MIGRATION
 
 ROOT = Path(__file__).resolve().parents[3]
 METRICS = ROOT / 'supabase/migrations/20261111100000_grafana_metrics.sql'
@@ -47,13 +47,13 @@ def test_dashboard_has_expected_panels_without_identity_columns():
 def test_metrics_migration_handles_empty_legacy_database_and_repeated_provisioning(metrics_database, has_onboarding):
     with psycopg.connect(**metrics_database, autocommit=True) as owner:
         if has_onboarding:
-            owner.execute(MIGRATION.read_text(encoding='utf-8'))
+            apply_onboarding_migrations(owner)
         owner.execute(METRICS.read_text(encoding='utf-8'))
         owner.execute(METRICS.read_text(encoding='utf-8'))
         assert owner.execute('SELECT count(*) FROM grafana_answers').fetchone() == (0,)
         assert owner.execute('SELECT count(*) FROM grafana_feedback').fetchone() == (0,)
         if not has_onboarding:
-            owner.execute(MIGRATION.read_text(encoding='utf-8'))
+            apply_onboarding_migrations(owner)
             owner.execute(METRICS.read_text(encoding='utf-8'))
             owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system','question_answered',%s)",
                           (Jsonb({'intern_id': 'intern-anya', 'topic': 'git'}),))
@@ -70,7 +70,7 @@ def test_panel_sql_matches_metrics_and_reader_cannot_read_private_tables_or_writ
         {'intern_id': 'intern-ivan', 'topic': 'git', 'with_source': True, 'refused': True},
     ]
     with psycopg.connect(**params, autocommit=True) as owner:
-        owner.execute(MIGRATION.read_text(encoding='utf-8'))
+        apply_onboarding_migrations(owner)
         owner.execute(METRICS.read_text(encoding='utf-8'))
         owner.execute("ALTER ROLE ai_buddy_grafana LOGIN PASSWORD 'grafana-test-only'")
         for payload in answers + [{'user_id': 'mentor-petr', 'topic': 'git', 'with_source': True}]:
@@ -114,7 +114,7 @@ def test_grafana_views_revoke_supabase_default_grants_and_keep_datasource(onboar
             with psycopg.connect(**{**params, 'dbname': database}, autocommit=True) as owner:
                 for role in api_roles:
                     owner.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {}').format(sql.Identifier(role)))
-                owner.execute(MIGRATION.read_text(encoding='utf-8'))
+                apply_onboarding_migrations(owner)
                 owner.execute(METRICS.read_text(encoding='utf-8'))
                 owner.execute("INSERT INTO intern_state (intern_id,start_date,current_day) VALUES ('intern-anya',current_date,1)")
                 owner.execute('''INSERT INTO plan_items (id,intern_id,stage,"order",title,summary,owner_role,status,updated_at)
@@ -162,7 +162,7 @@ def test_daily_buckets_follow_dashboard_timezone_including_midnight_and_dst(metr
     panel=next(p for p in dashboard['panels'] if p['title']=='Вопросы по дням')
     query=panel['targets'][0]['rawSql'].replace('${__timezone}',zone).replace('$__timeFilter(ts)','true')
     with psycopg.connect(**metrics_database,autocommit=True) as connection:
-        connection.execute(MIGRATION.read_text(encoding="utf-8"))
+        apply_onboarding_migrations(connection)
         connection.execute(METRICS.read_text(encoding="utf-8"))
         connection.execute('SET TIME ZONE UTC')
         for ts in timestamps:
@@ -180,7 +180,7 @@ def test_new_event_with_virtual_future_day_is_visible_in_current_time_window(met
     from app.mcp_server.seed import load_seed
     from psycopg.conninfo import make_conninfo
     with psycopg.connect(**metrics_database,autocommit=True) as connection:
-        connection.execute(MIGRATION.read_text(encoding="utf-8"));connection.execute(METRICS.read_text(encoding="utf-8"))
+        apply_onboarding_migrations(connection);connection.execute(METRICS.read_text(encoding="utf-8"))
     store=PostgresStore(make_conninfo(**metrics_database))
     monkeypatch.setattr(storage,'get_store',lambda:store)
     try:

@@ -1,7 +1,7 @@
 """Карта навыков: стажёр читает свою, изменяет только его наставник."""
 from app.agent.users import Role, User
 
-from . import events, storage
+from . import checklist, events, storage
 from ._domain import nonempty, require_intern, skill_level, timestamp
 from .errors import Forbidden, NotFound
 from .models import SkillLevel, SkillProfile
@@ -30,6 +30,7 @@ async def set_skill_level(actor: User, intern_id: str, topic: str, level: SkillL
             profile.skills[topic] = level
             profile.updated_by = actor.id
             profile.updated_at = timestamp(data, intern_id)
+            checklist._rebuild_personal(data, actor, intern_id)
             events._record(data, actor, "skill_level_changed", {
                 "intern_id": intern_id, "topic": topic, "from": previous, "to": level,
                 "day": data.interns[intern_id].current_day,
