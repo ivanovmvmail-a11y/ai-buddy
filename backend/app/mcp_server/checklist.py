@@ -112,7 +112,7 @@ async def weekly_summary(actor: User, intern_id: str, week: int) -> dict:
                 "status": event.payload["to"] if event else "not_started",
                 "status_reason": event.payload.get("reason") if event else None,
                 "waiting_for": event.payload.get("waiting_for") if event else None,
-                "updated_at": event.ts if event else timestamp(data, intern_id, 1),
+                "updated_at": timestamp(data, intern_id, event.payload["day"] if event else 1),
                 "updated_by": event.user_id if event else None,
             }, deep=True)
             if historical.status != "done":
