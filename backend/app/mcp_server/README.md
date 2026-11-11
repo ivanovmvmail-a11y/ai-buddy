@@ -172,47 +172,52 @@ intern_id и виртуальный day, поэтому фильтруются �
 Бизнес-функции сами проверяют права и записывают события в своей транзакции. Изменения сигнатур
 относительно сокращений в plan.md перечислены в HANDOFF. Транспорт не экспортирует приватные функции.
 
-## MCP: stdio-сервер и подключение клиента
+## MCP: один пользователь на stdio-процесс
 
-Официальный Python SDK `mcp` (FastMCP), восемь инструментов поверх тех же сервисов.
-Запуск из backend после `uv sync --frozen`:
+Официальный SDK mcp/FastMCP установлен только с extra mcp; обычный веб-образ Docker/Railway
+его не включает. Из backend:
 
 ```bash
-uv run python -m app.mcp_server.server
+uv sync --frozen --extra mcp
+uv run --extra mcp python -m app.mcp_server.server --user intern-anya
 ```
 
-Процесс ждёт MCP JSON-RPC на stdin и отвечает в stdout; диагностические сообщения идут в stderr.
-Ручной текст в терминале не является вызовом инструмента. SDK и все сервисы запускаются на общем
-`app.async_runner`; при закрытии соединения сервер закрывает хранилище/пул на том же event loop.
-Отдельный HTTP-порт, ключи LLM и процесс Flask для этого запуска не нужны.
+Вместо --user можно задать MCP_USER_ID в окружении процесса. Флаг --user имеет приоритет;
+пустое/неизвестное значение останавливает процесс с кодом 2 и понятным сообщением в stderr
+до запуска MCP-транспорта. Значение из .env можно загрузить через
+`uv run --env-file .env --extra mcp python -m app.mcp_server.server`.
 
-Каждый инструмент **требует user_id явно**. Сервер берёт готовый User только из DEMO_USERS,
-пустой/неизвестный id возвращает ошибку; пользователя по умолчанию нет. Например: intern-anya,
-intern-ivan, mentor-petr, mentor-maria, lead-olga, lead-sergey, hrbp-elena, curator-dmitry.
-Роль и команда определяются сервером; клиент не передаёт actor/role/team. Это имитация входа
-для локального демо: клиент выбирает демо-пользователя, а сервис проверяет его права на объект.
+Личность выбирает человек, который настраивает запуск MCP-клиента. Сервер один раз разрешает
+id по DEMO_USERS: intern-anya, intern-ivan, mentor-petr, mentor-maria, lead-olga, lead-sergey,
+hrbp-elena, curator-dmitry. Все вызовы этого процесса используют того же пользователя;
+аргументов user_id/actor/role/team в инструментах нет. Клиент не может подать заявку как стажёр,
+а затем одобрить её как наставник. Сервис проверяет права привязанного пользователя на объект.
+Это имитация входа для локального демо, не корпоративная аутентификация.
 
-| Инструмент | Аргументы помимо обязательного user_id |
+Процесс ждёт MCP JSON-RPC на stdin и отвечает в stdout; диагностика идёт в stderr. SDK и сервисы
+запускаются на общем app.async_runner. Сессии не закрывают общий пул: main закрывает хранилище
+после завершения stdio, включая ошибку транспорта. Отдельный HTTP-порт, ключ LLM и Flask не нужны.
+
+| Инструмент | Аргументы |
 |---|---|
 | get_plan | intern_id |
 | set_item_status | item_id, status, reason? |
 | list_resources | — |
 | create_request | resource_id, level, justification |
-| list_requests | intern_id? (без него — все доступные этому пользователю заявки) |
+| list_requests | intern_id? (без него — все доступные связанному пользователю заявки) |
 | decide_request | request_id, approve (JSON boolean), reason? (обязателен при отказе) |
 | get_skill_profile | intern_id |
-| list_reminders | — (только личные напоминания) |
+| list_reminders | — (только активные личные напоминания, как HTTP /reminders) |
 
-status: not_started / in_progress / waiting / done; level: read / edit / admin.
-Допустимость конкретного перехода/согласования проверяют существующие сервисы.
-set_item_status, create_request и decide_request изменяют данные при вызове; подтверждение
-инструмента на стороне MCP-клиента и HTTP-черновики агента — отдельные механизмы.
+status: not_started / in_progress / waiting / done; level: read / edit / admin. Допустимость
+перехода/согласования проверяют сервисы. set_item_status и decide_request имеют destructiveHint=true;
+create_request — destructiveHint=false, idempotentHint=false. Эти инструменты изменяют данные
+при вызове; подтверждение клиента и HTTP-черновики агента — отдельные механизмы.
 SYSTEM_ACTOR, cron_tick, log_event, set_skill_level и административный reset не зарегистрированы.
 
-Ответы — стандартный MCP CallToolResult: модели в structuredContent и текстовое JSON-представление
-в content. Для списков SDK оборачивает массив в structuredContent.result. Доменные ошибки дают
-isError=true; чужой и отсутствующий объект возвращают одинаковое «Не найдено». Неожиданные
-ошибки не раскрывают SQL/реквизиты подключения. Сессия продолжает работать после ошибки инструмента.
+Ответы — CallToolResult: модели в structuredContent и JSON-представление в content. Списки —
+structuredContent.result. Доменные ошибки дают isError=true; чужой и отсутствующий объект —
+одинаковое «Не найдено». Неожиданные ошибки не раскрывают SQL/реквизиты подключения.
 
 ### Claude Desktop
 
@@ -226,9 +231,10 @@ Windows: %APPDATA%\Claude\), затем перезапустить Claude Deskto
       "command": "uv",
       "args": [
         "--directory", "/absolute/path/to/ai-buddy/backend",
-        "run", "--frozen", "python", "-m", "app.mcp_server.server"
+        "run", "--frozen", "--extra", "mcp", "python", "-m", "app.mcp_server.server"
       ],
       "env": {
+        "MCP_USER_ID": "intern-anya",
         "DATABASE_URL": "",
         "LLM_PROVIDER": "echo",
         "PYTHONUTF8": "1"
@@ -238,20 +244,18 @@ Windows: %APPDATA%\Claude\), затем перезапустить Claude Deskto
 }
 ```
 
-Заменить каталог абсолютным путём к backend, а command — абсолютным путём к uv, если Desktop
-не видит его в PATH. На Windows в JSON используются пути вида C:\\projects\\ai-buddy\\backend.
-DATABASE_URL="" в примере принудительно выбирает память и не использует локальную .env-БД.
-Без этого переопределения действуют обычные настройки хранилища, включая ленивый seed и fallback.
-Память отдельного stdio-процесса не общая с работающим Flask; для общего прогресса обоим процессам
-нужен один DATABASE_URL с применённой миграцией. После перезапуска процесса прогресс памяти теряется.
+Заменить каталог абсолютным путём к backend, а command — путём к uv, если Desktop не видит его
+в PATH. На Windows в JSON используются пути вида C:\\projects\\ai-buddy\\backend.
+Для другого пользователя изменить MCP_USER_ID в настройках запуска и перезапустить процесс.
+DATABASE_URL="" выбирает память, переопределяя .env-БД. Для общего прогресса stdio-процессу
+и Flask нужен один DATABASE_URL с миграцией; память раздельная по процессам и теряется при рестарте.
 
-В любом MCP-клиенте с transport=stdio указать те же command/args/env. После initialize и tools/list
-вызвать get_plan с аргументами {"user_id":"intern-anya","intern_id":"intern-anya"}.
-Список инструментов содержит JSON Schema входа/выхода и подсказки readOnlyHint для клиента.
+В любом stdio-клиенте указать те же command/args/env. После initialize и tools/list вызвать
+get_plan с {"intern_id":"intern-anya"}. Пользователь не передаётся через tools/call.
 
-### Пример клиента Python SDK
+### Пример SDK-клиента
 
-Из backend можно проверить соединение без Desktop (пакет mcp уже в зависимостях):
+Из backend с extra mcp:
 
 ```python
 import sys
@@ -262,14 +266,12 @@ from app.async_runner import run
 async def inspect_plan():
     params = StdioServerParameters(
         command=sys.executable, args=["-m", "app.mcp_server.server"],
-        env={"DATABASE_URL": "", "LLM_PROVIDER": "echo", "PYTHONUTF8": "1"},
+        env={"MCP_USER_ID": "intern-anya", "DATABASE_URL": "", "LLM_PROVIDER": "echo"},
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as client:
             await client.initialize()
-            result = await client.call_tool(
-                "get_plan", {"user_id": "intern-anya", "intern_id": "intern-anya"}
-            )
+            result = await client.call_tool("get_plan", {"intern_id": "intern-anya"})
             print(result.structuredContent)
 
 run(inspect_plan())
@@ -279,7 +281,7 @@ run(inspect_plan())
 
 ```bash
 cd backend
-LLM_PROVIDER=echo uv run --frozen --offline pytest --cov=app --cov-branch --cov-report=term-missing
+LLM_PROVIDER=echo uv run --extra mcp --frozen --offline pytest --cov=app --cov-branch --cov-report=term-missing
 ```
 
 `tests/mcp/` проверяет прикладную часть AC-1…AC-11, матрицу прав для восьми пользователей,
@@ -287,7 +289,7 @@ LLM_PROVIDER=echo uv run --frozen --offline pytest --cov=app --cov-branch --cov-
 Обычные тесты не требуют ключей, сети, базы или Docker. Для общего набора на обоих хранилищах:
 
 ```bash
-LLM_PROVIDER=echo uv run --frozen --offline pytest --mcp-postgres --cov=app --cov-branch --cov-report=term-missing
+LLM_PROVIDER=echo uv run --extra mcp --frozen --offline pytest --mcp-postgres --cov=app --cov-branch --cov-report=term-missing
 ```
 
 Нужен Docker (включая Docker Desktop) и уже скачанный pgvector/pgvector:pg17; тесты сами не скачивают
@@ -301,9 +303,9 @@ lazy-пул на общем цикле, CLI seed/reset и AC-5 между про
 отсутствие повторной инициализации/перезаписи, порядок записей, запрет append истории при python -O.
 Проверка Linux CMD через /bin/sh пропускается на Windows; остальные проверки и Docker CLI переносимы.
 
-Протокол MCP: `tests/mcp/test_protocol.py` соединяет официальный ClientSession с FastMCP
-через memory transport: все восемь инструментов, изменения состояния, восемь ролей, обязательный
-user_id, неизвестный/системный пользователь, одинаковый отказ для чужого и отсутствующего объекта,
-ошибки/валидация/закрытие хранилища. Дополнительно клиент запускает настоящий модуль по stdio:
-initialize → tools/list → tools/call. С флагом --mcp-postgres общий набор MCP-протокола также
-использует временный PostgreSQL; stdio smoke всегда работает с отдельной памятью без ключей/сети.
+Протокол MCP: tests/mcp/test_protocol.py соединяет ClientSession с FastMCP через память,
+проверяет привязку пользователя к запуску, невозможность смены роли/самосогласования, все 8 ролей,
+активные личные напоминания, одинаковый NotFound, подсказки мутаций и две сессии без закрытия пула.
+Подпроцессы проверяют ошибку запуска без пользователя, приоритет --user над MCP_USER_ID и реальные
+вызовы по stdio. С --mcp-postgres общие сценарии также работают на временном PostgreSQL.
+Без extra mcp протокольный модуль тестов пропускается, остальной backend работает без SDK.

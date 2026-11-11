@@ -29,7 +29,7 @@
 | 23 | Спеки 102 (объяснение под уровень) и 301 (напоминания) — оформить по готовому коду | Claude | claude/specs-102-301 | на ревью | | только документы; найдено отличие от SPEC: нет колокольчика (301-T4) |
 | 24 | Колокольчик напоминаний в шапке (301-T4) + ревью PR #34 Codex | Claude | claude/reminders-bell | на ревью | | |
 
-| 25 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | в работе | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Восемь инструментов FastMCP/stdio; 405 passed / 94,40%; PostgreSQL: 600 passed / 98,42% |
+| 25 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | на ревью | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
 
 ## Блокеры
 _нет_

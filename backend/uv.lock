@@ -16,11 +16,15 @@ dependencies = [
     { name = "flask-cors" },
     { name = "gigachat" },
     { name = "gunicorn" },
-    { name = "mcp" },
     { name = "openai" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "pydantic-settings" },
+]
+
+[package.optional-dependencies]
+mcp = [
+    { name = "mcp" },
 ]
 
 [package.dev-dependencies]
@@ -35,12 +39,13 @@ requires-dist = [
     { name = "flask-cors", specifier = ">=6.0.5" },
     { name = "gigachat", specifier = ">=0.2.4" },
     { name = "gunicorn", specifier = ">=26.2.0" },
-    { name = "mcp", specifier = ">=1.30,<2" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.30,<2" },
     { name = "openai", specifier = ">=3.46.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0,<4" },
     { name = "psycopg-pool", specifier = ">=3.2.0,<4" },
     { name = "pydantic-settings", specifier = ">=2.16.2" },
 ]
+provides-extras = ["mcp"]
 
 [package.metadata.requires-dev]
 dev = [
