@@ -155,7 +155,8 @@ class ScenarioProvider:
         for title, content in _docs(system):
             for heading, unit in _units(content):
                 score = _overlap(wanted, heading + " " + unit)
-                if score > best[0]:
+                # при равном совпадении — более содержательный абзац (а не строка глоссария)
+                if (score, len(unit)) > (best[0], len(best[2])):
                     best = (score, title, unit)
         if best[0] >= need:
             fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
