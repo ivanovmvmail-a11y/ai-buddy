@@ -41,9 +41,9 @@
 | 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | готово | #49 | backend 428, frontend 49 / 98% |
 | 36 | [API] Аудит S1+S7: без ключа объяснение, «по шагам», «к кому идти» — сервер по документу пункта; фразы «спасибо», «кто наставник», «что у Ани зависло» | Claude | claude/scenario-answers | на ревью | | backend 452, frontend 51 / 98%, золотой 37/37 |
 
-| 37 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | [#45](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/45) | 683 passed / 98,37% с ветвлениями; оба PostgreSQL-флага; /health=200 |
-| 38 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 673 passed / 98,31% с ветвлениями; оба PostgreSQL-флага; /health=200 |
-| 39 | Бонус: приватная самопроверка по темам карты навыков | Codex | codex/self-check | на ревью | [#50](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/50) | 684 passed / 98,30% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 37 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | [#45](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/45) | 747 passed / 98,47% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 38 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 712 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 39 | Бонус: приватная самопроверка по темам карты навыков | Codex | codex/self-check | на ревью | [#50](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/50) | 723 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
 
 ## Блокеры
 _нет_
