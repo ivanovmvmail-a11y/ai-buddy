@@ -210,7 +210,7 @@ class DraftIn(BaseModel):
 def create_draft():
     """«Сделать за меня»: черновик write-инструмента без модели. Выполнение — POST /actions/{id}/confirm."""
     body = _body(DraftIn)
-    return _json(service.agent.draft(g.user, body.tool, body.params)), 201
+    return _json(async_runner.run(service.agent.draft(g.user, body.tool, body.params))), 201
 
 
 # --- Демо-панель (явно помечена в интерфейсе как инструмент демонстрации) -------------------------
@@ -248,4 +248,5 @@ def reset():
     if (denied := _demo_key_error()) is not None:
         return denied
     async_runner.run(clock.reset_demo(g.user))
+    async_runner.run(service.agent.store.clear())  # черновики старого прогона ссылались бы на сброшенные данные
     return {"status": "reset"}
