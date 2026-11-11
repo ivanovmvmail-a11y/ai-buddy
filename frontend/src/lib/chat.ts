@@ -6,6 +6,7 @@ import { findUser } from "./users";
 import { waitedFor } from "./plan-logic";
 import type {
   AccessRequest, AccessResource, Action, DemoUser, DocSource, ExplainKind, Plan, PlanItem, Reminder, SkillLevel, SkillProfile,
+  WeeklySummary,
 } from "./types";
 
 export type BotAction =
@@ -89,6 +90,25 @@ export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: A
     return scripted(`Привет, ${name}! Я отвечаю по общим документам. Планы и профили стажёров тебе не показываю — так настроены права.`);
   }
   return scripted(`Привет, ${name}! Слева — прогресс стажёров${actor.role === "curator" ? ", только чтение" : ""}.`);
+}
+
+/** Неделя, которая только что закончилась (день 8 → неделя 1), или null, если сегодня не первый день недели. */
+export function finishedWeek(day: number): number | null {
+  return day > 7 && (day - 1) % 7 === 0 ? (day - 1) / 7 : null;
+}
+
+/** Итоги недели стажёру (SPEC 3.2): только факты из событий, без оценок. Ту же сводку видит наставник. */
+export function weeklySummaryMsg(s: WeeklySummary, titles: Record<string, string> = {}): Msg {
+  const list = (xs: string[], empty: string) => (xs.length ? xs.map((x) => `«${x}»`).join(", ") : empty);
+  const lines = [
+    `Итоги недели ${s.week} — только факты из плана:`,
+    `• Закрыто: ${list(s.closed.map((c) => c.title), "пока ничего")}`,
+    `• Получены доступы: ${list(s.access_granted.map((a) => titles[a.resource_id] ?? a.resource_id), "нет")}`,
+    `• Переходит на следующую неделю: ${list(s.carry_over.map((c) => c.title), "ничего")}`,
+    "Эту же сводку видит наставник — удобно обсудить на встрече 1:1.",
+  ];
+  const next = s.carry_over.find((c) => c.owner_role === "intern" && c.status !== "waiting");
+  return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined });
 }
 
 export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
