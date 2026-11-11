@@ -96,7 +96,7 @@ def create_server(user_id: str) -> FastMCP:
 
     @server.tool(annotations=CREATE)
     async def create_request(resource_id: str, level: AccessLevel, justification: str) -> AccessRequest:
-        """Создать заявку на ресурс: базовый доступ выдаётся автоматически."""
+        """Создать заявку: auto/read выдаётся автоматически, edit/admin согласует наставник."""
         return await call(access.create_request, resource_id, level, justification)
 
     @server.tool(annotations=READ)

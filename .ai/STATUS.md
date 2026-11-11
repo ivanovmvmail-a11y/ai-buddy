@@ -39,11 +39,22 @@
 | 33 | Аудит 11.11, B2: маршрут проверки в README (шаги, кнопки), версии, порты, структура | Claude | claude/readme-expert-route | готово | #47 | шаги сверены в браузере без ключа |
 | 34 | Аудит 11.11: D3 журнал сервера (LOG_LEVEL), D5 статусы спецификаций, очередь S2–S4 для Codex в HANDOFF | Claude | claude/audit-hardening | готово | #48 | 426 passed |
 | 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | готово | #49 | backend 428, frontend 49 / 98% |
-| 36 | [API] Аудит S1+S7: без ключа объяснение, «по шагам», «к кому идти» — сервер по документу пункта; фразы «спасибо», «кто наставник», «что у Ани зависло» | Claude | claude/scenario-answers | на ревью | | backend 452, frontend 51 / 98%, золотой 37/37 |
+| 36 | [API] Аудит S1+S7: без ключа объяснение, «по шагам», «к кому идти» — сервер по документу пункта; фразы «спасибо», «кто наставник», «что у Ани зависло» | Claude | claude/scenario-answers | готово | #51 | backend 452, frontend 51 / 98%, золотой 37/37 |
+| 37 | Аудит S2: 9 документов «как сделать» (клонирование, ревью, красный пайплайн, песочница, локальный запуск, доступ); золотой набор 46 вопросов | Claude | claude/howto-docs | готово | #52 | сценарный 46/46; backend 452 |
+| 38 | Аудит S6: страница «Мой профиль» стажёра (SPEC 4, 6) | Claude | claude/my-profile | готово | #53 | frontend 53 |
+| 39 | Аудит S6: итоги недели стажёру в чате (SPEC 3.2) | Claude | claude/intern-weekly | готово | #54 | после #53; frontend 58 |
+| 40 | [API] Аудит S6: противоречия в документах — оба варианта с источниками, сигнал наставнику (SPEC 3.7) | Claude | claude/doc-conflicts | готово | #55 | после #54; backend 455, золотой 48/48, frontend 58 |
+| 41 | [API] Аудит S6/D1: хранилище действий — асинхронный протокол для PostgreSQL, атомарное подтверждение, «Сброс» очищает черновики | Claude | claude/action-store | готово | #56 | после #55; таблица — Codex (HANDOFF) |
+| 42 | [API] Аудит S6/D7: переписка сохраняется (GET /chat/history), браузер помнит пользователя, черновики восстанавливаются | Claude | claude/chat-history | готово | #57 | backend 464, frontend 60; таблица — Codex (HANDOFF) |
+| 43 | [API] Аудит D4, D8, мелочи: чужой ресурс — сразу 404, без заголовка — 401, лимиты сообщения, ошибки JSON, approve только bool | Claude | claude/api-hardening | готово | #58 | после #57; backend 468 |
+| 44 | Аудит S5 + мелочи интерфейса: честный раздел про MCP в README, «Написать наставнику» по зависшей заявке, шапка на телефоне 203→91 px, точка «новое» на «Чат», скорость «быстрее 0,1 с» | Claude | claude/ui-polish | готово | #60 | после #58; frontend 63 |
+| 45 | Аудит S4: повышенные доступы требуют решения наставника | Codex | codex/audit-s4-access-approval | готово | [#59](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/59) | 720 passed / 97,73%, PostgreSQL; мерж после комментария человека; бонусы #45/#46/#50 Draft |
+| 46 | Аудит S3: реальные timestamps событий и календарные сутки Grafana | Codex | codex/audit-s3-event-time | готово | [#61](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/61) | 700 passed / 97,63%, PostgreSQL; 30 дней, timezone браузера; мерж после комментария человека |
+| 47 | Аудит S2: загрузка how-to документов и изоляция команд | Codex | codex/audit-s2-howto-ingest | на ревью | [#62](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/62) | 698 passed / 97,63%, оба PostgreSQL-флага; 19 документов; мерж после комментария человека |
+| 48 | Ревью Codex #59 (повторно), #61, #62; поддельный сервер фронта — новые документы пунктов, как в #62 | Claude | claude/mock-howto-links | на ревью | | frontend 64 |
+| 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | на ревью | | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
 
-| 37 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | [#45](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/45) | 747 passed / 98,47% с ветвлениями; оба PostgreSQL-флага; /health=200 |
-| 38 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 712 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
-| 39 | Бонус: приватная самопроверка по темам карты навыков | Codex | codex/self-check | на ревью | [#50](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/50) | 723 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 51 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | в работе | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | возобновлён после аудита; main влит |
 
 ## Блокеры
-_нет_
+- нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).

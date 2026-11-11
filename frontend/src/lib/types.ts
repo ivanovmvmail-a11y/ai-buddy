@@ -96,6 +96,7 @@ export const SkillProfile = z.object({
   skills: z.record(z.string(), SkillLevel),
   strengths: z.array(z.string()),
   growth: z.array(z.string()),
+  updated_by: z.string().nullable().optional(), // кто последним менял уровень (наставник)
 });
 export type SkillProfile = z.infer<typeof SkillProfile>;
 
@@ -117,7 +118,7 @@ export const Action = z.object({
   tool: z.string(),
   title: z.string(),
   params: z.record(z.string(), z.unknown()),
-  status: z.enum(["pending", "done", "failed", "cancelled"]),
+  status: z.enum(["pending", "running", "done", "failed", "cancelled"]), // running — выполняется прямо сейчас
   result: z.record(z.string(), z.unknown()).nullable(),
   error: z.string().nullable(),
 });
@@ -170,5 +171,19 @@ export const Metrics = z.object({
   feedback: z.object({ useful: z.number(), not_useful: z.number() }),
   topics: z.array(TopicCount),
   unanswered_topics: z.array(TopicCount),
+  conflict_topics: z.array(TopicCount).default([]), // документы противоречат друг другу (SPEC 3.7)
 });
 export type Metrics = z.infer<typeof Metrics>;
+
+// GET /chat/history — своя переписка, старые сверху (SPEC 9).
+export const ChatHistory = z.object({
+  messages: z.array(z.object({
+    id: z.string(),
+    role: z.enum(["user", "assistant"]),
+    content: z.string(),
+    sources: z.array(DocSource),
+    answer_id: z.string().nullable(),
+    scripted: z.boolean(),
+  })),
+});
+export const ActionsResponse = z.object({ actions: z.array(Action) });

@@ -4,14 +4,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { askBot, ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
+import { ProfilePanel } from "@/components/ProfilePanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  accessDraftParams, actionFor, explainScripted, followupQuestion, followupsFor, greeting, msgId, reminderMsg, useChat,
+  accessDraftParams, actionFor, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, msgId, reminderMsg,
+  nudgeMsg, useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
-import { useSession } from "@/lib/store";
+import { savedUserId, useSession } from "@/lib/store";
 import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
 
@@ -53,6 +55,7 @@ export default function Home() {
   const setUser = useSession((s) => s.setUser);
   const actor = findUser(userId)!;
   const [tab, setTab] = useState<"plan" | "chat">("plan");
+  const [view, setView] = useState<"plan" | "profile">("plan"); // левая колонка стажёра: план или «Мой профиль»
   const client = useQueryClient();
   const refresh = useRefresh();
   const health = useHealth(userId);
@@ -60,6 +63,13 @@ export default function Home() {
   const [demoError, setDemoError] = useState<string | null>(null);
 
   const say = useChat((s) => s.push);
+  // Телефон: бот написал, пока открыт план, — точка на вкладке «Чат» (аудит, мелочи)
+  const messageCount = useChat((s) => s.messages.length);
+  const [seenCount, setSeenCount] = useState(0);
+  useEffect(() => {
+    if (tab === "chat") setSeenCount(messageCount);
+  }, [tab, messageCount]);
+  const unread = messageCount > seenCount;
 
   async function loadPlan(internId: string): Promise<Plan | null> {
     try {
@@ -82,9 +92,28 @@ export default function Home() {
     }
   }
 
+  /** Прошлая переписка и неподтверждённые черновики — с сервера (SPEC 9, аудит D7). Сбой — начинаем с чистого чата. */
+  async function restoreChat(who: DemoUser) {
+    const [past, drafts] = await Promise.all([
+      api.history(who.id).then((h) => h.messages).catch(() => []),
+      api.actions(who.id).then((a) => a.actions.filter((x) => x.status === "pending")).catch(() => []),
+    ]);
+    if (useSession.getState().userId !== who.id) return;
+    for (const m of past) {
+      say({
+        id: msgId(), role: m.role, kind: "text", content: m.content, scripted: m.scripted || undefined,
+        sources: m.sources.length ? m.sources : undefined, answerId: m.answer_id ?? undefined,
+      });
+    }
+    for (const draft of [...drafts].reverse()) {
+      say({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик ждёт твоего решения.", draft });
+    }
+  }
+
   async function welcome() {
     const who = actor;
     useChat.getState().reset([]);
+    await restoreChat(who);
     const plan = who.role === "intern" ? await loadPlan(who.id) : null;
     let approvals: AccessRequest[] = [];
     if (who.role === "mentor") {
@@ -96,8 +125,30 @@ export default function Home() {
       return;
     }
     say(greeting(who, plan, approvals));
+    if (plan) await showWeekly(who, plan.current_day);
     await showReminders(who, plan);
   }
+
+  /** Начало новой недели — бот сам присылает итоги прошедшей (SPEC 3.2). Сбой сводки остальному не мешает. */
+  async function showWeekly(who: DemoUser, day: number) {
+    const week = finishedWeek(day);
+    if (week === null) return;
+    try {
+      const [summary, resources] = await Promise.all([
+        api.summary(who.id, who.id, week),
+        api.resources(who.id).then((r) => r.resources).catch(() => []),
+      ]);
+      say(weeklySummaryMsg(summary, Object.fromEntries(resources.map((r) => [r.id, r.title]))));
+    } catch {
+      /* сводка — дополнение к приветствию */
+    }
+  }
+
+  useEffect(() => {
+    const saved = savedUserId();
+    if (saved && saved !== userId && findUser(saved)) setUser(saved); // вернуться под тем же пользователем
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     void welcome();
@@ -147,6 +198,11 @@ export default function Home() {
   }
 
   async function onAction(a: BotAction) {
+    if (a.kind === "nudge") {
+      setTab("chat");
+      say(nudgeMsg(a.requestId, a.itemTitle));
+      return;
+    }
     if (a.kind === "snooze") {
       await api.snooze(actor.id, a.reminderId).catch(() => undefined);
       await refresh();
@@ -173,6 +229,7 @@ export default function Home() {
       await withDemoKey((key) => api.nextDay(actor.id, key));
       await refresh();
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
+      if (plan) await showWeekly(actor, plan.current_day);
       const shown = await showReminders(actor, plan);
       if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Новый день. Зависших пунктов нет." });
     } catch (err) {
@@ -193,13 +250,13 @@ export default function Home() {
 
   return (
     <div className="flex h-dvh flex-col">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-black/10 px-4 py-2.5 dark:border-white/10">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-black/10 px-4 py-2 sm:gap-x-4 sm:gap-y-2 sm:py-2.5 dark:border-white/10">
         <div className="flex items-center gap-2">
           <span className="grid size-8 place-items-center rounded-full bg-[#00aaff] text-sm font-bold text-white">AI</span>
-          <h1 className="text-lg font-semibold">AI-buddy</h1>
+          <h1 className="hidden text-lg font-semibold sm:block">AI-buddy</h1>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-black/55 dark:text-white/55">Войти как</span>
+          <span className="sr-only text-black/55 sm:not-sr-only dark:text-white/55">Войти как</span>
           <select
             value={userId}
             onChange={(e) => setUser(e.target.value)}
@@ -217,7 +274,8 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
           <span className="text-black/45 dark:text-white/45">
-            Демо-панель{scriptedMode ? " · сценарный режим (без ключа модели)" : ""}
+            Демо<span className="hidden sm:inline">-панель</span>
+            {scriptedMode && <span className="hidden sm:inline"> · сценарный режим (без ключа модели)</span>}
           </span>
           <button onClick={nextDay} className="rounded-md bg-black/5 px-2 py-1 hover:bg-black/10 dark:bg-white/10">Следующий день</button>
           <button onClick={reset} className="rounded-md px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10">Сброс</button>
@@ -235,13 +293,33 @@ export default function Home() {
             className={`flex-1 py-2 text-sm font-medium ${tab === t ? "border-b-2 border-[#00aaff]" : "text-black/50 dark:text-white/50"}`}
           >
             {t === "plan" ? "План" : "Чат"}
+            {t === "chat" && unread && tab !== "chat" && (
+              <span aria-label="новые сообщения" className="ml-1.5 inline-block size-2 rounded-full bg-[#00aaff] align-middle" />
+            )}
           </button>
         ))}
       </div>
 
       <main className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className={`min-h-0 overflow-y-auto overscroll-contain border-black/10 md:block md:border-r dark:border-white/10 ${tab === "plan" ? "block" : "hidden"}`}>
-          <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} />
+          {actor.role === "intern" && (
+            <div className="flex gap-1 px-4 pt-4 sm:px-5" role="tablist" aria-label="Левая колонка">
+              {([["plan", "Мой план"], ["profile", "Мой профиль"]] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === v ? "bg-black/5 dark:bg-white/10" : "text-black/55 hover:bg-black/5 dark:text-white/55 dark:hover:bg-white/10"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {actor.role === "intern" && view === "profile"
+            ? <ProfilePanel actor={actor} />
+            : <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} />}
         </div>
         <div className={`min-h-0 md:block ${tab === "chat" ? "block" : "hidden"}`}>
           <ChatPanel actor={actor} onAction={onAction} />

@@ -198,7 +198,7 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
           <dt className="text-black/55 dark:text-white/55">Ресурс</dt><dd>{resource?.title ?? params.resource_id}</dd>
           <dt className="text-black/55 dark:text-white/55">Права</dt><dd>{LEVELS[params.level ?? "read"]} (минимально достаточные)</dd>
           <dt className="text-black/55 dark:text-white/55">Обоснование</dt><dd>{params.justification}</dd>
-          <dt className="text-black/55 dark:text-white/55">Согласует</dt><dd>{approverText(resource, actor)}</dd>
+          <dt className="text-black/55 dark:text-white/55">Согласует</dt><dd>{approverText(resource, actor, params.level ?? "read")}</dd>
         </dl>
       ) : (
         <div>{draft.title}</div>
@@ -212,7 +212,8 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
         </div>
       ) : (
         <div className="mt-2 text-black/55 dark:text-white/55">
-          {draft.status === "done" ? "Подтверждено" : draft.status === "cancelled" ? "Отменено — ничего не отправлено" : "Не выполнено"}
+          {draft.status === "done" ? "Подтверждено" : draft.status === "cancelled" ? "Отменено — ничего не отправлено"
+            : draft.status === "running" ? "Выполняется…" : "Не выполнено"}
         </div>
       )}
     </div>

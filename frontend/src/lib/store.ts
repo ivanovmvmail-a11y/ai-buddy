@@ -8,9 +8,27 @@ type Session = {
   pickIntern: (id: string) => void;
 };
 
+const SAVED_USER = "ai-buddy-user";
+
+/** Кто входил последним — чтобы обновление страницы не выкидывало на Аню (аудит D7). Без хранилища — просто нет. */
+export function savedUserId(): string | null {
+  try {
+    return localStorage.getItem(SAVED_USER);
+  } catch {
+    return null;
+  }
+}
+
 export const useSession = create<Session>((set) => ({
   userId: "intern-anya",
   internPick: null,
-  setUser: (userId) => set({ userId, internPick: null }),
+  setUser: (userId) => {
+    try {
+      localStorage.setItem(SAVED_USER, userId);
+    } catch {
+      /* приватное окно — запомнить не получится, это не ошибка */
+    }
+    set({ userId, internPick: null });
+  },
   pickIntern: (internPick) => set({ internPick }),
 }));

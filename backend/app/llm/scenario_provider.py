@@ -87,6 +87,40 @@ def _units(content: str) -> list[tuple[str, str]]:
     return [(h, u) for h, u in units if "синтетическ" not in u.lower()]
 
 
+CONFLICT_MARK = "Документы расходятся"
+_NUMBERS = {"одн": 1, "дв": 2, "тр": 3, "четыр": 4, "пят": 5}
+_DURATION = re.compile(
+    r"(?<![а-яё])(?:(?:(\d+)|(одн|дв|тр|четыр|пят)[а-яё]*)\s+)?(?:рабоч[а-яё]*\s+)?"
+    r"(день|дн(?:я|ей|и)|час(?:а|ов)?|недел[ьиюяе])(?![а-яё])")
+
+
+def _durations(text: str) -> set[tuple[int, str]]:
+    """Сроки в тексте: «в течение рабочего дня» → (1, день), «двух рабочих дней» → (2, день)."""
+    found = set()
+    for digits, word, unit in _DURATION.findall(text.lower().replace("ё", "е")):
+        n = int(digits) if digits else _NUMBERS.get(word, 1)
+        found.add((n, "день" if unit.startswith(("де", "дн")) else unit[:3]))
+    return found
+
+
+def _conflict(best: tuple[int, str, str], wanted: set[str], need: int, system: str) -> str | None:
+    """SPEC 3.7: два документа отвечают на вопрос разными сроками — не выбираем молча, показываем оба."""
+    mine = _durations(best[2])
+    if not mine:
+        return None
+    for title, content in _docs(system):
+        if title == best[1]:
+            continue
+        for heading, unit in _units(content):
+            other = _durations(unit)
+            if other and other != mine and _overlap(wanted, heading + " " + unit) >= need:
+                return (f"{CONFLICT_MARK}: в них разные сроки.\n\n"
+                        f"• «{best[1]}»: {best[2]}\n• «{title}»: {unit}\n\n"
+                        "Не буду выбирать молча — уточни у наставника, какой вариант действует. "
+                        "Расхождение я отметил: наставник увидит, что документ стоит обновить.")
+    return None
+
+
 def _names_someone(q: str) -> str | None:
     """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
     return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
@@ -174,13 +208,18 @@ class ScenarioProvider:
         # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
         # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
         need = min(2, len(wanted)) or 1
-        best = (0, "", "")
-        for title, content in _docs(system):
+        # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
+        # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
+        best, best_key = (0, "", ""), None
+        for rank, (title, content) in enumerate(_docs(system)):
             for heading, unit in _units(content):
                 score = _overlap(wanted, heading + " " + unit)
-                # при равном совпадении — более содержательный абзац (а не строка глоссария)
-                if (score, len(unit)) > (best[0], len(best[2])):
-                    best = (score, title, unit)
+                definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
+                key = (score, not definition, -rank, len(unit))
+                if best_key is None or key > best_key:
+                    best, best_key = (score, title, unit), key
+        if best[0] >= need and (conflict := _conflict(best, wanted, need, system)):
+            return conflict
         if best[0] >= need:
             fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
             return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
@@ -202,6 +241,9 @@ class ScenarioProvider:
         if result.get("error") == "forbidden":
             return LLMReply(content="У тебя нет доступа к этим данным — подробности не раскрываю. "
                                     "Если они нужны для работы, спроси наставника.")
+        if result.get("error") == "not_found":
+            return LLMReply(content="Такого ресурса нет среди доступных тебе — черновик не готовлю. "
+                                    "Посмотреть, на что можно подать заявку, — спроси «какие доступы можно запросить?».")
         if result.get("error"):
             return LLMReply(content="Сервис сейчас не ответил. Попробуй ещё раз чуть позже.")
         if result.get("status") == "awaiting_confirmation":

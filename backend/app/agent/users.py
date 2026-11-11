@@ -58,8 +58,8 @@ DEFAULT_USER_ID = "intern-anya"
 
 
 def get_user(user_id: str | None) -> User | None:
-    """Текущий пользователь. Пустой id → стажёр по умолчанию (демо), неизвестный id → None."""
-    return DEMO_USERS.get(user_id or DEFAULT_USER_ID)
+    """Текущий пользователь по id из имитации входа. Пустой или неизвестный id → None (401, аудит D8)."""
+    return DEMO_USERS.get(user_id) if user_id else None
 
 
 def has_permission(user: User, permission: str) -> bool:
