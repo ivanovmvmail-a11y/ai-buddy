@@ -36,6 +36,7 @@
 | 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | готово | [#42](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/42) | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен; миграции #39 и #42 применены к Supabase (Claude) |
 | 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | готово | #43 | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
 | 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | на ревью | | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
+| 33 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | | 683 passed / 98,37% с ветвлениями; оба PostgreSQL-флага; /health=200 |
 
 ## Блокеры
 _нет_

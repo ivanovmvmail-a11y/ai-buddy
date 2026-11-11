@@ -5,6 +5,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
+from .mentor_models import MentorQuestion
 from .models import (AccessRequest, AccessResource, ActionDraft, Event, InternState, OnboardingData,
                      PlanItem, Reminder, SkillProfile)
 
@@ -16,6 +17,7 @@ TABLES = (
     ("items", "plan_items", PlanItem, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
+    ("mentor_questions", "mentor_questions", MentorQuestion, "id"),
     ("reminders", "reminders", Reminder, "id"),
 )
 JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload"}

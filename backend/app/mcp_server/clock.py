@@ -50,6 +50,8 @@ def _tick(data: OnboardingData, day: int | None = None, intern_ids: set[str] | N
         created.append(reminder)
         events._record(data, SYSTEM_ACTOR, "reminder_created", {"intern_id": item.intern_id, "reminder_id": reminder.id,
                       "item_id": item.id, "day": current_day})
+    from .mentor_inbox import tick_questions
+    created.extend(tick_questions(data, day, intern_ids))
     return [reminder.model_copy(deep=True) for reminder in created]
 
 
@@ -91,6 +93,9 @@ async def list_reminders(actor: User) -> list[Reminder]:
 
 
 def _reminder_context(data: OnboardingData, reminder: Reminder) -> dict:
+    if reminder.mentor_question_id:
+        question = data.mentor_questions[reminder.mentor_question_id]
+        return {"kind": "mentor_question", "day": data.interns[question.intern_id].current_day}
     item = data.items.get(reminder.plan_item_id)
     request = data.requests.get(reminder.request_id)
     intern_id = item.intern_id if item else (request.intern_id if request else reminder.user_id)

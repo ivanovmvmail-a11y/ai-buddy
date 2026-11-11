@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
 
 from app.agent.users import Role, User
+from .mentor_models import MentorQuestion
 
 Stage = Literal["week1", "week2", "month1", "month2", "after3m"]
 OwnerRole = Literal["intern", "mentor", "lead"]
@@ -111,6 +112,7 @@ class Reminder(Model):
     user_id: str
     plan_item_id: str | None = None
     request_id: str | None = None
+    mentor_question_id: str | None = None
     text: str
     status: Literal["active", "snoozed", "done"] = "active"
     created_day: int = Field(ge=1)
@@ -143,6 +145,7 @@ class ActionDraft(Model):
 
 class OnboardingData(Model):
     interns: dict[str, InternState] = Field(default_factory=dict)
+    mentor_questions: dict[str, MentorQuestion] = Field(default_factory=dict)
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
