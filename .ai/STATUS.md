@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | 1 | Каркас проекта (backend + frontend + правила) | Claude | main (init) | готово | — | стартовый коммит |
 | 2 | Спецификация по ТЗ → docs/SPEC.md | Claude | claude/spec | готово | #14 | интервью проведено 10.11; один глубокий сценарий «Первые недели и чек-лист» + профиль стажёра |
-| 3 | Деплой Vercel + Render + UptimeRobot (бонус к Docker) | Claude + Миша | claude/deploy | todo | | проверить GigaChat с Render |
+| 3 | Деплой Vercel + Render + UptimeRobot (бонус к Docker) | Claude + Миша | claude/deploy | на ревью | | render.yaml + PORT от Render; дальше Миша подключает аккаунты |
 | 4 | Backend FastAPI → Flask + первые тесты | Claude | claude/flask | готово | #7 | по ТЗ: стек Авито Go / Python+Flask |
 | 5 | Docker: запуск одной командой | Claude | claude/docker | готово | #8 | Docker и тесты проверяет CI на GitHub (локально нет SVM в BIOS) |
 | 6 | Инструменты агента: права + черновик→подтверждение [API] | Claude | claude/agent-tools | готово | #9 | |
