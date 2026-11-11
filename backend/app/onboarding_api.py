@@ -16,7 +16,7 @@ from pydantic_core import to_jsonable_python
 
 from app import async_runner
 from app.config import settings
-from app.agent import analytics, service
+from app.agent import analytics, explain, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
 from app.mcp_server import access, checklist, clock, hiring
@@ -175,20 +175,23 @@ def feedback():
     return "", 204
 
 
+class ExplainIn(BaseModel):
+    kind: Literal["explain", "steps", "who"] = "explain"
+
+
 @bp.post("/plan/items/<item_id>/explained")
 def item_explained(item_id: str):
-    """Без модели объяснение пункта собирает интерфейс; записываем его в события, чтобы метрики его видели."""
+    """Без модели: объяснение пункта, «по шагам» или «к кому идти» — из документа пункта и оргструктуры
+    (app/agent/explain.py). Ответ записывается в события, чтобы метрики и оценка его видели."""
     started = time.perf_counter()
-    plan = async_runner.run(checklist.get_plan(g.user, _intern_id()))
-    item = next((i for i in plan.items if i.id == item_id), None)
-    if item is None:
-        raise NotFound()  # чужой и несуществующий пункт неразличимы
+    body = _body(ExplainIn)
+    result = async_runner.run(explain.explain_item(g.user, _intern_id(), item_id, body.kind))  # чужой пункт — 404
     answer_id = analytics.new_answer_id()
     async_runner.run(analytics.record_explained(
-        g.user, answer_id=answer_id, title=item.title, with_source=bool(item.doc_source_id),
+        g.user, answer_id=answer_id, title=result["title"], with_source=result["with_source"],
         latency_ms=round((time.perf_counter() - started) * 1000),
     ))
-    return jsonify(answer_id=answer_id), 201
+    return jsonify(answer_id=answer_id, text=result["text"], source=result["source"], chips=result["chips"]), 201
 
 
 @bp.get("/metrics")

@@ -132,7 +132,13 @@ export const ChatResponse = z.object({
 });
 export type ChatResponse = z.infer<typeof ChatResponse>;
 
-export const ExplainedResponse = z.object({ answer_id: z.string() }); // сценарное объяснение записано в события
+export const DocSource = z.object({ title: z.string(), url: z.string().nullable() });
+export type DocSource = z.infer<typeof DocSource>;
+/** Объяснение пункта без модели: текст из раздела документа пункта (аудит S1, S7); записано в события. */
+export const ExplainedResponse = z.object({
+  answer_id: z.string(), text: z.string(), source: DocSource.nullable(), chips: z.array(z.string()),
+});
+export type ExplainKind = "explain" | "steps" | "who";
 export const Health = z.object({ status: z.string(), llm_provider: z.string() });
 export const InternsResponse = z.object({ interns: z.array(z.object({ id: z.string(), name: z.string(), team: z.string() })) });
 export const RequestsResponse = z.object({ requests: z.array(AccessRequest) });

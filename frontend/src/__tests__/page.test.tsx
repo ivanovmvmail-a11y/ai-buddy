@@ -107,19 +107,24 @@ describe("экран «план + чат» на API", () => {
     expect(await screen.findByText(/Причина: Сначала песочница/)).toBeTruthy();
   });
 
-  it("без ключа объяснение — сценарное, по уровню: Аня новичок в Git, Иван уверенно", async () => {
+  it("без ключа объяснение и подсказки строит сервер по пункту, источник — ссылкой", async () => {
     open();
-    const row = (await screen.findByText("Запросить доступ в пространство команды и изучить его")).closest("li")!;
-    await waitFor(() => expect(within(row).getByText(/здесь помогу подробно/)).toBeTruthy());
+    const title = "Запросить доступ в пространство команды и изучить его";
+    const row = (await screen.findByText(title)).closest("li")!;
+    await waitFor(() => expect(screen.getByText(/сценарный режим/)).toBeTruthy());
     await click(within(row).getByRole("button", { name: "Объяснить" }));
-    expect(await screen.findByText(/только начинается/)).toBeTruthy();
-    expect(screen.getByText(/Источник: 05-platform-sandbox.md/)).toBeTruthy();
-    expect(screen.getByText(/сценарный режим/)).toBeTruthy();
+    expect(await screen.findByText(/^Из документа:/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Первые дни стажёра" }).getAttribute("href")).toBe("https://example.org/doc");
 
-    act(() => login("intern-ivan"));
-    const ivanRow = (await screen.findByText("Запросить доступ в пространство команды и изучить его")).closest("li")!;
-    await click(within(ivanRow).getByRole("button", { name: "Объяснить" }));
-    expect(await screen.findByText(/Ты в этой теме уверенно/)).toBeTruthy();
+    await click(screen.getByRole("button", { name: "Как это сделать по шагам?" }));
+    expect(await screen.findByText(`По шагам: ${title}`)).toBeTruthy();
+    const steps = srv.calls.filter((c) => c.path.includes("/explained")).at(-1)!;
+    expect(steps.body).toEqual({ kind: "steps" });
+    expect(steps.path).toContain("intern_id=intern-anya");
+    // у ответа «по шагам» остаётся только вторая подсказка
+    await click(screen.getAllByRole("button", { name: "К кому идти, если не получается?" }).at(-1)!);
+    expect(await screen.findByText(`К кому идти: ${title}`)).toBeTruthy();
+    expect(srv.calls.some((c) => c.path === "/chat")).toBe(false); // без ключа подсказки не уходят в поиск по всем документам
   });
 
   it("без ключа объяснение записывается в события и его можно оценить", async () => {
@@ -139,6 +144,16 @@ describe("экран «план + чат» на API", () => {
     await click(within(row).getByRole("button", { name: "Объяснить" }));
     expect(await screen.findByText(/Объясни пункт «Завести конспект/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Полезно" })).toBeNull();
+  });
+
+  it("сбой сервера на подсказке — сообщение, без выдуманного ответа", async () => {
+    open();
+    const row = (await screen.findByText("Завести конспект встреч с наставником")).closest("li")!;
+    await waitFor(() => expect(screen.getByText(/сценарный режим/)).toBeTruthy());
+    await click(within(row).getByRole("button", { name: "Объяснить" }));
+    srv.explainFails = true;
+    await click(await screen.findByRole("button", { name: "Как это сделать по шагам?" }));
+    expect(await screen.findByText("Не получилось связаться с сервером.")).toBeTruthy();
   });
 
   it("с моделью объяснение уходит вопросом в /chat", async () => {
@@ -306,10 +321,11 @@ describe("экран «план + чат» на API", () => {
     await click(screen.getByRole("button", { name: "Повторить" }));
     expect(await screen.findByText("Подготовил черновик")).toBeTruthy();
     expect(screen.getByText("Черновик действия")).toBeTruthy();
-    expect(screen.getByText(/Источник: Первые дни/)).toBeTruthy();
+    expect(screen.getByText("Первые дни")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Первые дни" })).toBeNull(); // без адреса — без ссылки
   });
 
-  it("ошибка модели показывает текст сервера; подсказка-вопрос уходит в чат", async () => {
+  it("ошибка модели показывает текст сервера; подсказка без ключа отвечает по пункту", async () => {
     srv.chatReplies = ["502"];
     open();
     await screen.findByText(/2-й день стажировки/);
@@ -320,6 +336,6 @@ describe("экран «план + чат» на API", () => {
     const row = (await screen.findByText("Завести конспект встреч с наставником")).closest("li")!;
     await click(within(row).getByRole("button", { name: "Объяснить" }));
     await click(await screen.findByRole("button", { name: "К кому идти, если не получается?" }));
-    expect(await screen.findByText("Ответ модели")).toBeTruthy();
+    expect(await screen.findByText("К кому идти: Завести конспект встреч с наставником")).toBeTruthy();
   });
 });

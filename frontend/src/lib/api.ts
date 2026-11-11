@@ -1,5 +1,6 @@
 // Клиент к backend. Контракт — docs/API.md. Каждый ответ проверяется схемой Zod (lib/types.ts).
 import type { z } from "zod";
+import type { ExplainKind } from "./types";
 import {
   AccessRequest, Action, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
   Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile, WeeklySummary,
@@ -61,8 +62,8 @@ export const api = {
   plan: (u: string, internId?: string) => request(`/plan${q(internId)}`, Plan, u),
   setStatus: (u: string, itemId: string, status: "done" | "in_progress", reason?: string) =>
     request(`/plan/items/${encodeURIComponent(itemId)}/status`, PlanItem, u, post({ status, reason })),
-  explained: (u: string, itemId: string, internId?: string) =>
-    request(`/plan/items/${encodeURIComponent(itemId)}/explained${q(internId)}`, ExplainedResponse, u, post()),
+  explained: (u: string, itemId: string, internId?: string, kind: ExplainKind = "explain") =>
+    request(`/plan/items/${encodeURIComponent(itemId)}/explained${q(internId)}`, ExplainedResponse, u, post({ kind })),
   summary: (u: string, internId: string, week: number) =>
     request(`/plan/summary?intern_id=${encodeURIComponent(internId)}&week=${week}`, WeeklySummary, u),
   resources: (u: string) => request("/access/resources", ResourcesResponse, u),

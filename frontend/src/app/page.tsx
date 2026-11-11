@@ -7,11 +7,12 @@ import { PlanPanel } from "@/components/PlanPanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  accessDraftParams, explainQuestion, explainScripted, greeting, msgId, reminderMsg, useChat, type BotAction,
+  accessDraftParams, actionFor, explainScripted, followupQuestion, followupsFor, greeting, msgId, reminderMsg, useChat,
+  type BotAction, type Msg,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { useSession } from "@/lib/store";
-import type { AccessRequest, DemoUser, Plan, PlanItem, Reminder } from "@/lib/types";
+import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
 
 const DEMO_KEY_STORAGE = "ai-buddy-demo-key";
@@ -104,16 +105,34 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  async function onExplain(item: PlanItem) {
+  const ASKED: Record<ExplainKind, (item: PlanItem) => string> = {
+    explain: (item) => `Объясни пункт «${item.title}»`,
+    steps: () => "Как это сделать по шагам?",
+    who: () => "К кому идти, если не получается?",
+  };
+
+  async function onExplain(item: PlanItem, kind: ExplainKind = "explain") {
     setTab("chat");
-    if (!scriptedMode) return askBot(actor, explainQuestion(item));
-    const profile = await client
-      .fetchQuery({ queryKey: keys.profile(actor.id, item.intern_id), queryFn: () => api.profile(actor.id, item.intern_id) })
-      .catch(() => undefined);
-    // Записываем объяснение в события (метрики, «полезно / не полезно»); сбой записи объяснению не мешает.
-    const recorded = await api.explained(actor.id, item.id, item.intern_id).catch(() => undefined);
-    say({ id: msgId(), role: "user", kind: "text", content: `Объясни пункт «${item.title}»` },
-      { ...explainScripted(item, profile), answerId: recorded?.answer_id });
+    if (!scriptedMode) return askBot(actor, followupQuestion(item, kind));
+    const asked: Msg = { id: msgId(), role: "user", kind: "text", content: ASKED[kind](item) };
+    try {
+      // Без модели ответ строит сервер по документу пункта и записывает в события (метрики, «полезно»).
+      const res = await api.explained(actor.id, item.id, item.intern_id, kind);
+      say(asked, {
+        id: msgId(), role: "assistant", kind: "text", scripted: true, content: res.text, answerId: res.answer_id,
+        sources: res.source ? [res.source] : undefined, followups: followupsFor(item, res.chips),
+        actions: kind === "explain" && item.resource_id && item.status !== "done" && item.status !== "waiting" ? [actionFor(item)] : undefined,
+      });
+    } catch {
+      if (kind !== "explain") {
+        say(asked, { id: msgId(), role: "assistant", kind: "error", content: "Не получилось связаться с сервером." });
+        return;
+      }
+      const profile = await client
+        .fetchQuery({ queryKey: keys.profile(actor.id, item.intern_id), queryFn: () => api.profile(actor.id, item.intern_id) })
+        .catch(() => undefined);
+      say(asked, explainScripted(item, profile));
+    }
   }
 
   async function onDo(item: PlanItem) {
@@ -138,7 +157,7 @@ export default function Home() {
     const item = plan?.items.find((i) => i.id === a.itemId);
     if (!item) return;
     if (a.kind === "do") await onDo(item);
-    else await onExplain(item);
+    else await onExplain(item, a.kind);
   }
 
   /** Из колокольчика: показать напоминание в чате с кнопками действия. */

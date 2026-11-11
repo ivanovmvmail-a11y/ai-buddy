@@ -37,8 +37,9 @@
 | 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | готово | #43 | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
 | 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | готово | #44 | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
 | 33 | Аудит 11.11, B2: маршрут проверки в README (шаги, кнопки), версии, порты, структура | Claude | claude/readme-expert-route | готово | #47 | шаги сверены в браузере без ключа |
-| 34 | Аудит 11.11: D3 журнал сервера (LOG_LEVEL), D5 статусы спецификаций, очередь S2–S4 для Codex в HANDOFF | Claude | claude/audit-hardening | на ревью | | 426 passed |
-| 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | на ревью | | backend 428, frontend 49 / 98% |
+| 34 | Аудит 11.11: D3 журнал сервера (LOG_LEVEL), D5 статусы спецификаций, очередь S2–S4 для Codex в HANDOFF | Claude | claude/audit-hardening | готово | #48 | 426 passed |
+| 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | готово | #49 | backend 428, frontend 49 / 98% |
+| 36 | [API] Аудит S1+S7: без ключа объяснение, «по шагам», «к кому идти» — сервер по документу пункта; фразы «спасибо», «кто наставник», «что у Ани зависло» | Claude | claude/scenario-answers | на ревью | | backend 452, frontend 51 / 98%, золотой 37/37 |
 
 ## Блокеры
 _нет_

@@ -4,10 +4,12 @@
 import { create } from "zustand";
 import { findUser } from "./users";
 import { waitedFor } from "./plan-logic";
-import type { AccessRequest, AccessResource, Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, SkillProfile } from "./types";
+import type {
+  AccessRequest, AccessResource, Action, DemoUser, DocSource, ExplainKind, Plan, PlanItem, Reminder, SkillLevel, SkillProfile,
+} from "./types";
 
 export type BotAction =
-  | { label: string; kind: "do" | "explain"; itemId: string; internId: string }
+  | { label: string; kind: "do" | "explain" | "steps" | "who"; itemId: string; internId: string }
   | { label: string; kind: "snooze"; reminderId: string };
 
 export type Msg = {
@@ -15,9 +17,10 @@ export type Msg = {
   role: "user" | "assistant";
   kind: "text" | "draft" | "error";
   content: string;
-  sources?: string[];
+  sources?: DocSource[];
   chips?: string[];
   actions?: BotAction[];
+  followups?: BotAction[]; // подсказки, привязанные к пункту плана («по шагам», «к кому идти»)
   draft?: Action;
   retry?: string; // текст вопроса для «Повторить»
   answerId?: string; // ответ модели можно оценить (спека 302)
@@ -96,7 +99,7 @@ export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
 }
 
 const DEPTH: Record<SkillLevel, string> = {
-  novice: "Разберём по шагам — эта тема у тебя только начинается, это нормально.",
+  novice: "Разберём подробно, с примерами.",
   familiar: "Коротко по шагам:",
   confident: "Ты в этой теме уверенно, поэтому коротко:",
 };
@@ -104,7 +107,26 @@ const DEPTH: Record<SkillLevel, string> = {
 export const explainQuestion = (item: PlanItem) =>
   `Объясни пункт плана «${item.title}» (id ${item.id}): зачем он нужен, как его выполнить и к кому идти.`;
 
-/** Сценарный ответ без модели: глубина по карте навыков (SPEC 3.4, 4). */
+export const FOLLOWUP_KIND: Record<string, ExplainKind> = {
+  "Как это сделать по шагам?": "steps",
+  "К кому идти, если не получается?": "who",
+};
+
+/** Подсказки сервера → кнопки, которые помнят пункт: без модели ответ строится по документу этого пункта. */
+export function followupsFor(item: PlanItem, chips: string[]): BotAction[] {
+  return chips
+    .filter((c) => c in FOLLOWUP_KIND)
+    .map((label) => ({ label, kind: FOLLOWUP_KIND[label] as "steps" | "who", itemId: item.id, internId: item.intern_id }));
+}
+
+/** Вопрос модели по подсказке — с названием пункта, чтобы поиск не потерял контекст. */
+export function followupQuestion(item: PlanItem, kind: ExplainKind): string {
+  if (kind === "steps") return `Как выполнить пункт плана «${item.title}» по шагам?`;
+  if (kind === "who") return `К кому идти, если не получается пункт плана «${item.title}»?`;
+  return explainQuestion(item);
+}
+
+/** Запасной сценарный ответ, если сервер объяснений не ответил: глубина по карте навыков (SPEC 3.4, 4). */
 export function explainScripted(item: PlanItem, profile: SkillProfile | undefined): Msg {
   const level = item.topic ? profile?.skills[item.topic] : undefined;
   const parts = [`«${item.title}» — ${item.summary}`];
@@ -113,12 +135,12 @@ export function explainScripted(item: PlanItem, profile: SkillProfile | undefine
     parts.push("1. Открой связанный документ команды и прочитай раздел про этот шаг.\n2. Сделай по нему одно действие и запиши, что получилось.\n3. Если застрял больше чем на 30 минут — спроси наставника, вопрос я помогу сформулировать.");
   } else if (level) {
     // Ссылку обещаем, только если у пункта есть документ, — иначе предлагаем разобрать по шагам.
-    parts.push(item.doc_source_id ? "Детали — в документе по ссылке ниже." : "Если нужно подробнее — спроси «Как это сделать по шагам?».");
+    parts.push(item.doc_source_id ? "Детали — в документе, он указан в источнике ниже." : "Если нужно подробнее — спроси «Как это сделать по шагам?».");
   }
   if (item.practice) parts.push(`Задание на практике: ${item.practice}`);
   return scripted(parts.join("\n\n"), {
-    sources: item.doc_source_id ? [item.doc_source_id.replace("demo:", "")] : undefined,
-    chips: ["Как это сделать по шагам?", "К кому идти, если не получается?"],
+    sources: item.doc_source_id ? [{ title: item.doc_source_id.replace("demo:", ""), url: null }] : undefined,
+    followups: followupsFor(item, ["Как это сделать по шагам?", "К кому идти, если не получается?"]),
     actions: item.resource_id && item.status !== "done" && item.status !== "waiting" ? [actionFor(item)] : undefined,
   });
 }

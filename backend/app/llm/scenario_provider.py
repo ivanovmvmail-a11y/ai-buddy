@@ -22,6 +22,10 @@ NEXT_WORDS = ("дальше", "следующ", "что мне делать", "�
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
 REQUEST_WORDS = ("мои", "статус", "какие", "ждут", "список", "покажи")
 GREETINGS = ("привет", "здравствуй", "добрый день", "хай", "hello")
+THANKS = re.compile(r"(спасибо|благодарю|спс|понятно|понял[а]?|ясно|ок|окей|отлично|супер)"
+                    r"(\s+(тебе|большое|огромное|всё|все))*[\s!.,)]*")
+STUCK_WORDS = ("завис", "жд", "просроч", "как дела", "как у", "прогресс", "успева", "застрял")
+LEVEL_WORDS = ("мой уровень", "уровень по", "какой у меня уровень", "что я знаю", "мои навыки", "карта навыков")
 STOP = {"который", "когда", "почему", "сделать", "нужно", "можно", "такой", "этого", "через", "после", "чтобы",
         "только", "какой", "какие", "какая", "мне", "меня", "есть", "надо", "подскажи", "пожалуйста", "расскажи",
         "такое", "такая", "такие", "этот", "этом", "where", "what"}
@@ -83,6 +87,11 @@ def _units(content: str) -> list[tuple[str, str]]:
     return [(h, u) for h, u in units if "синтетическ" not in u.lower()]
 
 
+def _names_someone(q: str) -> str | None:
+    """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
+    return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
+
+
 def _role(system: str) -> str:
     match = re.search(r"роль: (\w+)", system)
     return match.group(1) if match else "intern"
@@ -124,12 +133,26 @@ class ScenarioProvider:
         def call(name: str, args: dict[str, Any] | None = None) -> LLMReply:
             return LLMReply(tool_calls=[ToolCall(id=f"scn_{name}", name=name, arguments=args or {})])
 
+        if THANKS.fullmatch(q):
+            return LLMReply(content="Пожалуйста! Если появится вопрос — спрашивай. Следующий шаг всегда виден в плане слева.")
+        if "наставник" in q and any(w in q for w in ("кто", "мой", "моего", "как зовут", "связат", "написать")):
+            mentor = re.search(r"Наставник: ([^.]+)\.", system)
+            if mentor:
+                return LLMReply(content=(
+                    f"Твой наставник — {mentor.group(1)}. К нему — вопросы по задачам и всё, что блокирует работу; "
+                    "если работа встала, пиши сразу, ждать встречи 1:1 не нужно."))
+        if any(w in q for w in LEVEL_WORDS):
+            levels = re.search(r"Уровень по темам: (.+?)\.(\s|$)", system)
+            if levels:
+                return LLMReply(content=(
+                    f"По профилю: {levels.group(1)}. Уровень ставит наставник; я использую его только чтобы "
+                    "объяснять подробнее или короче, а не для оценки."))
         if any(w in q for w in ORG_WORDS):
             return LLMReply(content=(
                 f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
                 f"вопросы не отвечает. Черновик сообщения, можно скопировать:\n\n«Здравствуйте! {question} "
                 "Подскажите, пожалуйста, как это оформить.»"))
-        if "план" in q and "get_plan" in available:
+        if ("план" in q or any(w in q for w in STUCK_WORDS)) and "get_plan" in available:
             for intern_id, forms in NAMES.items():
                 if any(re.search(rf"\b{f}", q) for f in forms):
                     return call("get_plan", {"intern_id": intern_id})
@@ -185,14 +208,16 @@ class ScenarioProvider:
             return LLMReply(content=f"Подготовил черновик: {result.get('summary')}. Проверь и нажми «Подтвердить» — "
                                     "без этого ничего не отправится.")
         handler = {
-            "get_plan": self._plan,
+            "get_plan": lambda r: self._plan(r, own=not _names_someone(question.lower())),
             "list_access_resources": lambda r: self._pick_resource(r, question, available),
             "list_access_requests": self._requests,
         }.get(msg.name or "")
         return handler(result) if handler else LLMReply(content="Готово, данные сервиса получены.")
 
-    def _plan(self, plan: dict) -> LLMReply:
-        lines = [f"Сейчас {plan.get('current_day')}-й день стажировки."]
+    def _plan(self, plan: dict, own: bool = True) -> LLMReply:
+        day = plan.get("current_day")
+        first = _name(plan.get("intern_id")).split()[0]
+        lines = [f"Сейчас {day}-й день стажировки." if own else f"{first}: {day}-й день стажировки."]
         step = plan.get("next_step")
         if step:
             late = " Срок уже прошёл — лучше заняться им первым." if step.get("overdue") else ""
@@ -200,6 +225,13 @@ class ScenarioProvider:
         for item in plan.get("waiting") or []:
             lines.append(f"Ждём ответа ({_name(item.get('waiting_for'))}): «{item['title']}», "
                          f"{_days(item.get('waiting_days') or 0)}.")
+        shown = {step.get("id") if step else None} | {w.get("id") for w in plan.get("waiting") or []}
+        overdue = [i for i in plan.get("items") or [] if i.get("overdue") and i.get("id") not in shown
+                   and i.get("status") != "waiting"]
+        for item in overdue:
+            lines.append(f"Срок прошёл: «{item['title']}» (до дня {item.get('due_day')}).")
+        if not own and not plan.get("waiting") and not overdue and not (step and step.get("overdue")):
+            lines.append("Зависших пунктов нет.")
         if not step and not plan.get("waiting"):
             lines.append("Свои пункты недель 1–2 закрыты — дальше «Месяц 1».")
         return LLMReply(content="\n".join(lines))
