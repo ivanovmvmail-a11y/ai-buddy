@@ -16,9 +16,9 @@ PETR = DEMO_USERS["mentor-petr"]
 def test_ac1_working_items_and_inert_outlines(store):
     plan = run(checklist.get_plan(ANYA, ANYA.id))
     working = [item for item in plan.items if item.stage in {"week1", "week2"}]
-    assert len(working) == 10
+    assert len([item for item in working if item.kind == "common"]) == 10
     assert plan.current_day == 2
-    assert plan.ladder[0].total == 10 and plan.ladder[0].done == 1
+    assert plan.ladder[0].total == 12 and plan.ladder[0].done == 1
     assert plan.next_step.item.id == "anya.w1.access-base"
     assert [stage.title for stage in plan.ladder] == ["Недели 1–2", "Месяц 1", "Месяц 2", "После 3 месяцев"]
     assert [stage.state for stage in plan.ladder] == ["current", "ahead", "ahead", "ahead"]
@@ -33,8 +33,8 @@ def test_ac1_working_items_and_inert_outlines(store):
 def test_ac2_common_skeleton_and_team_items(store):
     anya = run(checklist.get_plan(ANYA, ANYA.id))
     ivan = run(checklist.get_plan(IVAN, IVAN.id))
-    a = {item.id.split(".", 1)[1]: item for item in anya.items}
-    b = {item.id.split(".", 1)[1]: item for item in ivan.items}
+    a = {item.id.split(".", 1)[1]: item for item in anya.items if item.kind == "common"}
+    b = {item.id.split(".", 1)[1]: item for item in ivan.items if item.kind == "common"}
     assert a.keys() == b.keys()
     differing = {key for key in a if a[key].title != b[key].title}
     assert differing == {"w1.team-space", "w1.sandbox", "w2.docs"}
@@ -63,7 +63,7 @@ def test_ac4_only_waiting_means_no_own_step(store, edit):
     plan = run(checklist.get_plan(ANYA, ANYA.id))
     assert plan.next_step.item is None
     assert plan.next_step.waiting and all(item.waiting_for == PETR.id for item in plan.next_step.waiting)
-    assert all(item.waiting_days == 1 for item in plan.next_step.waiting)
+    assert all(item.waiting_days == (1 if item.kind == "common" else 0) for item in plan.next_step.waiting)
 
 
 def test_ac5_status_survives_service_calls_in_same_store(store, snapshot):
@@ -134,7 +134,7 @@ def test_ac10_ladder_progress_and_remaining_count(store, edit):
 def test_ac11_advance_and_reset_restore_initial_states(store, snapshot):
     initial = snapshot()
     run(checklist.set_item_status(ANYA, "anya.w1.notes", "done"))
-    assert run(clock.advance_day(ANYA)) == {ANYA.id: 3, IVAN.id: 9}
+    assert run(clock.advance_day(ANYA)) == {id: state.current_day + 1 for id, state in initial.interns.items()}
     assert run(clock.advance_day(ANYA, ANYA.id)) == {ANYA.id: 4}
     plan = run(checklist.get_plan(ANYA, ANYA.id))
     assert next(item for item in plan.items if item.id == "anya.w1.access-base").overdue

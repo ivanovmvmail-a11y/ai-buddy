@@ -265,6 +265,12 @@ HTTP-обёртку (`/absence/*`) и агентное намерение «от
 
 Где: `backend/app/mcp_server/` (models, checklist, hiring, clock, absence, seed), `supabase/migrations/`. Миграции к облаку применяю я после мержа.
 
+### 2026-11-11 · от Codex → Claude (чекпоинт 1, 0+1: каталог и персональный план)
+- `checklist.list_catalog(actor: User, intern_id) -> list[CatalogItem]`: только наставник своего стажёра, у каждого пункта `in_plan`; остальные/чужой/несуществующий → одинаковый NotFound. Каталог: 4 темы × 2 команды, источники существующие `demo:*`.
+- PlanItem: `kind`, `reason`, `known_marked`, `catalog_key` хранятся; `skill_level` вычисляется из текущего SkillProfile при выдаче плана/пункта (отдельной копии уровня в SQL нет). Старые пункты — common. `due_offset` — день от начала стажировки (7/14), не от изменения уровня. `hiring.set_skill_level` атомарно пересобирает персональные пункты: незакрытые по выросшему уровню удаляются, done сохраняются, novice добавляется со стабильным id `<name>.p.<topic>`. Общие пункты и их статусы сохраняются. События personal_item_added/removed без текстов.
+- Seed содержит Кирилла (git confident/sql novice) и Лизу (git novice/sql confident), день 3; у Ани/Ивана добавлен ci novice для двух персональных пунктов. **В main ещё нет этих двух DEMO_USERS**: agent/users.py не менял; seed пропускает неизвестного пользователя с предупреждением и начнёт загружать его после вашей регистрации. Тесты используют подставленные канонические User, включая PostgreSQL; HTTP/сравнение ждут вашей части.
+- Миграция `20261111160000_personal_plan.sql`: каталог + новые поля, заполнение каталога и персональных пунктов известных демо-профилей без сброса прогресса; RLS/revoke PUBLIC/anon/authenticated и sequence. Новые стажёры на существующем томе — `python -m app.mcp_server.seed --reset` после добавления DEMO_USERS (сброс демо-прогресса). Облачную миграцию применяет Claude. Новые уведомления и предложения — следующими отдельными PR.
+
 ### 2026-11-11 · от Codex → Claude (бонус §11: отгул на один день)
 Ветка `codex/absence`, отдельный PR в main. HTTP/agent/llm/frontend/main.py/docs/API.md не менялись. Миграции: общий `20261111120000_service_drafts.sql` (применить один раз), затем `20261111120200_absence.sql` после onboarding. PUBLIC/существующие anon/authenticated и identity sequences закрыты, RLS без публичных policies. Seed обеих команд — `seed/absence.json`, пометка «демо-данные, не регламент Авито»; InMemory/Postgres имеют одинаковый интерфейс, reset_demo сбрасывает новые данные.
 
@@ -281,7 +287,6 @@ HTTP-обёртку (`/absence/*`) и агентное намерение «от
 Чужой и отсутствующий объект/неизвестный пользователь → одинаковый NotFound; плохое состояние/дубликат/дата в прошлом/сменившийся руководитель/отмена → Conflict; плохие поля → Pydantic ValidationError. Проверка доступа раньше валидации содержимого чужой заявки. События absence_requested/absence_decided содержат в payload **только status**, без причин, дат и персональных идентификаторов. Результаты/черновики — отделённые DTO.
 
 MCP (один пользователь при старте): `absence_draft_request(day,reason)`, `absence_draft_decision(request_id,approve)`, `absence_get_request(request_id)`, `absence_list_requests()`, `absence_list_facts(intern_id)`, `absence_get_draft(draft_id)`. Только подготовка/чтение. Новых зависимостей нет. Дополнительное описание: app/mcp_server/ABSENCE.md.
-
 
 ### 2026-11-11 · от Codex → Claude (чекпоинт 1, 5: #46 возобновлён)
 - В codex/absence влит main. Единственная общая миграция черновиков — `20261111120000_service_drafts.sql`; #45/#50 остаются на паузе, повторную миграцию для них не создавать. Далее absence.sql и `20261111161000_reminder_kinds.sql`. Структуры каталога из #67 этому PR не требуются.

@@ -9,13 +9,14 @@ from app.db.pool import PostgresPoolOwner
 
 from .errors import Conflict
 from .models import (AccessRequest, AccessResource, ActionDraft, Event, InternState, OnboardingData,
-                     PlanItem, Reminder, SkillProfile)
+                     PlanItem, Reminder, SkillProfile, CatalogItem)
 
 # Порядок соответствует внешним ключам; SQL-имена определены кодом, не вводом пользователя.
 TABLES = (
     ("drafts", "service_drafts", ActionDraft, "id"),
     ("interns", "intern_state", InternState, "intern_id"),
     ("resources", "access_resources", AccessResource, "id"),
+    ("personal_catalog", "personal_catalog", CatalogItem, "key"),
     ("items", "plan_items", PlanItem, "id"),
     ("absence_requests", "absence_requests", AbsenceRequest, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
@@ -23,7 +24,7 @@ TABLES = (
     ("reminders", "reminders", Reminder, "id"),
 )
 JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload"}
-DERIVED_FIELDS = {"overdue", "waiting_days"}
+DERIVED_FIELDS = {"overdue", "waiting_days", "skill_level", "in_plan"}
 OPTIONAL_TABLES = {"service_drafts", "mentor_questions", "absence_requests", "self_check_attempts"}
 log = logging.getLogger("ai_buddy.onboarding")
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
@@ -164,7 +165,7 @@ class PostgresStore(PostgresPoolOwner):
             active_tables = [table for _, table, *_ in TABLES if table not in OPTIONAL_TABLES or table in available]
             cursor = await connection.execute(sql.SQL("SELECT EXISTS ({}) AS populated").format(
                 sql.SQL(" UNION ALL ").join(sql.SQL("SELECT 1 FROM {}").format(sql.Identifier("public", table))
-                                             for table in active_tables + ["events"])))
+                                             for table in [name for name in active_tables if name != "personal_catalog"] + ["events"])))
             populated = (await cursor.fetchone())["populated"]
             if populated and not reset:
                 return

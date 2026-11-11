@@ -1,5 +1,6 @@
 """Единственный синтетический корпус для обеих будущих реализаций хранилища."""
 import json
+import logging
 from pathlib import Path
 
 from ..absence_models import AbsenceRequest
@@ -9,7 +10,7 @@ from app.agent.users import DEMO_USERS, User
 from .. import checklist, events, storage
 from .._domain import known_actor, owner_id, timestamp
 from .._system import SYSTEM_ACTOR
-from ..models import AccessRequest, AccessResource, InternState, OnboardingData, PlanItem, SkillProfile
+from ..models import CatalogItem, AccessRequest, AccessResource, InternState, OnboardingData, PlanItem, SkillProfile
 
 SEED_PATH = Path(__file__).with_name("onboarding.json")
 
@@ -17,6 +18,9 @@ SEED_PATH = Path(__file__).with_name("onboarding.json")
 def load_seed() -> OnboardingData:
     source = json.loads(SEED_PATH.read_text(encoding="utf-8"))
     data = OnboardingData()
+    for entry in source["personal_catalog"]:
+        item = CatalogItem.model_validate(entry)
+        data.personal_catalog[item.key] = item
     for resource in source["resources"]:
         model = AccessResource.model_validate({"fields": source["request_fields"], **resource})
         data.resources[model.id] = model
@@ -25,7 +29,10 @@ def load_seed() -> OnboardingData:
         request = AbsenceRequest(**entry, lead_id=user.lead_id, team=user.team)
         data.absence_requests[request.id] = request
     for entry in source["interns"]:
-        user = DEMO_USERS[entry["id"]]
+        user = DEMO_USERS.get(entry["id"])
+        if user is None:
+            logging.getLogger(__name__).warning("Seed: пользователь %s ещё не добавлен в DEMO_USERS; пропущен", entry["id"])
+            continue
         state = InternState(intern_id=user.id, start_date=entry["start_date"], current_day=entry["current_day"])
         data.interns[user.id] = state
         prefix = user.id.removeprefix("intern-")
@@ -41,6 +48,7 @@ def load_seed() -> OnboardingData:
             intern_id=user.id, skills=entry["skills"], strengths=entry["strengths"], growth=entry["growth"],
             updated_at=timestamp(data, user.id, 1),
         )
+        checklist._rebuild_personal(data, user, user.id)
     for entry in source["requests"]:
         user = DEMO_USERS[entry["intern_id"]]
         item = next((item for item in data.items.values()
