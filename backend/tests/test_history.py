@@ -31,7 +31,8 @@ def test_scripted_explanation_is_saved(client):
     user_msg, bot_msg = get_history(client)
     assert user_msg["content"] == "Как это сделать по шагам?"
     assert bot_msg["content"].startswith("По шагам") and bot_msg["scripted"] is True
-    assert bot_msg["sources"][0]["title"] == "Платформа объявлений — учебный стенд"
+    assert bot_msg["sources"][0]["title"] == "Платформа объявлений — как поднять песочницу"
+    assert bot_msg["sources"][0]["url"].endswith("17-platform-sandbox-setup.md")
 
 
 def test_limit_and_reset(client):
