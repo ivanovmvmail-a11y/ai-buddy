@@ -32,7 +32,7 @@
 
 | 25 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | на ревью | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
 
-| 28 | Закрыть пул PostgreSQL в RAG CLI | Codex | codex/rag-cli-close | на ревью | | --rag-postgres: 425 passed / 94,26%; успех/ошибки закрывают пул |
+| 28 | Закрыть пул PostgreSQL в RAG CLI | Codex | codex/rag-cli-close | на ревью | [#40](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/40) | --rag-postgres: 425 passed / 94,26%; успех/ошибки закрывают пул |
 
 ## Блокеры
 _нет_
