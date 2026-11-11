@@ -27,14 +27,14 @@ async function request<S extends z.ZodTypeAny>(
   path: string,
   schema: S,
   userId: string,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; headers?: Record<string, string> },
 ): Promise<z.infer<S>> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: init?.method ?? "GET",
       // X-User-Id — имитация входа, в Авито заменяется SSO (docs/API.md)
-      headers: { "Content-Type": "application/json", "X-User-Id": userId },
+      headers: { "Content-Type": "application/json", "X-User-Id": userId, ...init?.headers },
       body: init?.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch {
@@ -46,6 +46,10 @@ async function request<S extends z.ZodTypeAny>(
   if (!parsed.success) throw new ApiError("Сервер ответил в неожиданном формате.", res.status);
   return parsed.data;
 }
+
+/** Код-слово демо-кнопок на публичном сайте (docs/API.md). Кириллицу браузер в заголовке не пропустит — кодируем. */
+export const DEMO_KEY_REQUIRED = "Нужно код-слово демо";
+const demoKey = (key?: string): Record<string, string> => (key ? { "X-Demo-Key": encodeURIComponent(key) } : {});
 
 const q = (internId?: string) => (internId ? `?intern_id=${encodeURIComponent(internId)}` : "");
 const post = (body: unknown = {}) => ({ method: "POST", body });
@@ -88,6 +92,6 @@ export const api = {
     if (!res.ok) throw new ApiError(`Ошибка сервера: ${res.status}`, res.status);
   },
   metrics: (u: string, internId?: string) => request(`/metrics${q(internId)}`, Metrics, u),
-  nextDay: (u: string) => request("/demo/next-day", DaysResponse, u, post()),
-  reset: (u: string) => request("/demo/reset", ResetResponse, u, post()),
+  nextDay: (u: string, key?: string) => request("/demo/next-day", DaysResponse, u, { ...post(), headers: demoKey(key) }),
+  reset: (u: string, key?: string) => request("/demo/reset", ResetResponse, u, { ...post(), headers: demoKey(key) }),
 };

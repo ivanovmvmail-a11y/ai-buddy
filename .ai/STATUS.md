@@ -35,7 +35,8 @@
 | 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | готово | [#41](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/41) | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
 | 30 | Grafana: закрыть public-представления для API-ролей Supabase | Codex | codex/grafana-view-permissions | готово | [#42](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/42) | Default grants anon/authenticated закрыты; 634 passed / 98,15%; Docker проверен; миграции #39 и #42 применены к Supabase (Claude) |
 | 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | готово | #43 | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
-| 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | на ревью | | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
+| 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | готово | #44 | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
+| 35 | [API] Аудит D6: код-слово для демо-кнопок на публичном сайте (DEMO_KEY) | Claude | claude/demo-key | на ревью | | backend 428, frontend 49 / 98% |
 
 ## Блокеры
 _нет_

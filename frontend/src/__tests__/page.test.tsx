@@ -221,6 +221,31 @@ describe("экран «план + чат» на API", () => {
     expect(await screen.findByText(/2-й день стажировки/)).toBeTruthy();
   });
 
+  it("код-слово демо-кнопок: спрашивает один раз, запоминает, сообщает об ошибке", async () => {
+    srv.demoKey = "маяк";
+    sessionStorage.clear();
+    const prompt = vi.spyOn(window, "prompt");
+    open();
+    await screen.findByText(/2-й день стажировки/);
+
+    prompt.mockReturnValueOnce(null);
+    await click(screen.getByRole("button", { name: "Следующий день" }));
+    expect(await screen.findByText("Без код-слова демо-кнопки на этом сайте не работают.")).toBeTruthy();
+
+    prompt.mockReturnValueOnce("не то");
+    await click(screen.getByRole("button", { name: "Следующий день" }));
+    expect(await screen.findByText("Код-слово не подошло.")).toBeTruthy();
+    expect(srv.state.days["intern-anya"]).toBe(2);
+
+    prompt.mockReturnValueOnce(" маяк ");
+    await click(screen.getByRole("button", { name: "Следующий день" }));
+    await waitFor(() => expect(srv.state.days["intern-anya"]).toBe(3));
+    await click(screen.getByRole("button", { name: "Сброс" }));
+    expect(await screen.findByText(/2-й день стажировки/)).toBeTruthy();
+    expect(prompt).toHaveBeenCalledTimes(3); // после верного код-слова больше не спрашивает
+    prompt.mockRestore();
+  });
+
   it("сбой демо-панели — сообщение", async () => {
     open();
     await screen.findByText(/2-й день стажировки/);
