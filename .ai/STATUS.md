@@ -56,7 +56,7 @@
 
 | 50 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 
-| 52 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | — | 828 passed / 97,85%; зависит от #67; решение только наставником |
+| 52 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | 828 passed / 97,85%; зависит от #67; решение только наставником |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
