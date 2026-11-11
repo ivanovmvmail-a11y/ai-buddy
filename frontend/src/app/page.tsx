@@ -4,13 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { askBot, ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
+import { ReminderBell } from "@/components/ReminderBell";
 import { api } from "@/lib/api";
 import {
   accessDraftParams, explainQuestion, explainScripted, greeting, msgId, reminderMsg, useChat, type BotAction,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { useSession } from "@/lib/store";
-import type { AccessRequest, DemoUser, Plan, PlanItem } from "@/lib/types";
+import type { AccessRequest, DemoUser, Plan, PlanItem, Reminder } from "@/lib/types";
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
 
 export default function Home() {
@@ -93,6 +94,7 @@ export default function Home() {
   async function onAction(a: BotAction) {
     if (a.kind === "snooze") {
       await api.snooze(actor.id, a.reminderId).catch(() => undefined);
+      await refresh();
       say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Хорошо, напомню завтра." });
       return;
     }
@@ -101,6 +103,13 @@ export default function Home() {
     if (!item) return;
     if (a.kind === "do") await onDo(item);
     else await onExplain(item);
+  }
+
+  /** Из колокольчика: показать напоминание в чате с кнопками действия. */
+  async function openReminder(r: Reminder) {
+    setTab("chat");
+    const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
+    say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));
   }
 
   async function nextDay() {
@@ -148,7 +157,10 @@ export default function Home() {
             ))}
           </select>
         </label>
-        <div className="ml-auto flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
+        <div className="ml-auto">
+          <ReminderBell actor={actor} onOpen={openReminder} />
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
           <span className="text-black/45 dark:text-white/45">
             Демо-панель{scriptedMode ? " · сценарный режим (без ключа модели)" : ""}
           </span>

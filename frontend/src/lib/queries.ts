@@ -56,6 +56,14 @@ export const useResources = (actor: DemoUser) =>
     staleTime: 60_000,
   });
 
+/** Активные напоминания текущего пользователя — для колокольчика (спека 301). */
+export const useReminders = (actor: DemoUser) =>
+  useQuery({
+    queryKey: keys.reminders(actor.id),
+    queryFn: async () => (await api.reminders(actor.id)).reminders,
+    enabled: actor.role !== "hrbp",
+  });
+
 export const useSummary = (actor: DemoUser, internId: string, week: number, enabled: boolean) =>
   useQuery({
     queryKey: keys.summary(actor.id, internId, week),
