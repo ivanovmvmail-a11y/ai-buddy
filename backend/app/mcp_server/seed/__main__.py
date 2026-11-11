@@ -5,8 +5,8 @@ from app.agent.users import DEFAULT_USER_ID, DEMO_USERS
 from app.async_runner import run
 from psycopg.errors import UndefinedTable
 
-from . import load_seed
-from .. import events, storage
+from . import _reset_store, load_seed
+from .. import storage
 
 
 def main(argv=None):
@@ -27,11 +27,17 @@ def main(argv=None):
     async def seed_store():
         try:
             seed = load_seed()
+            await store.initialize(seed)
             if args.reset:
-                events._record(seed, DEMO_USERS[DEFAULT_USER_ID], "demo_reset", {})
-            await store.initialize(seed, reset=args.reset)
+                await _reset_store(DEMO_USERS[DEFAULT_USER_ID], store)
         finally:
-            await store.close()
+            try:
+                await store.close()
+            finally:
+                from app import rag
+                service = rag.cached_service()
+                if service is not None:
+                    await service.store.close()
 
     try:
         run(seed_store())

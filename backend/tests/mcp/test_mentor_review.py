@@ -143,3 +143,19 @@ def test_question_and_draft_rls_even_with_explicit_select(store):
         finally:
             connection.execute(sql.SQL('DROP OWNED BY {}').format(sql.Identifier(reader)))
             connection.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(reader)))
+
+def test_seed_cli_reset_cleans_published_answers(store,capsys):
+    from app.mcp_server.seed.__main__ import main
+    q=answer(send(),True)
+    main(['--reset'])
+    assert 'seed reset' in capsys.readouterr().out
+    assert q.source_id not in rag.get_memory_service().store.documents
+    with pytest.raises(NotFound): run(inbox.get_question('intern-anya',q.id))
+
+
+def test_seed_cli_closes_existing_rag_owner(store,monkeypatch):
+    from app.mcp_server.seed.__main__ import main
+    publication=SimpleNamespace(store=SimpleNamespace(close=AsyncMock()))
+    monkeypatch.setattr(rag,'cached_service',lambda:publication)
+    main([])
+    publication.store.close.assert_awaited_once()

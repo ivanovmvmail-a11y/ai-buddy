@@ -60,9 +60,13 @@ def load_seed() -> OnboardingData:
 
 
 async def reset_demo(actor: User) -> None:
+    await _reset_store(actor, storage.get_store())
+
+
+async def _reset_store(actor: User, store) -> None:
     known_actor(actor)
-    seed = load_seed()
-    async with storage.get_store().transaction() as data:
+    seed = await store.seed_for_schema(load_seed())
+    async with store.transaction() as data:
         sources = [q.source_id for q in data.mentor_questions.values() if q.source_id]
         if sources:
             from app import rag
