@@ -18,6 +18,8 @@ from .users import User
 log = logging.getLogger("ai_buddy.agent")
 
 MAX_TOOL_STEPS = 5
+# Сколько фрагментов документов класть в контекст. Документов ~20: при 4 нужный абзац иногда вытесняли соседние темы.
+RAG_TOP_K = 6
 STEP_LIMIT_REPLY = "Не получилось довести запрос до конца. Попробуй переформулировать или спроси наставника."
 
 
@@ -87,7 +89,7 @@ class Agent:
 
     async def answer(self, history: list[Message], user: User) -> AgentResult:
         question = next((m.content for m in reversed(history) if m.role == "user"), "")
-        docs = await retrieve(question, user)
+        docs = await retrieve(question, user, k=RAG_TOP_K)
 
         system = SYSTEM_PROMPT + user_context(user.name, user.role.value, user.team) + await plan_context(user)
         if docs:
