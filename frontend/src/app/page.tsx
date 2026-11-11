@@ -9,7 +9,7 @@ import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
   accessDraftParams, actionFor, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, msgId, reminderMsg,
-  useChat, weeklySummaryMsg,
+  nudgeMsg, useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
@@ -63,6 +63,13 @@ export default function Home() {
   const [demoError, setDemoError] = useState<string | null>(null);
 
   const say = useChat((s) => s.push);
+  // Телефон: бот написал, пока открыт план, — точка на вкладке «Чат» (аудит, мелочи)
+  const messageCount = useChat((s) => s.messages.length);
+  const [seenCount, setSeenCount] = useState(0);
+  useEffect(() => {
+    if (tab === "chat") setSeenCount(messageCount);
+  }, [tab, messageCount]);
+  const unread = messageCount > seenCount;
 
   async function loadPlan(internId: string): Promise<Plan | null> {
     try {
@@ -191,6 +198,11 @@ export default function Home() {
   }
 
   async function onAction(a: BotAction) {
+    if (a.kind === "nudge") {
+      setTab("chat");
+      say(nudgeMsg(a.requestId, a.itemTitle));
+      return;
+    }
     if (a.kind === "snooze") {
       await api.snooze(actor.id, a.reminderId).catch(() => undefined);
       await refresh();
@@ -238,13 +250,13 @@ export default function Home() {
 
   return (
     <div className="flex h-dvh flex-col">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-black/10 px-4 py-2.5 dark:border-white/10">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-black/10 px-4 py-2 sm:gap-x-4 sm:gap-y-2 sm:py-2.5 dark:border-white/10">
         <div className="flex items-center gap-2">
           <span className="grid size-8 place-items-center rounded-full bg-[#00aaff] text-sm font-bold text-white">AI</span>
-          <h1 className="text-lg font-semibold">AI-buddy</h1>
+          <h1 className="hidden text-lg font-semibold sm:block">AI-buddy</h1>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-black/55 dark:text-white/55">Войти как</span>
+          <span className="sr-only text-black/55 sm:not-sr-only dark:text-white/55">Войти как</span>
           <select
             value={userId}
             onChange={(e) => setUser(e.target.value)}
@@ -262,7 +274,8 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
           <span className="text-black/45 dark:text-white/45">
-            Демо-панель{scriptedMode ? " · сценарный режим (без ключа модели)" : ""}
+            Демо<span className="hidden sm:inline">-панель</span>
+            {scriptedMode && <span className="hidden sm:inline"> · сценарный режим (без ключа модели)</span>}
           </span>
           <button onClick={nextDay} className="rounded-md bg-black/5 px-2 py-1 hover:bg-black/10 dark:bg-white/10">Следующий день</button>
           <button onClick={reset} className="rounded-md px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10">Сброс</button>
@@ -280,6 +293,9 @@ export default function Home() {
             className={`flex-1 py-2 text-sm font-medium ${tab === t ? "border-b-2 border-[#00aaff]" : "text-black/50 dark:text-white/50"}`}
           >
             {t === "plan" ? "План" : "Чат"}
+            {t === "chat" && unread && tab !== "chat" && (
+              <span aria-label="новые сообщения" className="ml-1.5 inline-block size-2 rounded-full bg-[#00aaff] align-middle" />
+            )}
           </button>
         ))}
       </div>

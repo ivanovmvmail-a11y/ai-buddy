@@ -60,7 +60,9 @@ function reminders(s: DemoState, actor: DemoUser): Reminder[] {
     const id = `rem.${item.id}`;
     if (s.dismissedReminders.includes(id)) return [];
     return [{
-      id, user_id: actor.id, plan_item_id: item.id, request_id: null, status: "active" as const,
+      id, user_id: actor.id, plan_item_id: item.id, status: "active" as const,
+      request_id: waitingLong
+        ? s.requests.find((r) => r.plan_item_id === item.id && r.status === "pending_approval")?.id ?? null : null,
       text: waitingLong ? `Заявка «${item.title}» ждёт. Напомнить наставнику?` : `У пункта «${item.title}» прошёл срок.`,
       created_day: s.days[actor.id], snooze_until_day: null,
     }];

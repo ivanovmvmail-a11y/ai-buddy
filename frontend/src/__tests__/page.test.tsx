@@ -192,6 +192,22 @@ describe("экран «план + чат» на API", () => {
     expect(srv.calls.some((c) => c.path.endsWith("/snooze"))).toBe(true);
   });
 
+  it("зависшая заявка: «Написать наставнику» — готовый текст для копирования, бот сам не отправляет", async () => {
+    open("intern-ivan");
+    const reminder = (await screen.findByText(/ждёт. Напомнить наставнику/)).parentElement!;
+    await click(within(reminder).getByRole("button", { name: "Написать наставнику" }));
+    expect(await screen.findByText(/получится посмотреть мою заявку REQ-\d+ \(пункт плана «/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Скопировать/ }).length).toBeGreaterThan(0);
+  });
+
+  it("телефон: точка «новое» на вкладке «Чат», пока открыт план", async () => {
+    open();
+    await screen.findByText(/2-й день стажировки/);
+    expect(screen.getByLabelText("новые сообщения")).toBeTruthy();
+    await click(screen.getByRole("tab", { name: /Чат/ }));
+    expect(screen.queryByLabelText("новые сообщения")).toBeNull();
+  });
+
   it("колокольчик (спека 301): число, «Открыть в чате», «Готово» убирает напоминание", async () => {
     open("intern-ivan");
     const bell = await screen.findByRole("button", { name: /Напоминания: \d/ });
