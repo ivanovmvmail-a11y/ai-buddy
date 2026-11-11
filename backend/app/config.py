@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
 
+    # Журнал сервера: DEBUG | INFO | WARNING. INFO — видно права, черновики и вызовы инструментов (без текстов вопросов).
+    log_level: str = "INFO"
+
     # CORS: адреса фронтенда через запятую
     frontend_origins: str = "http://localhost:3000"
 
