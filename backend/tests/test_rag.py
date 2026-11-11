@@ -200,7 +200,8 @@ def test_retrieval_failure_logs_and_chat_still_answers(client, service, monkeypa
     elif stage == "storage":
         monkeypatch.setattr(service.store, "search", failed)
     assert run(rag.retrieve("question", DEMO_USERS["intern-ivan"])) == []
-    response = client.post("/chat", json={"messages": [{"role": "user", "content": "question"}]})
+    response = client.post("/chat", json={"messages": [{"role": "user", "content": "question"}]},
+                           headers={"X-User-Id": "intern-anya"})
     assert response.status_code == 200
     body = response.get_json()
     assert "question" in body["reply"] and body["sources"] == []

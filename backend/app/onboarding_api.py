@@ -12,11 +12,12 @@ from urllib.parse import unquote
 from typing import Literal
 
 from flask import Blueprint, g, jsonify, request
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, StrictBool, ValidationError
 from pydantic_core import to_jsonable_python
 
 from app import async_runner
 from app.config import settings
+from app.http_body import json_body
 from app.agent import analytics, explain, history, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
@@ -34,7 +35,7 @@ def _json(model) -> dict:
 
 
 def _body(model: type[BaseModel]) -> BaseModel:
-    return model.model_validate(request.get_json(silent=True) or {})
+    return model.model_validate(json_body())
 
 
 def _intern_id() -> str:
@@ -112,7 +113,7 @@ def requests_list():
 
 
 class DecideIn(BaseModel):
-    approve: bool
+    approve: StrictBool  # «yes», 1 и т. п. согласием не считаются
     reason: str | None = None
 
 

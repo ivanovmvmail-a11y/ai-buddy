@@ -5,7 +5,7 @@ from typing import Literal
 
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from app import async_runner
 from app.agent import analytics, service
@@ -13,6 +13,7 @@ from app.agent import history as chat_history
 from app.agent.actions import Action
 from app.agent.users import get_user
 from app.config import settings
+from app.http_body import BadBody, json_body
 from app.llm import Message
 from app.onboarding_api import bp as onboarding_bp
 
@@ -21,13 +22,17 @@ SCRIPTED_PROVIDERS = ("scenario", "echo")
 log = logging.getLogger("ai_buddy.api")
 
 
+MAX_MESSAGE_CHARS = 4000  # длиннее вопрос стажёра не бывает; защита от 200-КБ сообщений (аудит D8)
+MAX_HISTORY = 40
+
+
 class ChatMessageIn(BaseModel):
     role: Literal["system", "user", "assistant"]
-    content: str
+    content: str = Field(max_length=MAX_MESSAGE_CHARS)
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessageIn]
+    messages: list[ChatMessageIn] = Field(min_length=1, max_length=MAX_HISTORY)
 
 
 class Source(BaseModel):
@@ -59,6 +64,7 @@ def configure_logging(level: str) -> None:
 def create_app() -> Flask:
     configure_logging(settings.log_level)
     app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = 512 * 1024
     app.json.ensure_ascii = False  # кириллица в ответах как есть, без \uXXXX
 
     origins = [o.strip() for o in settings.frontend_origins.split(",") if o.strip()]
@@ -69,11 +75,31 @@ def create_app() -> Flask:
         # ИМИТАЦИЯ авторизации: в Авито пользователь берётся из корпоративного SSO.
         if request.endpoint in (None, "health") or request.method == "OPTIONS":
             return None
-        user = get_user(request.headers.get(USER_HEADER))
+        user_id = request.headers.get(USER_HEADER)
+        if not user_id:
+            return jsonify(detail=f"Не указан пользователь: заголовок {USER_HEADER} (имитация входа, в Авито — SSO)"), 401
+        user = get_user(user_id)
         if user is None:
             return jsonify(detail="Неизвестный пользователь"), 401
         g.user = user
         return None
+
+    @app.errorhandler(BadBody)
+    def bad_body(exc: BadBody):
+        return jsonify(detail=str(exc)), 400
+
+    # Ошибки самого Flask — тоже JSON, а не HTML-страница (аудит, мелочи)
+    @app.errorhandler(404)
+    def no_route(exc):
+        return jsonify(detail="Нет такого адреса"), 404
+
+    @app.errorhandler(405)
+    def wrong_method(exc):
+        return jsonify(detail="Этот метод здесь не поддерживается"), 405
+
+    @app.errorhandler(413)
+    def too_large(exc):
+        return jsonify(detail="Слишком большой запрос"), 413
 
     @app.errorhandler(service.ActionError)
     def action_error(exc: service.ActionError):
@@ -90,9 +116,12 @@ def create_app() -> Flask:
     @app.post("/chat")
     def chat():
         try:
-            req = ChatRequest.model_validate(request.get_json(silent=True) or {})
+            req = ChatRequest.model_validate(json_body())
         except ValidationError as exc:
-            return jsonify(detail=exc.errors(include_url=False, include_context=False)), 422
+            return jsonify(detail=exc.errors(include_url=False, include_context=False, include_input=False)), 422
+        last = req.messages[-1]
+        if last.role != "user" or not last.content.strip():
+            return jsonify(detail="Пустое сообщение"), 422
 
         # системные сообщения от клиента не принимаем — системный промпт задаёт только сервер
         history = [Message(role=m.role, content=m.content) for m in req.messages if m.role != "system"]

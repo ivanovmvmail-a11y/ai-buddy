@@ -241,6 +241,9 @@ class ScenarioProvider:
         if result.get("error") == "forbidden":
             return LLMReply(content="У тебя нет доступа к этим данным — подробности не раскрываю. "
                                     "Если они нужны для работы, спроси наставника.")
+        if result.get("error") == "not_found":
+            return LLMReply(content="Такого ресурса нет среди доступных тебе — черновик не готовлю. "
+                                    "Посмотреть, на что можно подать заявку, — спроси «какие доступы можно запросить?».")
         if result.get("error"):
             return LLMReply(content="Сервис сейчас не ответил. Попробуй ещё раз чуть позже.")
         if result.get("status") == "awaiting_confirmation":
