@@ -80,6 +80,8 @@ export type FakeServer = {
   feedback: Array<{ answer_id: string; useful: boolean }>;
   explainFails?: boolean;
   summaryFails?: boolean;
+  /** GET /chat/history по пользователю (сервер хранит переписку, SPEC 9). */
+  history: Record<string, Array<Record<string, unknown>>>;
   metrics: Record<string, unknown> | null;
   /** Код-слово демо-кнопок, как DEMO_KEY на сервере; не задано — кнопки открыты. */
   demoKey?: string;
@@ -87,7 +89,7 @@ export type FakeServer = {
 
 export function installFakeServer(): FakeServer {
   const srv: FakeServer = {
-    state: initialState(), actions: [], provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null,
+    state: initialState(), actions: [], history: {}, provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null,
   };
   let reqN = 1003;
   let actN = 1;
@@ -155,6 +157,8 @@ export function installFakeServer(): FakeServer {
       if (item) { item.status = body.approve ? "done" : "in_progress"; item.status_reason = body.approve ? null : String(body.reason); }
       return ok(req);
     }
+    if (p === "/chat/history") return ok({ messages: srv.history[actor.id] ?? [] });
+    if (p === "/actions" && method === "GET") return ok({ actions: srv.actions.filter((a) => a.user_id === actor.id) });
     if (p === "/actions" && method === "POST") {
       if (actor.role !== "intern") return err(403, "Нет прав на это действие");
       const params = body.params as Record<string, unknown>;

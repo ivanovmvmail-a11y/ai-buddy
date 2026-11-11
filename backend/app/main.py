@@ -9,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from app import async_runner
 from app.agent import analytics, service
+from app.agent import history as chat_history
 from app.agent.actions import Action
 from app.agent.users import get_user
 from app.config import settings
@@ -16,6 +17,7 @@ from app.llm import Message
 from app.onboarding_api import bp as onboarding_bp
 
 USER_HEADER = "X-User-Id"
+SCRIPTED_PROVIDERS = ("scenario", "echo")
 log = logging.getLogger("ai_buddy.api")
 
 
@@ -108,12 +110,25 @@ def create_app() -> Flask:
             tools=result.tools, refused=result.refused, drafts=len(result.actions),
             latency_ms=round((time.perf_counter() - started) * 1000),
         ))
+        try:
+            async_runner.run(chat_history.record_turn(
+                g.user.id, question, result.reply, sources=result.sources, answer_id=answer_id,
+                scripted=settings.llm_provider in SCRIPTED_PROVIDERS))
+        except Exception:  # история — удобство, ответ важнее
+            log.exception("chat history not saved user=%s", g.user.id)
         return ChatResponse(
             answer_id=answer_id,
             reply=result.reply,
             sources=[Source(**s) for s in result.sources],
             actions=result.actions,
         ).model_dump(mode="json")
+
+    @app.get("/chat/history")
+    def get_chat_history():
+        """Своя переписка, старые сверху (SPEC 9). Чужую историю получить нельзя: пользователь — из заголовка."""
+        limit = min(request.args.get("limit", type=int) or chat_history.HISTORY_LIMIT, chat_history.HISTORY_LIMIT)
+        items = async_runner.run(chat_history.history.list(g.user.id, limit))
+        return {"messages": [e.model_dump(mode="json", exclude={"user_id"}) for e in items]}
 
     @app.get("/actions")
     def list_actions():

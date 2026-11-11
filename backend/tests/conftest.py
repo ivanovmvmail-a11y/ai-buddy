@@ -43,6 +43,8 @@ def agent(monkeypatch):
     """Свежий агент (пустое хранилище действий) на каждый тест."""
     fresh = service.build_agent()
     monkeypatch.setattr(service, "agent", fresh)
+    from app.agent import history
+    monkeypatch.setattr(history, "history", history.InMemoryHistoryStore())  # и пустая переписка
     return fresh
 
 
