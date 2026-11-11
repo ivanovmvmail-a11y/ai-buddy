@@ -2,9 +2,8 @@
 from contextlib import asynccontextmanager
 
 from psycopg import sql
-from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
-from psycopg_pool import AsyncConnectionPool
+from app.db.pool import PostgresPoolOwner
 
 from .models import (AccessRequest, AccessResource, Event, InternState, OnboardingData,
                      PlanItem, Reminder, SkillProfile)
@@ -27,27 +26,7 @@ def _dump(model):
     return model.model_dump(mode="json", exclude=DERIVED_FIELDS)
 
 
-class PostgresStore:
-    def __init__(self, database_url: str):
-        if not database_url:
-            raise ValueError("DATABASE_URL is required")
-        self.database_url = database_url
-        self._pool = None
-
-    async def _get_pool(self):
-        if self._pool is None:
-            self._pool = AsyncConnectionPool(
-                self.database_url, open=False, min_size=1, max_size=8, timeout=5,
-                kwargs={"connect_timeout": 5, "row_factory": dict_row},
-            )
-        await self._pool.open()
-        return self._pool
-
-    async def close(self):
-        if self._pool is not None:
-            await self._pool.close()
-            self._pool = None
-
+class PostgresStore(PostgresPoolOwner):
     async def _load(self, connection, *, include_events):
         data = OnboardingData()
         for field, table, model, key in TABLES:
