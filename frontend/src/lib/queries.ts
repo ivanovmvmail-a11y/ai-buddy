@@ -12,6 +12,7 @@ export const keys = {
   resources: (u: string) => ["resources", u] as const,
   profile: (u: string, intern: string) => ["profile", u, intern] as const,
   reminders: (u: string) => ["reminders", u] as const,
+  summary: (u: string, intern: string, week: number) => ["summary", u, intern, week] as const,
 };
 
 const PLAN_ROLES = new Set(["intern", "mentor", "lead", "curator"]);
@@ -54,11 +55,18 @@ export const useResources = (actor: DemoUser) =>
     staleTime: 60_000,
   });
 
+export const useSummary = (actor: DemoUser, internId: string, week: number, enabled: boolean) =>
+  useQuery({
+    queryKey: keys.summary(actor.id, internId, week),
+    queryFn: () => api.summary(actor.id, internId, week),
+    enabled,
+  });
+
 /** После любого изменения на сервере обновляем всё, что могло измениться. */
 export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile"].map((k) => client.invalidateQueries({ queryKey: [k] })),
+      ["plan", "requests", "reminders", "profile", "summary"].map((k) => client.invalidateQueries({ queryKey: [k] })),
     );
 }

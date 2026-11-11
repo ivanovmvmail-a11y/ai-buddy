@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { canMarkDone, canRequestAccess, isWorking, STAGE_TITLES, waitedFor } from "@/lib/plan-logic";
 import { useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/store";
+import { InternCards } from "./InternCards";
 import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
@@ -58,6 +59,10 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
 
   return (
     <div className="space-y-5 p-4 sm:p-5">
+      {actor.role !== "intern" && <InternCards actor={actor} />}
+
+      {actor.role === "mentor" && <Approvals actor={actor} />}
+
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">{actor.id === p.intern_id ? "Мой план" : `План: ${intern?.name}`}</h2>
@@ -78,8 +83,6 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
           </select>
         )}
       </div>
-
-      {actor.role === "mentor" && <Approvals actor={actor} />}
 
       <Ladder ladder={p.ladder} />
 
@@ -162,7 +165,7 @@ function PlanRow({
       {working && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
           <span className={`rounded-full px-2 py-0.5 ${st.cls}`}>{st.label}</span>
-          {item.overdue && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-orange-800 dark:text-orange-300">срок прошёл</span>}
+          {item.overdue && item.status !== "waiting" && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-orange-800 dark:text-orange-300">срок прошёл</span>}
           <span className="text-black/50 dark:text-white/50">
             {OWNER[item.owner_role]}
             {item.due_day ? ` · до дня ${item.due_day}` : ""}

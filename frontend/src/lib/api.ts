@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import {
   AccessRequest, Action, ChatResponse, DaysResponse, Health, InternsResponse, Plan, PlanItem,
-  Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillProfile,
+  Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillProfile, WeeklySummary,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -57,6 +57,8 @@ export const api = {
   plan: (u: string, internId?: string) => request(`/plan${q(internId)}`, Plan, u),
   setStatus: (u: string, itemId: string, status: "done" | "in_progress", reason?: string) =>
     request(`/plan/items/${encodeURIComponent(itemId)}/status`, PlanItem, u, post({ status, reason })),
+  summary: (u: string, internId: string, week: number) =>
+    request(`/plan/summary?intern_id=${encodeURIComponent(internId)}&week=${week}`, WeeklySummary, u),
   resources: (u: string) => request("/access/resources", ResourcesResponse, u),
   requests: (u: string, internId?: string) => request(`/access/requests${q(internId)}`, RequestsResponse, u),
   decide: (u: string, requestId: string, approve: boolean, reason?: string) =>

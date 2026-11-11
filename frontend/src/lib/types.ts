@@ -138,3 +138,13 @@ export const ResourcesResponse = z.object({ resources: z.array(AccessResource) }
 export const RemindersResponse = z.object({ reminders: z.array(Reminder) });
 export const DaysResponse = z.object({ days: z.record(z.string(), z.number()) });
 export const ResetResponse = z.object({ status: z.string() });
+
+// GET /plan/summary — «Итоги недели» (SPEC 3.2): только факты из событий, без оценок.
+export const WeeklySummary = z.object({
+  intern_id: z.string(),
+  week: z.number(),
+  closed: z.array(z.object({ item_id: z.string(), title: z.string(), day: z.number() })),
+  access_granted: z.array(z.object({ request_id: z.string(), resource_id: z.string(), day: z.number() })),
+  carry_over: z.array(PlanItem),
+});
+export type WeeklySummary = z.infer<typeof WeeklySummary>;

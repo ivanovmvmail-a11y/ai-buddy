@@ -20,6 +20,7 @@
 | 14 | 101-T4a [API]: HTTP онбординга + инструменты агента поверх имитаций сервисов | Claude | claude/api-onboarding | готово | #19 | 318 тестов, покрытие 99%; проверено вживую с GigaChat |
 | 15 | 101-T4b: интерфейс на API (TanStack Query, Zod) + resource_title в заявках [API] | Claude | claude/frontend-api | готово | #20 | 28 тестов Vitest на поддельном сервере, покрытие 99%; проверено вживую |
 | 16 | Спека 003: сценарный режим без ключа (LLM_PROVIDER=scenario по умолчанию) | Claude | claude/scenario-mode | на ревью | | 337 тестов backend; проверено на демо-документах |
+| 17 | Спека 201: экран наставника — карточки стажёров, что зависло, итоги недели | Claude | claude/mentor-screen | на ревью | | ветка от claude/scenario-mode (#22); 34 теста Vitest |
 
 ## Блокеры
 _нет_
