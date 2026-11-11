@@ -376,3 +376,20 @@ def test_cli_closes_store_on_same_loop_after_success_or_failure(service, monkeyp
         return asyncio.get_running_loop()
     assert closed == [run(loop())]
     assert all(item is closed[0] for item in embedded)
+
+
+@pytest.mark.parametrize("user_id", DEMO_USERS)
+def test_howto_queries_never_return_another_team_even_with_exact_foreign_text(demo, user_id):
+    user = DEMO_USERS[user_id]
+    documents = [document for document, _ in demo.store.documents.values()]
+    allowed = {document.title for document in documents if document.team in (None, user.team)}
+    new_documents = [document for document in documents
+                     if int(document.source_id.split(":", 1)[1].split("-", 1)[0]) >= 11]
+    assert len(new_documents) == 9
+    for document in new_documents:
+        hits = run(demo.retrieve(document.content, user, k=100))
+        assert {hit["title"] for hit in hits} == allowed
+        if document.team is not None and document.team != user.team:
+            top = run(demo.retrieve(document.content, user, k=1))
+            assert top and top[0]["title"] in allowed
+            assert document.title not in {hit["title"] for hit in top}

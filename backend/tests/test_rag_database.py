@@ -17,7 +17,7 @@ import pytest
 from app import async_runner
 from app.agent.users import DEMO_USERS
 from app.rag.embeddings import DeterministicEmbedder
-from app.rag.ingest import ingest_directory
+from app.rag.ingest import DEMO_DOCS, ingest_directory, read_document
 from app.rag.postgres import PostgresDocumentStore
 from app.rag.service import RAGService
 
@@ -39,7 +39,7 @@ def test_cli_process_exits_without_pending_pool_workers(postgres_cluster, schema
             result = subprocess.run([sys.executable, "-m", "app.rag.ingest"],
                 cwd=Path(__file__).resolve().parents[1], env=environment, capture_output=True, text=True, timeout=30)
             assert result.returncode == (0 if schema_exists else 1), result.stderr
-            assert ("Loaded 10 documents" in result.stdout) == schema_exists
+            assert ("Loaded 19 documents" in result.stdout) == schema_exists
             assert "Task was destroyed" not in result.stderr
             assert "AsyncConnectionPool.worker" not in result.stderr
         finally:
@@ -123,26 +123,40 @@ def test_migration_privileges_and_pooled_team_isolation(postgres_cluster, api_ro
 
             owner_store = PostgresDocumentStore(make_conninfo(**params, dbname=database_name))
             service = RAGService(DeterministicEmbedder(), owner_store)
-            assert async_runner.run(ingest_directory(service)) == (10, 10)
+            assert async_runner.run(ingest_directory(service)) == (19, 19)
             pool = owner_store._pool
-            assert async_runner.run(ingest_directory(service)) == (10, 10)
+            assert async_runner.run(ingest_directory(service)) == (19, 19)
             for user in DEMO_USERS.values():
                 hits = async_runner.run(service.retrieve("Лиловый конструктор", user, 100))
-                assert len(hits) == (7 if user.team in {"Авито Доставка", "Платформа объявлений"} else 4)
+                assert len(hits) == (13 if user.team in {"Авито Доставка", "Платформа объявлений"} else 7)
                 assert all(not hit["title"].startswith(team) or team == user.team
                            for team in ("Авито Доставка", "Платформа объявлений") for hit in hits)
+            # Новые how-to хранятся с тем же source_id и scope после повторного CLI/ingest.
+            documents = [read_document(path, f"demo:{path.name}") for path in DEMO_DOCS.glob("*.md")]
+            for user in DEMO_USERS.values():
+                allowed = {doc.title for doc in documents if doc.team in (None, user.team)}
+                for doc in documents:
+                    hits = async_runner.run(service.retrieve(doc.content, user, 100))
+                    assert {hit["title"] for hit in hits} == allowed
+                    if doc.team is not None and doc.team != user.team:
+                        assert doc.title not in {hit["title"] for hit in hits}
+                        top = async_runner.run(service.retrieve(doc.content, user, 1))
+                        assert top and top[0]["title"] in allowed
+            with psycopg.connect(**params, dbname=database_name) as owner:
+                assert owner.execute("SELECT count(*) FROM public.rag_documents").fetchone() == (19,)
+                assert owner.execute("SELECT count(*) FROM public.rag_chunks").fetchone() == (19,)
             assert owner_store._pool is pool
             reader_params = {**params, "user": reader, "password": "reader-test-only", "dbname": database_name}
             reader_store = PostgresDocumentStore(make_conninfo(**reader_params))
             reader_service = RAGService(DeterministicEmbedder(), reader_store)
-            assert len(async_runner.run(reader_service.retrieve("Лиловый конструктор", DEMO_USERS["intern-ivan"], 100))) == 7
+            assert len(async_runner.run(reader_service.retrieve("Лиловый конструктор", DEMO_USERS["intern-ivan"], 100))) == 13
 
             async def check_returned_connection():
                 async with (await reader_store._get_pool()).connection() as connection:
                     cursor = await connection.execute("SELECT count(*) AS count FROM public.rag_documents")
-                    assert (await cursor.fetchone())["count"] == 4
+                    assert (await cursor.fetchone())["count"] == 7
                     cursor = await connection.execute("SELECT count(*) AS count FROM public.rag_chunks")
-                    assert (await cursor.fetchone())["count"] == 4
+                    assert (await cursor.fetchone())["count"] == 7
 
             async_runner.run(check_returned_connection())
         finally:
