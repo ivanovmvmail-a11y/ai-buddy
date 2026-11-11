@@ -157,13 +157,13 @@ def test_grafana_views_revoke_supabase_default_grants_and_keep_datasource(onboar
         [('2026-11-01T04:00:00+00:00',2)]),
 ])
 def test_daily_buckets_follow_dashboard_timezone_including_midnight_and_dst(metrics_database,zone,timestamps,expected):
-    dashboard=json.loads(DASHBOARD.read_text())
+    dashboard=json.loads(DASHBOARD.read_text(encoding="utf-8"))
     assert dashboard['time']=={'from':'now-30d','to':'now'} and dashboard['timezone']=='browser'
     panel=next(p for p in dashboard['panels'] if p['title']=='Вопросы по дням')
     query=panel['targets'][0]['rawSql'].replace('${__timezone}',zone).replace('$__timeFilter(ts)','true')
     with psycopg.connect(**metrics_database,autocommit=True) as connection:
-        connection.execute(MIGRATION.read_text())
-        connection.execute(METRICS.read_text())
+        connection.execute(MIGRATION.read_text(encoding="utf-8"))
+        connection.execute(METRICS.read_text(encoding="utf-8"))
         connection.execute('SET TIME ZONE UTC')
         for ts in timestamps:
             connection.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (%s,'system','system','system','question_answered',%s)",
@@ -180,7 +180,7 @@ def test_new_event_with_virtual_future_day_is_visible_in_current_time_window(met
     from app.mcp_server.seed import load_seed
     from psycopg.conninfo import make_conninfo
     with psycopg.connect(**metrics_database,autocommit=True) as connection:
-        connection.execute(MIGRATION.read_text());connection.execute(METRICS.read_text())
+        connection.execute(MIGRATION.read_text(encoding="utf-8"));connection.execute(METRICS.read_text(encoding="utf-8"))
     store=PostgresStore(make_conninfo(**metrics_database))
     monkeypatch.setattr(storage,'get_store',lambda:store)
     try:

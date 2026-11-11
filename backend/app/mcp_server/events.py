@@ -9,6 +9,10 @@ from .models import Actor, Event, OnboardingData
 
 def _record(data: OnboardingData, actor: Actor, type: str, payload: dict) -> Event:
     """Только из уже авторизованной бизнес-транзакции, не пользовательский инструмент."""
+    intern_id = payload.get("intern_id", actor.id)
+    if intern_id in data.interns:
+        payload = {**payload}
+        payload.setdefault("day", data.interns[intern_id].current_day)
     event = Event(
         ts=datetime.now(timezone.utc),
         user_id=actor.id, role=actor.role, team=actor.team, type=type, payload=payload,
