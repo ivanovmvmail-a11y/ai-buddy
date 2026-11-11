@@ -10,7 +10,7 @@
 ```
 
 ## 2026-11-11 — Бонус: отгул на один день (codex/absence)
-- Обязательный цикл: main/pull (6a6784a), STATUS/оба журнала/HANDOFF перечитаны; независимая ветка с общей основой ActionDraft из первого бонуса, без кода входящих наставника.
+- Обязательный цикл: main/pull (6a6784a), STATUS/оба журнала/HANDOFF перечитаны; PR #46 → main; независимая ветка с общей основой ActionDraft из первого бонуса, без кода входящих наставника.
 - Сделано: draft_absence → confirm_absence, входящие руководителя своей команды, draft_decision → confirm_decision. Причины только personal/family/study, без медицинского текста, ровно один день не в прошлом по виртуальным часам. Повтор одного подтверждения идемпотентен; повторные заявки/решения и смена руководителя проверяются при исполнении.
 - Сделано: одинаковый интерфейс InMemory/Postgres, RLS + отзыв PUBLIC/anon/authenticated и sequence grants, partial unique index на pending/approved дату, синтетический seed обеих команд. Наставник получает отдельный DTO только intern_id/day согласованных отсутствий; HR/куратор и чужие пользователи не видят заявки. Payload событий — только status.
 - Проверено: `LLM_PROVIDER=echo uv run --extra mcp pytest --mcp-postgres --rag-postgres --cov=app --cov-branch` — 673 passed, без пропусков, покрытие 98,31% с ветвлениями (исходное main 98,15%). Все восемь пользователей, протокол MCP, конкуренция, отмена/ошибки черновиков, persistence/reset PostgreSQL, RLS и default privileges. Живой `/health` → 200 echo; реальная БД не затрагивалась.

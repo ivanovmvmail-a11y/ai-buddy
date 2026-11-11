@@ -37,7 +37,7 @@
 | 31 | Прогон демо SPEC §14 с нуля + порядок в STATUS; «по ссылке ниже» без документа | Claude | claude/status-demo-run | готово | #43 | шаги 1–7 пройдены без ключа; шаг 8 (Grafana) — только в Docker/CI |
 | 32 | [API] Сценарные объяснения пункта — в события и метрики | Claude | claude/scenario-explain-metrics | на ревью | | без ключа «Объяснить» считается в /metrics и Grafana, можно оценить |
 
-| 34 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | | 673 passed / 98,31% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 34 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 673 passed / 98,31% с ветвлениями; оба PostgreSQL-флага; /health=200 |
 
 ## Блокеры
 _нет_
