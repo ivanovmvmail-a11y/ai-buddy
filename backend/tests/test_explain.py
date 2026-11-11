@@ -28,8 +28,7 @@ def test_explanation_comes_from_item_document_with_working_link(client):
 def test_depth_follows_skill_level(client):
     novice = explain(client, item_id(client, "Открыть пространство Платформы объявлений")).get_json()["text"]
     confident = explain(client, item_id(client, "Разобрать документы Платформы объявлений")).get_json()["text"]
-    assert "Разберём подробно" in novice and "Ты в этой теме уверенно" not in novice
-    assert "Коротко по разделу" not in novice
+    assert "Разберём подробно" in novice and "коротко" not in novice
     assert "Ты в этой теме уверенно, поэтому коротко" in confident
     assert "слаб" not in novice + confident and "только начинается" not in novice
 

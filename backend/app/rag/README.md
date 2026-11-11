@@ -138,3 +138,27 @@ CLI загрузки закрывает DocumentStore.close() в finally пос�
 Docker/Railway используют тот же загрузчик при старте. Реальную облачную переиндексацию
 с выбранным эмбеддером выполняет Claude/оператор после ревью; тесты используют только
 временную PostgreSQL и детерминированный эмбеддер.
+
+## Обновление уже существующего тома Docker
+
+PostgreSQL исполняет `/docker-entrypoint-initdb.d` только при создании тома.
+Обычное `docker compose up --build` не применит новый SQL к существующей базе.
+После получения новой версии, из корня репозитория:
+
+```bash
+docker compose up --detach --build
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U buddy -d ai_buddy -f /docker-entrypoint-initdb.d/20261111154000_howto_plan_sources.sql
+docker compose exec -T backend python -m app.rag.ingest
+```
+
+Этот вариант сохраняет прогресс и исправляет только старые стандартные ссылки.
+Если локальный демо-прогресс не нужен, вместо точечного SQL можно загрузить
+новый seed полностью:
+
+```bash
+docker compose exec -T backend python -m app.mcp_server.seed --reset
+```
+
+`seed --reset` сбрасывает планы, заявки, профили, события и напоминания выбранной
+локальной БД к демо-данным. Делать это только при согласии потерять текущий прогресс.
+Облачную миграцию и переиндексацию после слияния выполняет Claude/оператор.

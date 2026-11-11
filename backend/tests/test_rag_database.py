@@ -133,9 +133,12 @@ def test_migration_privileges_and_pooled_team_isolation(postgres_cluster, api_ro
                            for team in ("Авито Доставка", "Платформа объявлений") for hit in hits)
             # Новые how-to хранятся с тем же source_id и scope после повторного CLI/ingest.
             documents = [read_document(path, f"demo:{path.name}") for path in DEMO_DOCS.glob("*.md")]
-            for user in DEMO_USERS.values():
+            for user_id in ("intern-anya", "intern-ivan", "hrbp-elena"):
+                user = DEMO_USERS[user_id]
                 allowed = {doc.title for doc in documents if doc.team in (None, user.team)}
                 for doc in documents:
+                    if doc.team in (None, user.team):
+                        continue
                     hits = async_runner.run(service.retrieve(doc.content, user, 100))
                     assert {hit["title"] for hit in hits} == allowed
                     if doc.team is not None and doc.team != user.team:

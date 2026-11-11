@@ -48,9 +48,9 @@
 | 42 | [API] Аудит S6/D7: переписка сохраняется (GET /chat/history), браузер помнит пользователя, черновики восстанавливаются | Claude | claude/chat-history | на ревью | | backend 464, frontend 60; таблица — Codex (HANDOFF) |
 | 43 | [API] Аудит D4, D8, мелочи: чужой ресурс — сразу 404, без заголовка — 401, лимиты сообщения, ошибки JSON, approve только bool | Claude | claude/api-hardening | на ревью | | после #57; backend 468 |
 | 44 | Аудит S5 + мелочи интерфейса: честный раздел про MCP в README, «Написать наставнику» по зависшей заявке, шапка на телефоне 203→91 px, точка «новое» на «Чат», скорость «быстрее 0,1 с» | Claude | claude/ui-polish | на ревью | | после #58; frontend 63 |
-| 45 | Аудит S4: повышенные доступы требуют решения наставника | Codex | codex/audit-s4-access-approval | на ревью | [#59](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/59) | 720 passed / 97,73%, PostgreSQL; мерж после комментария человека; бонусы #45/#46/#50 Draft |
+| 45 | Аудит S4: повышенные доступы требуют решения наставника | Codex | codex/audit-s4-access-approval | готово | [#59](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/59) | 720 passed / 97,73%, PostgreSQL; мерж после комментария человека; бонусы #45/#46/#50 Draft |
 | 46 | Аудит S3: реальные timestamps событий и календарные сутки Grafana | Codex | codex/audit-s3-event-time | на ревью | [#61](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/61) | 700 passed / 97,63%, PostgreSQL; 30 дней, timezone браузера; мерж после комментария человека |
-| 47 | Аудит S2: загрузка how-to документов и изоляция команд | Codex | codex/audit-s2-howto-ingest | на ревью | [#62](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/62) | 698 passed / 97,63%, оба PostgreSQL-флага; 19 документов; мерж после комментария человека |
+| 47 | Аудит S2: загрузка how-to документов и изоляция команд | Codex | codex/audit-s2-howto-ingest | блок | [#62](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/62) | Ревью: Docker-команды и общая проверка восстановлены; 743 passed / 1 failed, 97,73%; ждёт правки текста 13 от Claude |
 
 ## Блокеры
-_нет_
+- #62: общая проверка «коротко» not in novice восстановлена; документ 13 содержит «В обосновании коротко напиши…». Нужна правка текста Claude, детали в HANDOFF.

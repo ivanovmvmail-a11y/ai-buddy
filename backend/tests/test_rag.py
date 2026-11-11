@@ -383,9 +383,14 @@ def test_howto_queries_never_return_another_team_even_with_exact_foreign_text(de
     user = DEMO_USERS[user_id]
     documents = [document for document, _ in demo.store.documents.values()]
     allowed = {document.title for document in documents if document.team in (None, user.team)}
+    howto_names = {
+        "11-git-workflow.md", "12-red-pipeline.md", "13-team-space-access.md",
+        "15-platform-local-run.md", "16-platform-reviewers.md", "17-platform-sandbox-setup.md",
+        "18-delivery-local-run.md", "19-delivery-reviewers.md", "20-delivery-sandbox-setup.md",
+    }
     new_documents = [document for document in documents
-                     if int(document.source_id.split(":", 1)[1].split("-", 1)[0]) >= 11]
-    assert len(new_documents) == 9
+                     if document.source_id.removeprefix("demo:") in howto_names]
+    assert {document.source_id.removeprefix("demo:") for document in new_documents} == howto_names
     for document in new_documents:
         hits = run(demo.retrieve(document.content, user, k=100))
         assert {hit["title"] for hit in hits} == allowed
