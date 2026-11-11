@@ -1,4 +1,5 @@
 """План, следующий шаг, лестница и фактическая сводка недели."""
+from copy import deepcopy
 from app.agent.users import Role, User
 
 from . import events, storage
@@ -55,7 +56,7 @@ def _build_plan(data: OnboardingData, actor: User, intern_id: str) -> Plan:
 
 
 async def get_plan(actor: User, intern_id: str) -> Plan:
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().read() as data:
         require_intern(data, actor, intern_id)
         plan = _build_plan(data, actor, intern_id)
         events._record(data, actor, "plan_viewed", {"intern_id": intern_id})
@@ -65,7 +66,7 @@ async def get_plan(actor: User, intern_id: str) -> Plan:
 
 
 async def set_item_status(actor: User, item_id: str, status: ItemStatus, reason: str | None = None) -> PlanItem:
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         item = data.items.get(item_id)
         if item is None:
             raise NotFound()
@@ -90,7 +91,7 @@ async def set_item_status(actor: User, item_id: str, status: ItemStatus, reason:
 
 
 async def weekly_summary(actor: User, intern_id: str, week: int) -> dict:
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().read(include_events=True) as data:
         require_intern(data, actor, intern_id)
         week = positive.validate_python(week)
         start, end = (week - 1) * 7 + 1, week * 7
@@ -117,8 +118,8 @@ async def weekly_summary(actor: User, intern_id: str, week: int) -> dict:
             if historical.status != "done":
                 carry.append(item_view(data, historical, cutoff))
             elif event is not None and start <= event.payload["day"]:
-                closed.append(event.payload)
-        granted = {event.payload["request_id"]: event.payload for event in facts
+                closed.append(deepcopy(event.payload))
+        granted = {event.payload["request_id"]: deepcopy(event.payload) for event in facts
                    if event.type == "access_request_decided" and event.payload.get("status") == "granted"
                    and start <= event.payload["day"]}
         return {"intern_id": intern_id, "week": week, "closed": closed,

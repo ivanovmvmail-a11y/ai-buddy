@@ -12,16 +12,16 @@ async def list_resources(actor: User) -> list[AccessResource]:
     known_actor(actor)
     if actor.role != Role.INTERN:
         raise Forbidden()
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().read() as data:
         intern(data, actor.id)
-        return [resource for resource in data.resources.values() if resource.team in {None, actor.team}]
+        return [resource.model_copy(deep=True) for resource in data.resources.values() if resource.team in {None, actor.team}]
 
 
 async def create_request(actor: User, resource_id: str, level: AccessLevel, justification: str) -> AccessRequest:
     known_actor(actor)
     if actor.role != Role.INTERN:
         raise Forbidden()
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         target = intern(data, actor.id)
         resource = data.resources.get(resource_id)
         if resource is None or resource.team not in {None, target.team}:
@@ -53,23 +53,23 @@ async def create_request(actor: User, resource_id: str, level: AccessLevel, just
         if item:
             checklist._change_status(data, actor, item, "done" if request.status == "granted" else "waiting",
                                     waiting_for=approver_id)
-        return request
+        return request.model_copy(deep=True)
 
 
 async def list_requests(actor: User, intern_id: str | None = None) -> list[AccessRequest]:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().read() as data:
         targets = [intern(data, intern_id)] if intern_id is not None else [intern(data, key) for key in data.interns]
         visible = {target.id for target in targets if can_read_private(actor, target)}
         if not visible:
             raise NotFound()
-        return sorted((request for request in data.requests.values() if request.intern_id in visible),
+        return sorted((request.model_copy(deep=True) for request in data.requests.values() if request.intern_id in visible),
                       key=lambda request: (request.created_at, int(request.id.removeprefix("REQ-"))), reverse=True)
 
 
 async def decide_request(actor: User, request_id: str, approve: bool, reason: str | None = None) -> AccessRequest:
     known_actor(actor)
-    async with storage.get_store().transaction() as data:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         request = data.requests.get(request_id)
         if request is None or not can_read_private(actor, intern(data, request.intern_id)):
             raise NotFound()
@@ -96,4 +96,4 @@ async def decide_request(actor: User, request_id: str, approve: bool, reason: st
         if request.plan_item_id:
             checklist._change_status(data, actor, data.items[request.plan_item_id],
                                     "done" if approve else "in_progress", reason)
-        return request
+        return request.model_copy(deep=True)

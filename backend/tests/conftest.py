@@ -88,3 +88,4 @@ def fresh_onboarding(monkeypatch):
 
 def pytest_addoption(parser):
     parser.addoption("--rag-postgres", action="store_true", help="Test migration/pool on a disposable local Docker PostgreSQL")
+    parser.addoption("--mcp-postgres", action="store_true", help="Run the shared onboarding suite on memory and a disposable PostgreSQL")

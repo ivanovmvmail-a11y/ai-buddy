@@ -21,13 +21,13 @@ def _record(data: OnboardingData, actor: Actor, type: str, payload: dict) -> Eve
 async def log_event(actor: Actor, type: str, payload: dict) -> Event:
     require_system(actor)
     type = nonempty.validate_python(type)
-    async with storage.get_store().transaction() as data:
-        return _record(data, actor, type, payload)
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
+        return _record(data, actor, type, payload).model_copy(deep=True)
 
 
 async def list_events(actor: Actor, intern_id: str | None = None, type: str | None = None) -> list[Event]:
     require_system(actor)
-    async with storage.get_store().transaction() as data:
-        return [event for event in data.events
+    async with storage.get_store().read(include_events=True) as data:
+        return [event.model_copy(deep=True) for event in data.events
                 if (intern_id is None or event.payload.get("intern_id") == intern_id)
                 and (type is None or event.type == type)]
