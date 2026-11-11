@@ -1,7 +1,7 @@
 // Данные с сервера через TanStack Query: кэш, повтор, статус загрузки. Ключи включают пользователя,
 // чтобы при «Войти как…» не мелькали чужие данные.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import type { DemoUser } from "./types";
 
 export const keys = {
@@ -14,6 +14,8 @@ export const keys = {
   reminders: (u: string) => ["reminders", u] as const,
   summary: (u: string, intern: string, week: number) => ["summary", u, intern, week] as const,
   metrics: (u: string, intern: string) => ["metrics", u, intern] as const,
+  suggestions: (u: string) => ["suggestions", u] as const,
+  compare: (u: string, a: string, b: string) => ["compare", u, a, b] as const,
 };
 
 const PLAN_ROLES = new Set(["intern", "mentor", "lead", "curator"]);
@@ -78,11 +80,41 @@ export const useMetrics = (actor: DemoUser, internId?: string) =>
     enabled: ["mentor", "lead", "curator"].includes(actor.role),
   });
 
+/** Новые эндпоинты 11.11 могут ещё не быть на сервере: 404 → «пока пусто», а не ошибка на экране. */
+async function orEmpty<T>(load: () => Promise<T>, empty: T): Promise<T> {
+  try {
+    return await load();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return empty;
+    throw e;
+  }
+}
+
+/** Предложения бота поднять уровень (SPEC 4) — только наставнику. */
+export const useSuggestions = (actor: DemoUser) =>
+  useQuery({
+    queryKey: keys.suggestions(actor.id),
+    queryFn: () => orEmpty(async () => (await api.suggestions(actor.id)).suggestions, []),
+    enabled: actor.role === "mentor",
+    retry: false, // пока адреса нет на сервере, браузер видит сбой CORS — не повторяем впустую
+  });
+
+/** Два плана рядом (SPEC 5). null — сервер сравнение пока не умеет. */
+export const useCompare = (actor: DemoUser, a: string, b: string, enabled: boolean) =>
+  useQuery({
+    queryKey: keys.compare(actor.id, a, b),
+    queryFn: () => orEmpty(() => api.compare(actor.id, a, b), null),
+    enabled: enabled && actor.role === "mentor" && !!a && !!b && a !== b,
+    retry: false,
+  });
+
 /** После любого изменения на сервере обновляем всё, что могло измениться. */
 export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile", "summary", "metrics"].map((k) => client.invalidateQueries({ queryKey: [k] })),
+      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare"].map((k) =>
+        client.invalidateQueries({ queryKey: [k] }),
+      ),
     );
 }
