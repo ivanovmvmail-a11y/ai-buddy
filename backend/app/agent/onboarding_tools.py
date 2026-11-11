@@ -19,7 +19,7 @@ from app.mcp_server.models import PlanItem
 from app.mcp_server.seed import load_seed
 
 from .tools import FORBIDDEN_MESSAGE, Tool, ToolRegistry
-from .users import DEMO_USERS, Role, User
+from .users import DEMO_USERS, Role, User, can_view_intern
 
 DOMAIN_ERRORS = (NotFound, Forbidden, Conflict, ValidationError)
 
@@ -199,7 +199,14 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
 
 
 async def plan_context(user: User) -> str:
-    """Короткая сводка для системного промпта: стажёру — его день, следующий шаг и уровень по темам."""
+    """Короткая сводка для системного промпта: стажёру — его день, следующий шаг и уровень по темам;
+    наставнику, руководителю и куратору — каких стажёров он видит (id для инструментов)."""
+    if user.role in (Role.MENTOR, Role.LEAD, Role.CURATOR):
+        visible = [u for u in DEMO_USERS.values() if u.role == Role.INTERN and can_view_intern(user, u)]
+        if not visible:
+            return ""
+        names = ", ".join(f"{u.name} (intern_id {u.id})" for u in visible)
+        return f"\n\nСтажёры, чьи планы тебе доступны: {names}. Для их плана вызывай get_plan с intern_id."
     if user.role != Role.INTERN:
         return ""
     try:

@@ -84,3 +84,4 @@ docs/             SPEC, API, DECISIONS, SETUP_TEAMMATE
 - На http://localhost:3000 отправить сообщение — приходит ответ.
 - Тесты backend: `cd backend && uv run pytest --cov=app --cov-report=term-missing`
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
+- Золотой набор (37 контрольных вопросов, метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md)

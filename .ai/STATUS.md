@@ -20,8 +20,9 @@
 | 14 | 101-T4a [API]: HTTP онбординга + инструменты агента поверх имитаций сервисов | Claude | claude/api-onboarding | готово | #19 | 318 тестов, покрытие 99%; проверено вживую с GigaChat |
 | 15 | 101-T4b: интерфейс на API (TanStack Query, Zod) + resource_title в заявках [API] | Claude | claude/frontend-api | готово | #20 | 28 тестов Vitest на поддельном сервере, покрытие 99%; проверено вживую |
 | 16 | 101-T3: PostgreSQL-хранилище онбординга, миграция, seed и оптимизация чтения | Codex | codex/onboarding-postgres | готово | [#21](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/21) | Ревью 1–4, 8 исправлено; 5–7 → HANDOFF; PostgreSQL: 507 passed / 98,32%; офлайн: 336 passed / 93,47% |
-| 17 | Спека 003: сценарный режим без ключа (LLM_PROVIDER=scenario по умолчанию) | Claude | claude/scenario-mode | на ревью | #22 | 337 тестов backend; проверено на демо-документах |
-| 18 | Спека 201: экран наставника — карточки стажёров, что зависло, итоги недели | Claude | claude/mentor-screen | на ревью | #23 | после #22; 34 теста Vitest |
+| 17 | Спека 003: сценарный режим без ключа (LLM_PROVIDER=scenario по умолчанию) | Claude | claude/scenario-mode | готово | #22 | 337 тестов backend; проверено на демо-документах |
+| 18 | Спека 201: экран наставника — карточки стажёров, что зависло, итоги недели | Claude | claude/mentor-screen | готово | #23 | после #22; 34 теста Vitest |
+| 19 | Спека 004: золотой набор (37 вопросов) + отчёты; промпт против выдумок | Claude | claude/golden-set | на ревью | | сценарный 37/37, GigaChat 37/37, утечек 0 |
 
 ## Блокеры
 _нет_

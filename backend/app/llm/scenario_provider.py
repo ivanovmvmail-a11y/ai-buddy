@@ -18,7 +18,7 @@ from .base import LLMReply, Message, ToolCall, ToolSpec
 DOCS_MARKER = "Контекст из документов команды"
 
 ORG_WORDS = ("отпуск", "больнич", "отгул", "зарплат", "компенсац", "справк", "дмс", "увольн", "трудов", "командиров")
-NEXT_WORDS = ("дальше", "следующ", "что делать", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня")
+NEXT_WORDS = ("дальше", "следующ", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня")
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
 REQUEST_WORDS = ("мои", "статус", "какие", "ждут", "список", "покажи")
 GREETINGS = ("привет", "здравствуй", "добрый день", "хай", "hello")
@@ -62,18 +62,25 @@ def _docs(system: str) -> list[tuple[str, str]]:
     return docs
 
 
-def _units(content: str) -> list[str]:
-    """Абзацы и отдельные пункты списков, без заголовков и служебной пометки «синтетический документ»."""
-    units: list[str] = []
+def _units(content: str) -> list[tuple[str, str]]:
+    """(заголовок раздела, текст): абзацы и отдельные пункты списков. Заголовок участвует в поиске
+    («Первый день» → абзац под ним), но в ответ не попадает. Служебная пометка «синтетический документ» — пропуск."""
+    units: list[tuple[str, str]] = []
+    heading = ""
     for paragraph in re.split(r"\n\s*\n", content):
-        lines = [line.strip() for line in paragraph.splitlines() if line.strip() and not line.strip().startswith("#")]
+        lines = []
+        for line in (raw.strip() for raw in paragraph.splitlines()):
+            if line.startswith("#"):
+                heading = line.lstrip("# ")
+            elif line:
+                lines.append(line)
         if not lines:
             continue
         if all(re.match(r"^([-*]|\d+\.)\s", line) for line in lines):
-            units.extend(lines)  # список — каждый пункт отдельно
+            units.extend((heading, line) for line in lines)  # список — каждый пункт отдельно
         else:
-            units.append(" ".join(lines))
-    return [u for u in units if "синтетическ" not in u.lower()]
+            units.append((heading, " ".join(lines)))
+    return [(h, u) for h, u in units if "синтетическ" not in u.lower()]
 
 
 def _role(system: str) -> str:
@@ -146,8 +153,8 @@ class ScenarioProvider:
         need = min(2, len(wanted)) or 1
         best = (0, "", "")
         for title, content in _docs(system):
-            for unit in _units(content):
-                score = _overlap(wanted, unit)
+            for heading, unit in _units(content):
+                score = _overlap(wanted, heading + " " + unit)
                 if score > best[0]:
                     best = (score, title, unit)
         if best[0] >= need:
