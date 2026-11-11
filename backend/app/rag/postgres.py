@@ -1,6 +1,5 @@
 """Прямое async-подключение psycopg; Supabase REST и специальные роли не нужны."""
-from psycopg.rows import dict_row
-from psycopg_pool import AsyncConnectionPool
+from app.db.pool import PostgresPoolOwner
 
 from .embeddings import validate_embedding
 from .storage import Chunk, Document, SearchHit
@@ -11,31 +10,7 @@ def _vector_literal(embedding: list[float]) -> str:
     return "[" + ",".join(str(float(value)) for value in embedding) + "]"
 
 
-class PostgresDocumentStore:
-    def __init__(self, database_url: str) -> None:
-        if not database_url:
-            raise ValueError("DATABASE_URL is required")
-        self.database_url = database_url
-        self._pool: AsyncConnectionPool | None = None
-
-    async def _get_pool(self) -> AsyncConnectionPool:
-        # Конструктор хранилища может вызываться из Flask/CLI. Создание и открытие
-        # пула выполняются только здесь, на общем цикле app.async_runner.
-        if self._pool is None:
-            self._pool = AsyncConnectionPool(
-                self.database_url, open=False, min_size=1, max_size=8, timeout=5,
-                kwargs={"connect_timeout": 5, "row_factory": dict_row},
-            )
-        # open() идемпотентен, в том числе при одновременных первых запросах.
-        await self._pool.open()
-        return self._pool
-
-    async def close(self) -> None:
-        """Закрыть пул на том же event loop при явном завершении работы."""
-        if self._pool is not None:
-            await self._pool.close()
-            self._pool = None
-
+class PostgresDocumentStore(PostgresPoolOwner):
     async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
         vectors = [_vector_literal(chunk.embedding) for chunk in chunks]
         async with (await self._get_pool()).connection() as connection:

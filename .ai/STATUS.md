@@ -32,5 +32,7 @@
 
 | 25 | 101-T5: MCP-протокол поверх имитаций сервисов | Codex | codex/mcp-protocol | на ревью | [#34](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/34) | Ревью 1–7 исправлено; один пользователь на запуск; extra mcp: 415 passed / 94,24%; PostgreSQL: 608 / 98,23% |
 
+| 29 | Общий пул PostgreSQL для RAG и онбординга | Codex | codex/shared-postgres-pool | на ревью | | Оба PostgreSQL-флага: 620 passed / 98,14%; до 8 соединений суммарно |
+
 ## Блокеры
 _нет_

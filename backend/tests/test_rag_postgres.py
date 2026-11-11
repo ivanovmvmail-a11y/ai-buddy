@@ -67,8 +67,10 @@ def database(monkeypatch):
     pool.close = AsyncMock()
     pool.connection.return_value = connection
     factory = Mock(return_value=pool)
-    monkeypatch.setattr("app.rag.postgres.AsyncConnectionPool", factory)
-    return PostgresDocumentStore("postgresql://example.invalid/demo"), connection, factory
+    monkeypatch.setattr("app.db.pool.AsyncConnectionPool", factory)
+    store = PostgresDocumentStore("postgresql://example.invalid/demo")
+    yield store, connection, factory
+    run(store.close())
 
 
 def vector():
@@ -146,7 +148,7 @@ def test_pool_is_lazy_reused_and_opened_on_shared_loop(database):
     vector_data = vector()
     loop = run(requests())
     factory.assert_called_once()
-    assert loops == [loop] * 4
+    assert loops == [loop]
     assert connection.returned == 4
     run(store.close())
     factory.return_value.close.assert_awaited_once()
