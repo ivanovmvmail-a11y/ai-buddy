@@ -23,7 +23,10 @@ export async function askBot(actor: DemoUser, text: string) {
     .map((m) => ({ role: m.role, content: m.content }));
   try {
     const res = await api.chat(actor.id, history);
-    chat.push({ id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources.map((s) => s.title) });
+    chat.push({
+      id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources.map((s) => s.title),
+      answerId: res.answer_id ?? undefined,
+    });
     for (const action of res.actions) {
       chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action });
     }
@@ -122,6 +125,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
             ))}
           </div>
         )}
+        {m.answerId && <Feedback m={m} actor={actor} />}
         {m.scripted && m.kind === "text" && (
           <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">сценарный ответ · из данных плана</div>
         )}
@@ -190,6 +194,31 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
           {draft.status === "done" ? "Подтверждено" : draft.status === "cancelled" ? "Отменено — ничего не отправлено" : "Не выполнено"}
         </div>
       )}
+    </div>
+  );
+}
+
+/** «Полезно / Не полезно» под ответом модели (SPEC 6, спека 302). Оценка — одна, без текста вопроса. */
+function Feedback({ m, actor }: { m: Msg; actor: DemoUser }) {
+  const update = useChat((s) => s.update);
+  const [error, setError] = useState(false);
+  if (m.rated) {
+    return <div className="mt-2 text-xs text-black/50 dark:text-white/50">Спасибо, учту{m.rated === "not_useful" ? " — передам наставнику как тему для документа" : ""}.</div>;
+  }
+  async function rate(useful: boolean) {
+    setError(false);
+    try {
+      await api.feedback(actor.id, m.answerId!, useful);
+      update(m.id, { rated: useful ? "useful" : "not_useful" });
+    } catch {
+      setError(true);
+    }
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+      <button onClick={() => rate(true)} className="rounded-full border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">Полезно</button>
+      <button onClick={() => rate(false)} className="rounded-full border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">Не полезно</button>
+      {error && <span role="alert" className="text-red-700 dark:text-red-300">Не получилось сохранить оценку.</span>}
     </div>
   );
 }

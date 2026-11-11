@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic_core import to_jsonable_python
 
 from app import async_runner
-from app.agent import service
+from app.agent import analytics, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
 from app.mcp_server import access, checklist, clock, hiring
@@ -140,6 +140,25 @@ def snooze(reminder_id: str):
 @bp.post("/reminders/<reminder_id>/done")
 def reminder_done(reminder_id: str):
     return _json(async_runner.run(clock.done_reminder(g.user, reminder_id)))
+
+
+# --- Оценка ответов и метрики (спека 302) ----------------------------------------------------------
+
+class FeedbackIn(BaseModel):
+    answer_id: str
+    useful: bool
+
+
+@bp.post("/feedback")
+def feedback():
+    body = _body(FeedbackIn)
+    async_runner.run(analytics.record_feedback(g.user, body.answer_id, body.useful))
+    return "", 204
+
+
+@bp.get("/metrics")
+def metrics_view():
+    return jsonify(async_runner.run(analytics.metrics(g.user, request.args.get("intern_id"))))
 
 
 # --- Черновик по кнопке ---------------------------------------------------------------------------

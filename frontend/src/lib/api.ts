@@ -1,7 +1,7 @@
 // Клиент к backend. Контракт — docs/API.md. Каждый ответ проверяется схемой Zod (lib/types.ts).
 import type { z } from "zod";
 import {
-  AccessRequest, Action, ChatResponse, DaysResponse, Health, InternsResponse, Plan, PlanItem,
+  AccessRequest, Action, ChatResponse, DaysResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
   Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillProfile, WeeklySummary,
 } from "./types";
 
@@ -70,6 +70,20 @@ export const api = {
   draft: (u: string, tool: string, params: Record<string, unknown>) => request("/actions", Action, u, post({ tool, params })),
   confirm: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/confirm`, Action, u, post()),
   cancel: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/cancel`, Action, u, post()),
+  feedback: async (u: string, answerId: string, useful: boolean) => {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-User-Id": u },
+        body: JSON.stringify({ answer_id: answerId, useful }),
+      });
+    } catch {
+      throw new ApiError(OFFLINE, 0);
+    }
+    if (!res.ok) throw new ApiError(`Ошибка сервера: ${res.status}`, res.status);
+  },
+  metrics: (u: string, internId?: string) => request(`/metrics${q(internId)}`, Metrics, u),
   nextDay: (u: string) => request("/demo/next-day", DaysResponse, u, post()),
   reset: (u: string) => request("/demo/reset", ResetResponse, u, post()),
 };

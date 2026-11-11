@@ -1,5 +1,6 @@
 """HTTP API AI-buddy (Flask). Контракт — docs/API.md."""
 import logging
+import time
 from typing import Literal
 
 from flask import Flask, g, jsonify, request
@@ -7,7 +8,7 @@ from flask_cors import CORS
 from pydantic import BaseModel, ValidationError
 
 from app import async_runner
-from app.agent import service
+from app.agent import analytics, service
 from app.agent.actions import Action
 from app.agent.users import get_user
 from app.config import settings
@@ -33,6 +34,7 @@ class Source(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    answer_id: str | None = None  # для оценки «полезно / не полезно» (спека 302)
     reply: str
     sources: list[Source] = []
     actions: list[Action] = []
@@ -81,13 +83,22 @@ def create_app() -> Flask:
 
         # системные сообщения от клиента не принимаем — системный промпт задаёт только сервер
         history = [Message(role=m.role, content=m.content) for m in req.messages if m.role != "system"]
+        started = time.perf_counter()
         try:
             result = async_runner.run(service.agent.answer(history, g.user))
         except Exception:
             # детали — только в лог сервера; пользователю — общее сообщение без внутренностей
             log.exception("chat failed user=%s", g.user.id)
             return jsonify(detail="Помощник временно недоступен. Попробуйте ещё раз через минуту."), 502
+        answer_id = analytics.new_answer_id()
+        question = next((m.content for m in reversed(history) if m.role == "user"), "")
+        async_runner.run(analytics.record_answer(
+            g.user, answer_id=answer_id, question=question, reply=result.reply, sources=len(result.sources),
+            tools=result.tools, refused=result.refused, drafts=len(result.actions),
+            latency_ms=round((time.perf_counter() - started) * 1000),
+        ))
         return ChatResponse(
+            answer_id=answer_id,
             reply=result.reply,
             sources=[Source(**s) for s in result.sources],
             actions=result.actions,
