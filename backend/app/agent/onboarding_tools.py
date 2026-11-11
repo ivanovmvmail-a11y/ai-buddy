@@ -114,6 +114,14 @@ class RequestArgs(BaseModel):
 LEVEL_TITLES = {"read": "чтение", "edit": "редактирование", "admin": "администрирование"}
 
 
+async def resource_visible(user: User, args: RequestArgs) -> bool:
+    """Ресурс есть в списке, доступном стажёру (своя команда или общий). Чужой — как несуществующий."""
+    try:
+        return any(r.id == args.resource_id for r in await access.list_resources(user))
+    except DOMAIN_ERRORS:
+        return False
+
+
 async def create_access_request(user: User, args: RequestArgs) -> dict:
     async def run():
         req = await access.create_request(user, args.resource_id, args.level, args.justification)
@@ -179,6 +187,7 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
         args_model=RequestArgs, permission="access:request", handler=create_access_request, kind="write",
         describe=lambda a: (f"Заявка на доступ: {resource_titles().get(a.resource_id, a.resource_id)}, "
                             f"права — {LEVEL_TITLES[a.level]}"),
+        precheck=resource_visible,
     ))
     registry.register(Tool(
         name="list_access_requests",

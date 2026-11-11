@@ -130,6 +130,11 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
   );
 }
 
+/** «0.0 с» читается как «не работает» — быстрые ответы подписываем честно (аудит, мелочи). */
+export function latencyText(ms: number): string {
+  return ms < 100 ? "быстрее 0,1 с" : `за ${(ms / 1000).toFixed(1).replace(".", ",")} с`;
+}
+
 /** Сводка по всем видимым стажёрам (спека 302): метрики «видим вживую» из SPEC 10. */
 function MetricsLine({ actor }: { actor: DemoUser }) {
   const m = useMetrics(actor).data;
@@ -139,7 +144,7 @@ function MetricsLine({ actor }: { actor: DemoUser }) {
     <p className="text-sm text-black/60 dark:text-white/60" aria-label="Метрики">
       Вопросов боту: {m.questions} · закрыто без человека: {m.closed_without_human} · с источником:{" "}
       {Math.round(m.with_source_share * 100)}% · полезно: {m.feedback.useful} из {rated}
-      {m.questions ? ` · ответ в среднем за ${(m.avg_latency_ms / 1000).toFixed(1)} с` : ""}
+      {m.questions ? ` · ответ в среднем ${latencyText(m.avg_latency_ms)}` : ""}
     </p>
   );
 }

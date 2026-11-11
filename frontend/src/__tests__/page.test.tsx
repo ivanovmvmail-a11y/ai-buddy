@@ -12,6 +12,14 @@ beforeEach(() => {
   srv = installFakeServer();
   useSession.setState({ userId: "intern-anya", internPick: null });
   useChat.getState().reset([]);
+  // Node 24 подставляет свой пустой localStorage поверх jsdom — даём тестам честное хранилище в памяти
+  const data = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, String(v)),
+    removeItem: (k: string) => void data.delete(k),
+    clear: () => data.clear(),
+  });
 });
 afterEach(() => {
   cleanup();
@@ -184,6 +192,22 @@ describe("экран «план + чат» на API", () => {
     expect(srv.calls.some((c) => c.path.endsWith("/snooze"))).toBe(true);
   });
 
+  it("зависшая заявка: «Написать наставнику» — готовый текст для копирования, бот сам не отправляет", async () => {
+    open("intern-ivan");
+    const reminder = (await screen.findByText(/ждёт. Напомнить наставнику/)).parentElement!;
+    await click(within(reminder).getByRole("button", { name: "Написать наставнику" }));
+    expect(await screen.findByText(/получится посмотреть мою заявку REQ-\d+ \(пункт плана «/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Скопировать/ }).length).toBeGreaterThan(0);
+  });
+
+  it("телефон: точка «новое» на вкладке «Чат», пока открыт план", async () => {
+    open();
+    await screen.findByText(/2-й день стажировки/);
+    expect(screen.getByLabelText("новые сообщения")).toBeTruthy();
+    await click(screen.getByRole("tab", { name: /Чат/ }));
+    expect(screen.queryByLabelText("новые сообщения")).toBeNull();
+  });
+
   it("колокольчик (спека 301): число, «Открыть в чате», «Готово» убирает напоминание", async () => {
     open("intern-ivan");
     const bell = await screen.findByRole("button", { name: /Напоминания: \d/ });
@@ -267,6 +291,31 @@ describe("экран «план + чат» на API", () => {
     open();
     expect(await screen.findByText(/8-й день стажировки/)).toBeTruthy();
     expect(screen.queryByText(/Итоги недели/)).toBeNull();
+  });
+
+  it("после обновления страницы: прошлая переписка, черновик и тот же пользователь (SPEC 9, D7)", async () => {
+    srv.history["intern-ivan"] = [
+      { id: "m1", role: "user", content: "Кто такой buddy?", sources: [], answer_id: null, scripted: false },
+      { id: "m2", role: "assistant", content: "Buddy — наставник.", sources: [{ title: "Глоссарий стажировки", url: null }],
+        answer_id: "ans_old", scripted: true },
+    ];
+    srv.actions.push({ id: "act_old", user_id: "intern-ivan", tool: "create_access_request", title: "Заявка: учебный Jira",
+      params: { resource_id: "jira", level: "read", justification: "x" }, status: "pending", result: null, error: null });
+    localStorage.setItem("ai-buddy-user", "intern-ivan");
+    open();
+    expect(await screen.findByText("Buddy — наставник.")).toBeTruthy();
+    expect(screen.getByText("Кто такой buddy?")).toBeTruthy();
+    expect(screen.getByText("Черновик ждёт твоего решения.")).toBeTruthy();
+    expect(await screen.findByText(/8-й день стажировки/)).toBeTruthy(); // приветствие — после истории, под Иваном
+    const order = useChat.getState().messages.map((m) => m.content);
+    expect(order.indexOf("Buddy — наставник.")).toBeLessThan(order.findIndex((c) => c.startsWith("Привет, Иван")));
+  });
+
+  it("выбор пользователя запоминается", async () => {
+    open();
+    await screen.findByText(/2-й день стажировки/);
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "mentor-petr" } });
+    expect(localStorage.getItem("ai-buddy-user")).toBe("mentor-petr");
   });
 
   it("у наставника нет вкладки «Мой профиль»", async () => {

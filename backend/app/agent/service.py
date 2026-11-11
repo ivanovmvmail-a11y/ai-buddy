@@ -12,7 +12,7 @@ from .actions import Action, ActionStore, InMemoryActionStore
 from .demo_tools import register_demo_tools
 from .onboarding_tools import plan_context, register_onboarding_tools
 from .prompts import SYSTEM_PROMPT, user_context
-from .tools import ToolExecutor, ToolRegistry, check_access, to_tool_content
+from .tools import NOT_FOUND_MESSAGE, ToolExecutor, ToolRegistry, check_access, to_tool_content
 from .users import User
 
 log = logging.getLogger("ai_buddy.agent")
@@ -180,6 +180,8 @@ class Agent:
             raise ActionInvalid("Неверные данные: " + "; ".join(e["msg"] for e in exc.errors())) from exc
         if not check_access(user, tool, args):
             raise ActionForbidden("Нет прав на это действие")
+        if tool.precheck and not await tool.precheck(user, args):
+            raise ActionNotFound(NOT_FOUND_MESSAGE)
         title = tool.describe(args) if tool.describe else tool.description
         return await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
 

@@ -101,3 +101,12 @@ describe("итоги недели (SPEC 3.2)", () => {
     expect(empty.actions).toBeUndefined();
   });
 });
+
+describe("кто согласует заявку (аудит S4)", () => {
+  it("автоматически — только чтение; повышенные права — наставник", () => {
+    const jira = { id: "jira", title: "Учебный Jira", kind: "tool", team: null, approver: "auto" } as never;
+    expect(approverText(jira, u("intern-anya"))).toBe("выдаётся автоматически");
+    expect(approverText(jira, u("intern-anya"), "edit")).toBe("Пётр Волков");
+    expect(approverText(undefined, u("intern-anya"))).toBe("—");
+  });
+});

@@ -6,23 +6,26 @@
 черновик и `POST /actions/{id}/confirm`.
 """
 import hmac
+import logging
 import time
 from urllib.parse import unquote
 from typing import Literal
 
 from flask import Blueprint, g, jsonify, request
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, StrictBool, ValidationError
 from pydantic_core import to_jsonable_python
 
 from app import async_runner
 from app.config import settings
-from app.agent import analytics, explain, service
+from app.http_body import json_body
+from app.agent import analytics, explain, history, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
 from app.mcp_server import access, checklist, clock, hiring
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
 
 bp = Blueprint("onboarding", __name__)
+log = logging.getLogger("ai_buddy.onboarding_api")
 
 PLAN_ROLES = {Role.INTERN, Role.MENTOR, Role.LEAD, Role.CURATOR}
 
@@ -32,7 +35,7 @@ def _json(model) -> dict:
 
 
 def _body(model: type[BaseModel]) -> BaseModel:
-    return model.model_validate(request.get_json(silent=True) or {})
+    return model.model_validate(json_body())
 
 
 def _intern_id() -> str:
@@ -110,7 +113,7 @@ def requests_list():
 
 
 class DecideIn(BaseModel):
-    approve: bool
+    approve: StrictBool  # «yes», 1 и т. п. согласием не считаются
     reason: str | None = None
 
 
@@ -191,6 +194,13 @@ def item_explained(item_id: str):
         g.user, answer_id=answer_id, title=result["title"], with_source=result["with_source"],
         latency_ms=round((time.perf_counter() - started) * 1000),
     ))
+    asked = {"explain": f"Объясни пункт «{result['title']}»", "steps": explain.CHIPS["steps"], "who": explain.CHIPS["who"]}
+    try:
+        async_runner.run(history.record_turn(
+            g.user.id, asked[body.kind], result["text"], sources=[result["source"]] if result["source"] else [],
+            answer_id=answer_id, scripted=True))
+    except Exception:
+        log.exception("chat history not saved user=%s", g.user.id)
     return jsonify(answer_id=answer_id, text=result["text"], source=result["source"], chips=result["chips"]), 201
 
 
@@ -248,5 +258,6 @@ def reset():
     if (denied := _demo_key_error()) is not None:
         return denied
     async_runner.run(clock.reset_demo(g.user))
-    async_runner.run(service.agent.store.clear())  # черновики старого прогона ссылались бы на сброшенные данные
+    async_runner.run(service.agent.store.clear())
+    async_runner.run(history.history.clear())  # черновики старого прогона ссылались бы на сброшенные данные
     return {"status": "reset"}
