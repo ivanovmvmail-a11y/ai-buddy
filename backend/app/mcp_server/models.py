@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, PrivateAttr, model_validator
 
 from app.agent.users import Role, User
 from .absence_models import AbsenceRequest
@@ -127,6 +127,9 @@ class SkillProfile(Model):
     updated_at: AwareDatetime
 
 
+SuggestionStatus = Literal["pending", "accepted", "dismissed"]
+
+
 class SkillSuggestion(Model):
     id: str
     intern_id: str
@@ -139,7 +142,7 @@ class SkillSuggestion(Model):
     basis: str
     evidence: list[str] = Field(default_factory=list, exclude=True)
     created_day: int = Field(ge=1)
-    status: Literal["pending", "accepted", "dismissed"] = "pending"
+    status: SuggestionStatus = "pending"
     decided_day: int | None = Field(default=None, ge=1)
 
 
@@ -201,6 +204,9 @@ class ActionDraft(Model):
 
 
 class OnboardingData(Model):
+    # Возможность конкретной SQL-транзакции, не поле публичного DTO или seed.
+    _suggestions_available: bool = PrivateAttr(default=True)
+
     interns: dict[str, InternState] = Field(default_factory=dict)
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)

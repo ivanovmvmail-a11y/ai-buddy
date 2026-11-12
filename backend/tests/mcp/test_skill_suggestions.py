@@ -81,7 +81,8 @@ def test_validation_and_stale_proposal_do_not_downgrade_profile(store,snapshot):
     run(hiring.set_skill_level(P,A.id,'git','confident'))
     with pytest.raises(Conflict):run(hiring.decide_suggestion(P,s.id,True))
     assert snapshot().profiles[A.id].skills['git']=='confident'
-    run(hiring.decide_suggestion(P,s.id,False))
+    assert suggestions('dismissed')[0].id==s.id
+    with pytest.raises(Conflict):run(hiring.decide_suggestion(P,s.id,False))
     assert suggestions()==[]
 
 

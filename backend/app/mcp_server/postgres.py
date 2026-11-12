@@ -26,7 +26,7 @@ TABLES = (
 )
 JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload", "evidence"}
 DERIVED_FIELDS = {"overdue", "waiting_days", "skill_level", "in_plan"}
-OPTIONAL_TABLES = {"service_drafts", "mentor_questions", "absence_requests", "self_check_attempts"}
+OPTIONAL_TABLES = {"service_drafts", "mentor_questions", "absence_requests", "self_check_attempts", "skill_suggestions"}
 log = logging.getLogger("ai_buddy.onboarding")
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
 
@@ -55,6 +55,7 @@ class PostgresStore(PostgresPoolOwner):
     async def _load(self, connection, *, include_events):
         data = OnboardingData()
         available = await self._available_tables(connection)
+        data._suggestions_available = "skill_suggestions" in available
         for field, table, model, key in TABLES:
             if table in OPTIONAL_TABLES and table not in available:
                 continue

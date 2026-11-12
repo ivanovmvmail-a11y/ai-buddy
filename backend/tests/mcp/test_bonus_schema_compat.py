@@ -26,7 +26,7 @@ def old_database(dsn):
             with psycopg.connect(target,autocommit=True) as connection:
                 connection.execute(MIGRATION.read_text(encoding="utf-8"))
                 # Текущая основная схема плана уже обновлена, отсутствуют только бонусные таблицы.
-                for migration_name in ("20261111160000_personal_plan.sql", "20261111162000_skill_suggestions.sql"):
+                for migration_name in ("20261111160000_personal_plan.sql",):
                     connection.execute(MIGRATION.with_name(migration_name).read_text(encoding="utf-8"))
             yield target
         finally:
