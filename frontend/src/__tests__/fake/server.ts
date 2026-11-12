@@ -57,7 +57,13 @@ function plan(s: DemoState, internId: string, actor: DemoUser): Plan {
 }
 
 function reminders(s: DemoState, actor: DemoUser): Reminder[] {
-  if (actor.role !== "intern") return [];
+  // Уведомления новых типов (SPEC 3.6) тест кладёт сам в s.notifications — как их создаёт сервер.
+  const extra = s.notifications.filter((r) => r.user_id === actor.id && !s.dismissedReminders.includes(r.id));
+  if (actor.role !== "intern") return extra;
+  return [...extra, ...planReminders(s, actor)];
+}
+
+function planReminders(s: DemoState, actor: DemoUser): Reminder[] {
   return plan(s, actor.id, actor).items.flatMap((item) => {
     const waitingLong = item.status === "waiting" && (item.waiting_days ?? 0) >= 2;
     if (!waitingLong && !(item.overdue && item.owner_role === "intern")) return [];

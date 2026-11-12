@@ -108,9 +108,23 @@ export const SkillProfile = z.object({
 });
 export type SkillProfile = z.infer<typeof SkillProfile>;
 
+// SPEC 3.6 (11.11): единые уведомления. kind/action/ссылки — из контракта docs/API.md; у старого сервера их нет.
+export const ReminderKind = z.enum([
+  "plan_item", "access_request", "skill_changed", "personal_item_added", "skill_suggestion",
+  "absence_pending", "absence_decided", "absence_today", "absence_new", "absence_fact",
+]);
+export type ReminderKind = z.infer<typeof ReminderKind>;
+export const ReminderTarget = z.enum(["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern"]);
+export type ReminderTarget = z.infer<typeof ReminderTarget>;
+
 export const Reminder = z.object({
   id: z.string(),
   user_id: z.string(),
+  kind: ReminderKind.optional(),
+  action: z.object({ label: z.string(), target: ReminderTarget }).nullable().optional(),
+  intern_id: z.string().nullable().optional(),
+  absence_request_id: z.string().nullable().optional(),
+  suggestion_id: z.string().nullable().optional(),
   plan_item_id: z.string().nullable(),
   request_id: z.string().nullable(),
   text: z.string(),
