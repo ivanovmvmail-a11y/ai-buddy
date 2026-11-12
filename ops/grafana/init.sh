@@ -7,12 +7,9 @@ if [ ! -s /secrets/password ]; then
     psql -X -At -v ON_ERROR_STOP=1 -c "SELECT replace(gen_random_uuid()::text, '-', '')" > /secrets/password
 fi
 export GRAFANA_SQL_PASSWORD="$(cat /secrets/password)"
-# Не откатываем более новую версию view старой provision-миграцией на каждом up.
-view_version="$(psql -X -At -v ON_ERROR_STOP=1 -c "SELECT coalesce(obj_description(to_regclass('public.grafana_answers'), 'pg_class'), '')")"
-case "$view_version" in
-    ai-buddy:grafana-topic-titles:*) ;;
-    *) psql -X -v ON_ERROR_STOP=1 -f /provision/metrics.sql ;;
-esac
+# Сначала восстанавливаем все views/grants, затем переводим темы (включая старый том).
+psql -X -v ON_ERROR_STOP=1 -f /provision/metrics.sql
+psql -X -v ON_ERROR_STOP=1 -f /provision/topic_titles.sql
 psql -X -v ON_ERROR_STOP=1 <<'SQL'
 \getenv reader_password GRAFANA_SQL_PASSWORD
 ALTER ROLE ai_buddy_grafana LOGIN PASSWORD :'reader_password';

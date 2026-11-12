@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 import pytest
 
 from app.agent.analytics import closed_without_human
+from app.agent.analytics import TOPIC_TITLES as ANALYTICS_TOPIC_TITLES
 from .conftest import apply_onboarding_migrations, MIGRATION
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -57,11 +58,22 @@ def test_metrics_migration_handles_empty_legacy_database_and_repeated_provisioni
         assert owner.execute('SELECT count(*) FROM grafana_feedback').fetchone() == (0,)
         if not has_onboarding:
             apply_onboarding_migrations(owner)
+        owner.execute("INSERT INTO intern_state (intern_id,start_date,current_day) VALUES ('intern-anya',current_date,1)")
+        owner.execute('''INSERT INTO plan_items (id,intern_id,stage,"order",title,summary,owner_role,status,updated_at)
+            VALUES ('demo-item','intern-anya','week1',0,'Demo','Demo','intern','done',now())''')
+        for event_type in ('question_answered', 'answer_feedback'):
+            owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system',%s,%s)",
+                          (event_type, Jsonb({'intern_id': 'intern-anya', 'topic': 'git', 'useful': True})))
+        owner.execute('REVOKE SELECT ON grafana_answers, grafana_feedback, grafana_plan_progress FROM ai_buddy_grafana')
+        # Тот же порядок SQL, что в init: обновляет старые заглушки и восстанавливает права.
+        for _ in range(2):
             owner.execute(METRICS.read_text(encoding='utf-8'))
             owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
-            owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system','question_answered',%s)",
-                          (Jsonb({'intern_id': 'intern-anya', 'topic': 'git'}),))
-            assert owner.execute('SELECT count(*) FROM grafana_answers').fetchone() == (1,)
+            with owner.transaction():
+                owner.execute('SET LOCAL ROLE ai_buddy_grafana')
+                assert owner.execute('SELECT topic FROM grafana_answers').fetchall() == [('git и ревью',)]
+                assert owner.execute('SELECT useful FROM grafana_feedback').fetchall() == [(True,)]
+                assert owner.execute('SELECT stage,status,items FROM grafana_plan_progress').fetchall() == [('week1', 'done', 1)]
 
 
 def test_panel_sql_matches_metrics_and_reader_cannot_read_private_tables_or_write(metrics_database):
@@ -225,3 +237,16 @@ def test_topic_titles_are_russian_in_view_and_actual_dashboard_queries(metrics_d
                 rows = owner.execute(query.replace('$__timeFilter(ts)', 'true')).fetchall()
                 assert {row[0] for row in rows} == set(titles.values())
                 assert next(row[1] for row in rows if row[0] == 'другое') == 3
+
+
+@pytest.mark.parametrize('topic,title', ANALYTICS_TOPIC_TITLES.items())
+def test_every_analytics_topic_has_the_same_title_in_grafana(metrics_database, topic, title):
+    with psycopg.connect(**metrics_database, autocommit=True) as owner:
+        apply_onboarding_migrations(owner)
+        owner.execute(METRICS.read_text(encoding='utf-8'))
+        owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
+        owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system','question_answered',%s)",
+                      (Jsonb({'intern_id': 'intern-anya', 'topic': topic}),))
+        with owner.transaction():
+            owner.execute('SET LOCAL ROLE ai_buddy_grafana')
+            assert owner.execute('SELECT topic FROM grafana_answers').fetchall() == [(title,)]

@@ -24,14 +24,13 @@ DO $$ BEGIN
             CASE WHEN jsonb_typeof(payload->'latency_ms') = 'number'
                  THEN (payload->>'latency_ms')::double precision ELSE 0::double precision END AS latency_ms
         FROM public.events WHERE type = 'question_answered' AND payload->>'intern_id' IS NOT NULL;
-        COMMENT ON VIEW public.grafana_answers IS 'ai-buddy:grafana-topic-titles:v1';
     ELSE
         CREATE OR REPLACE VIEW public.grafana_answers AS
         SELECT NULL::timestamptz AS ts, NULL::text AS topic, false AS with_source,
             false AS not_in_base, false AS closed_without_human, 0::double precision AS latency_ms WHERE false;
-        COMMENT ON VIEW public.grafana_answers IS NULL;
     END IF;
 END $$;
+COMMENT ON VIEW public.grafana_answers IS NULL;
 REVOKE ALL ON public.grafana_answers FROM PUBLIC;
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
