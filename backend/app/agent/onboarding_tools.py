@@ -289,6 +289,9 @@ async def plan_context(user: User) -> str:
     mentor = DEMO_USERS.get(user.mentor_id or "")
     if mentor:
         lines.append(f"Наставник: {mentor.name}.")
+    lead = DEMO_USERS.get(user.lead_id or "")
+    if lead:
+        lines.append(f"Руководитель: {lead.name}.")
     today = await intern_today(user)
     if today:
         lines.append(f"Сегодня: {today.isoformat()}.")

@@ -164,3 +164,17 @@ def test_ac5_mentor_explain_is_not_an_intern_question(scenario):
     assert resp.status_code == 201
     [p] = answered()
     assert "intern_id" not in p  # вопросы наставника в метрики стажёров не попадают
+
+
+def test_off_topic_questions_are_not_closed_without_human(scenario, monkeypatch):
+    """Проверка 12.11, В5: «а когда зп приходит?» и вопрос о чужой команде раньше получали абзац не по теме
+    с источником и считались «закрытыми без человека». Теперь — HR BP и «в документах нет», метрика честная."""
+    from golden.run import _demo_rag
+    from app.agent import service
+    rag = async_runner.run(_demo_rag())
+    monkeypatch.setattr(service, "retrieve", lambda query, user, k=4: rag.retrieve(query, user, k))
+    ask(scenario, "а когда зп приходит?")
+    ask(scenario, "Какие статусы проходит учебное отправление в Доставке?")
+    salary, foreign = answered()
+    assert salary["topic"] == "hr" and not analytics.closed_without_human(salary)
+    assert foreign["not_in_base"] and not foreign["with_source"] and not analytics.closed_without_human(foreign)

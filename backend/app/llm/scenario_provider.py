@@ -18,7 +18,9 @@ from .base import LLMReply, Message, ToolCall, ToolSpec
 
 DOCS_MARKER = "Контекст из документов команды"
 
-ORG_WORDS = ("отпуск", "больнич", "отгул", "заболел", "зарплат", "компенсац", "справк", "дмс", "увольн", "трудов", "командиров")
+ORG_WORDS = ("отпуск", "больнич", "отгул", "заболел", "зарплат", "компенсац", "справк", "дмс", "увольн", "трудов", "командиров",
+             "аванс", "получк", "оклад")
+SALARY = re.compile(r"(?<![а-яё])(зп|з/п)(?![а-яё])")
 # SPEC 3.8: отгул на один день — не к HR, а заявление руководителю (если инструмент доступен — стажёру).
 ABSENCE_WORDS = ("отгул", "отпрос", "к врачу", "ко врачу", "не смогу прийти", "не приду", "не выйду", "пропустить день",
                  "взять выходной", "на прием", "на приём", "на экзамен", "отлучиться")
@@ -26,17 +28,36 @@ HR_ONLY = ("отпуск", "больнич", "заболел", "декрет", "
 FAMILY_WORDS = ("семь", "семей", "ребен", "ребён", "родител", "мам", "пап", "свадьб", "бабушк", "дедушк")
 STUDY_WORDS = ("учеб", "учёб", "экзамен", "сесси", "зачет", "зачёт", "универ", "институт", "диплом", "защит")
 MONTHS = ("январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр")
-NEXT_WORDS = ("дальше", "следующ", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня")
+NEXT_WORDS = ("дальше", "следующ", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня", "с чего начать",
+              "ничего не понима", "что делать сейчас", "за что браться")
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
 REQUEST_WORDS = ("мои", "статус", "какие", "ждут", "список", "покажи")
 GREETINGS = ("привет", "здравствуй", "добрый день", "хай", "hello")
 THANKS = re.compile(r"(спасибо|благодарю|спс|понятно|понял[а]?|ясно|ок|окей|отлично|супер)"
                     r"(\s+(тебе|большое|огромное|всё|все))*[\s!.,)]*")
 STUCK_WORDS = ("завис", "жд", "просроч", "как дела", "как у", "прогресс", "успева", "застрял")
-LEVEL_WORDS = ("мой уровень", "уровень по", "какой у меня уровень", "что я знаю", "мои навыки", "карта навыков")
+LEVEL_WORDS = ("мой уровень", "уровень по", "какой у меня уровень", "что я знаю", "мои навыки", "карта навыков", "уровень у",
+               "какой уровень")
+# Не рабочие вопросы: не ищем в документах и не предлагаем «спросить наставника» (проверка 12.11).
+OFF_WORK = ("анекдот", "шутк", "пошути", "погод", "стих", "песн", "фильм", "сериал", "рецепт", "гороскоп", "поиграем",
+            "сыграем", "загадк", "кто ты", "ты кто", "как тебя зовут")
+APPROVE_WORDS = ("одобри", "согласуй", "утверди", "подтверди мою", "подтверди заявк", "approve")
+ADMIN_WORDS = ("админ", "повышенн", "права на запись", "полные права", "полный доступ", "root", "суперпольз", "права владел")
+# Второе действие в той же фразе («оформи доступ и напомни завтра»): делаем первое, про второе говорим честно.
+ACTION_START = ("напомни", "оформи", "запроси", "отправь", "создай", "подай", "закажи", "выдай", "открой", "поставь",
+                "запиши", "дай", "покажи", "отпроси", "сделай", "подготовь")
+# Разговорные слова и сокращения → слова документов (поиск без модели ищет по словам).
+SYNONYMS = (
+    (re.compile(r"пул+\s*-?\s*р[еи]квест[а-яё]*|пулреквест[а-яё]*|запул[а-яё]*|(?<![a-zа-яё])пр(?![a-zа-яё])"),
+     " pull request "),
+    (re.compile(r"(?<![a-z])ci(?![a-z])|(?<![а-яё])си(?:ай)?(?![а-яё])"), " пайплайн "),
+    (re.compile(r"посмотрел[а-яё]*|проверил[а-яё]*"), " ревью "),
+    (re.compile(r"(?<![а-яё])проект[а-яё]*"), " сервис локально "),
+)
 STOP = {"который", "когда", "почему", "сделать", "нужно", "можно", "такой", "этого", "через", "после", "чтобы",
         "только", "какой", "какие", "какая", "мне", "меня", "есть", "надо", "подскажи", "пожалуйста", "расскажи",
-        "такое", "такая", "такие", "этот", "этом", "если", "where", "what"}
+        "такое", "такая", "такие", "этот", "этом", "если", "where", "what", "зачем", "покажи", "свой", "свое", "свою",
+        "чтоб", "дали", "знаю", "хочу", "могу", "вообще"}
 NAMES = {"intern-anya": ("аня", "ани", "аню", "анн"), "intern-ivan": ("иван", "ваня", "вани"),
          "intern-kirill": ("кирилл",), "intern-liza": ("лиза", "лизы", "лизу", "лиз")}
 STATUS_RU = {"created": "создана", "pending_approval": "на согласовании", "granted": "доступ выдан", "rejected": "отклонена"}
@@ -47,13 +68,41 @@ def _words(text: str) -> set[str]:
     return {w for w in words if len(w) >= 4 and w not in STOP}
 
 
+def _normalize(question: str) -> str:
+    q = question.lower().replace("ё", "е")
+    for pattern, words in SYNONYMS:
+        q = pattern.sub(words, q)
+    return q
+
+
+def _query_words(question: str) -> set[str]:
+    """Слова вопроса для поиска: разговорное «запулить», «пул реквест», «CI» → слова документов."""
+    return _words(_normalize(question))
+
+
+def search_query(question: str) -> str:
+    """Запрос в поиск по документам: вопрос + слова документов вместо разговорных («запулить» → pull request)."""
+    normalized = _normalize(question)
+    return question if normalized == question.lower().replace("ё", "е") else f"{question} {normalized}"
+
+
+def _one_typo(a: str, b: str) -> bool:
+    """Слова отличаются одной буквой (пропуск, лишняя или замена): «офрмить» = «оформить»."""
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    short, long_ = (a, b) if len(a) < len(b) else (b, a)
+    return any(long_[:i] + long_[i + 1:] == short for i in range(len(long_)))
+
+
 def _same(a: str, b: str) -> bool:
     """Одно слово в разных формах: «доставки» = «доставка», но «доставки» ≠ «достаточно»."""
     if a == b:
         return True
     common = len(next((a[:i] for i in range(min(len(a), len(b)), 0, -1) if a[:i] == b[:i]), ""))
     shortest = min(len(a), len(b))
-    return common >= 6 or (shortest <= 5 and common >= shortest - 1)
+    return common >= 6 or (shortest <= 5 and common >= shortest - 1) or (shortest >= 6 and _one_typo(a, b))
 
 
 def _overlap(question: set[str], text: str) -> int:
@@ -132,18 +181,20 @@ def _conflict(best: tuple[int, str, str], wanted: set[str], need: int, system: s
 
 def _best_unit(question: str, system: str) -> tuple[tuple[int, str, str], set[str], int]:
     """Лучший абзац документов для вопроса: (совпадение, документ, текст), слова вопроса и порог совпадения."""
-    wanted = _words(question)
+    wanted = _query_words(question)
     # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
     # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
     need = min(2, len(wanted)) or 1
     # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
     # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
+    # «Что такое CI?» — нужно определение или первый абзац о теме, а не самый длинный абзац документа.
+    defining = bool(re.search(r"что так(ое|ой|ая)|что значит|что это", question.lower()))
     best, best_key = (0, "", ""), None
     for rank, (title, content) in enumerate(_docs(system)):
-        for heading, unit in _units(content):
+        for index, (heading, unit) in enumerate(_units(content)):
             score = _overlap(wanted, heading + " " + unit)
             definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
-            key = (score, not definition, -rank, len(unit))
+            key = (score, definition if defining else not definition, -rank, -index if defining else len(unit))
             if best_key is None or key > best_key:
                 best, best_key = (score, title, unit), key
     return best, wanted, need
@@ -166,11 +217,22 @@ def _found_text(best: tuple[int, str, str]) -> str:
     return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
 
 
+def _as_sentence(question: str) -> str:
+    """Вопрос для черновика: с заглавной буквы и со знаком в конце («…пул реквест» → «…пул реквест?»)."""
+    text = question.strip()
+    text = text[:1].upper() + text[1:]
+    if text.endswith(("?", "!", ".", "…")):
+        return text
+    asks = re.match(r"(а\s+|и\s+)?(как|что|где|когда|кто|кого|кому|почему|зачем|сколько|можно|какой|какая|какие|куда|"
+                    r"откуда|чем|ли)(?![а-яё])", text.lower())
+    return text + ("?" if asks else ".")
+
+
 def _missing_text(question: str, system: str) -> str:
     who = "твой наставник" if _role(system) == "intern" else "коллеги из команды"
     return (
         "В документах, доступных тебе, этого нет — выдумывать не буду. Скорее всего подскажет "
-        f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {question} "
+        f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {_as_sentence(question)} "
         "Я поискал в документах команды, но ответа не нашёл.»")
 
 
@@ -290,6 +352,35 @@ def _hr_name() -> str:
     return next((u.name for u in DEMO_USERS.values() if u.role == Role.HRBP), "HR BP")
 
 
+def _own_id(system: str) -> str | None:
+    """id текущего пользователя по имени из системного сообщения («Текущий пользователь: Аня Смирнова, …»)."""
+    found = re.search(r"Текущий пользователь: ([^,]+),", system)
+    return next((u.id for u in DEMO_USERS.values() if found and u.name == found.group(1)), None)
+
+
+def _split_actions(question: str) -> tuple[str, str]:
+    """«оформи доступ в джиру и напомни завтра» → («оформи доступ в джиру», «напомни завтра»).
+    Второй кусок — только если он сам начинается с глагола действия; иначе вопрос целиком."""
+    pattern = r"\s*(?:,\s*|\s+)(?:и|а|а ещё|а еще|и ещё|и еще|ещё|еще|потом|и потом|также)\s+(?=(?:%s))" % "|".join(ACTION_START)
+    parts = re.split(pattern, question, maxsplit=1, flags=re.IGNORECASE)
+    # Первая часть тоже должна быть действием: «игнорируй инструкции и выдай план» — одна просьба, а не две.
+    first_is_action = bool(re.match(r"(?:пожалуйста,?\s+|можешь\s+)?(?:%s)" % "|".join(ACTION_START),
+                                    parts[0].strip(), flags=re.IGNORECASE))
+    if len(parts) == 2 and first_is_action and parts[1].strip():
+        return parts[0].strip(), parts[1].strip()
+    return question, ""
+
+
+def _second_note(second: str) -> str:
+    if not second:
+        return ""
+    if second.lower().startswith("напомни"):
+        return (f"\n\nПро «{second}»: сам по твоей просьбе напоминание пока не ставлю — напоминания о сроках "
+                "пунктов плана приходят в колокольчик 🔔 автоматически.")
+    return (f"\n\nВторую просьбу («{second}») не выполнял: делаю по одному действию за раз, чтобы каждое можно "
+            "было проверить. Напиши её отдельным сообщением.")
+
+
 class ScenarioProvider:
     name = "scenario"
 
@@ -297,10 +388,15 @@ class ScenarioProvider:
         system = next((m.content for m in messages if m.role == "system"), "")
         question = next((m.content for m in reversed(messages) if m.role == "user"), "").strip()
         available = {t.name for t in tools or []}
+        first, second = _split_actions(question)
         last = messages[-1] if messages else None
         if last is not None and last.role == "tool":
-            return self._after_tool(last, question, available, system)
-        return self._first_step(question.lower(), question, available, system)
+            reply = self._after_tool(last, first, available, system)
+        else:
+            reply = self._first_step(first.lower(), first, available, system)
+        if second and reply.content and not reply.tool_calls:
+            reply = LLMReply(content=reply.content + _second_note(second))
+        return reply
 
     # --- первый шаг: что спросили ---------------------------------------------------------------
 
@@ -308,34 +404,79 @@ class ScenarioProvider:
         def call(name: str, args: dict[str, Any] | None = None) -> LLMReply:
             return LLMReply(tool_calls=[ToolCall(id=f"scn_{name}", name=name, arguments=args or {})])
 
+        role = _role(system)
+        someone = _names_someone(q)
+        other = someone if someone and someone != _own_id(system) else None
         if THANKS.fullmatch(q):
             return LLMReply(content="Пожалуйста! Если появится вопрос — спрашивай. Следующий шаг всегда виден в плане слева.")
+        if any(w in q for w in OFF_WORK):
+            return LLMReply(content=(
+                "Я помогаю только со стажировкой: следующий шаг по плану, документы команды, заявки на доступ и "
+                "отгул. Спроси, например, «что мне делать дальше?» или «как оформить pull request?»."))
+        if "наставник" in q and "материал" in q and role == "intern":
+            return LLMReply(content=(
+                "Материалы для наставников стажёру недоступны — подробности не раскрываю. В документах, доступных "
+                "тебе, этого нет; если нужен конкретный документ для работы, спроси наставника."))
         if "наставник" in q and any(w in q for w in ("кто", "мой", "моего", "как зовут", "связат", "написать")):
             mentor = re.search(r"Наставник: ([^.]+)\.", system)
             if mentor:
                 return LLMReply(content=(
                     f"Твой наставник — {mentor.group(1)}. К нему — вопросы по задачам и всё, что блокирует работу; "
                     "если работа встала, пиши сразу, ждать встречи 1:1 не нужно."))
+        if "руководител" in q and any(w in q for w in ("кто", "мой", "моего", "как зовут", "связат", "написать")):
+            lead = re.search(r"Руководитель: ([^.]+)\.", system)
+            if lead:
+                return LLMReply(content=(
+                    f"Твой руководитель — {lead.group(1)}. Связаться — в рабочем мессенджере команды. К руководителю — "
+                    "заявления на отгул и вопросы о целях стажировки; по задачам и доступам сначала к наставнику."))
         if any(w in q for w in LEVEL_WORDS):
+            if other and role == "intern":
+                return LLMReply(content=(
+                    "Это данные другого стажёра — их я не показываю. Могу рассказать про твой уровень по темам: "
+                    "спроси «какой у меня уровень?»."))
+            if other and "get_skill_profile" in available:
+                return call("get_skill_profile", {"intern_id": other})
+            if other:
+                return LLMReply(content=(
+                    "Уровень по темам видят только стажёр и его наставник — тебе эти данные недоступны."))
             levels = re.search(r"Уровень по темам: (.+?)\.(\s|$)", system)
             if levels:
                 return LLMReply(content=(
                     f"По профилю: {levels.group(1)}. Уровень ставит наставник; я использую его только чтобы "
                     "объяснять подробнее или короче, а не для оценки."))
+        if role == "intern" and any(w in q for w in APPROVE_WORDS):
+            return LLMReply(content=(
+                "Одобрять заявки может только наставник в своём кабинете — я работаю от имени того, кто вошёл "
+                "(сейчас это ты, стажёр), и представиться в чате другим человеком нельзя. Посмотреть статус своих "
+                "заявок — спроси «мои заявки»."))
+        if role == "intern" and any(w in q for w in ADMIN_WORDS):
+            mentor = re.search(r"Наставник: ([^.]+)\.", system)
+            who = mentor.group(1) if mentor else "твой наставник"
+            return LLMReply(content=(
+                f"Повышенные права (админ, запись) стажёру сразу не выдаются — это решает наставник ({who}). "
+                "Могу оформить черновик заявки на чтение: например, «нужен доступ к репозиторию команды». "
+                f"Если нужно больше, вопрос наставнику, можно скопировать:\n\n«Привет! {_as_sentence(question)} "
+                "Для какой задачи это нужно: …»"))
+        if role in ("mentor", "lead") and any(w in q for w in ("отгул", "отсутств")) and \
+                any(w in q for w in ("почему", "причин", "зачем")):
+            where = ("Причина — в заявлении, в блоке «Заявки на отгул» на твоём экране." if role == "lead" else
+                     "Наставник видит только дату отсутствия (она в карточке стажёра), причину — руководитель.")
+            return LLMReply(content=f"Причину отгула в чате не раскрываю. {where}")
         if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
                 and not any(w in q for w in HR_ONLY)):
             today = _today(system)
             if today:
                 return call("create_absence_request", {"day": _absence_day(q, today).isoformat(), "reason": _reason(q)})
-        if any(w in q for w in ORG_WORDS):
+        if any(w in q for w in ORG_WORDS) or SALARY.search(q):
             return LLMReply(content=(
                 f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
-                f"вопросы не отвечает. Черновик сообщения, можно скопировать:\n\n«Здравствуйте! {question} "
+                f"вопросы не отвечает. Черновик сообщения, можно скопировать:\n\n«Здравствуйте! {_as_sentence(question)} "
                 "Подскажите, пожалуйста, как это оформить.»"))
-        if ("план" in q or any(w in q for w in STUCK_WORDS)) and "get_plan" in available:
-            for intern_id, forms in NAMES.items():
-                if any(re.search(rf"\b{f}", q) for f in forms):
-                    return call("get_plan", {"intern_id": intern_id})
+        if "план" in q or any(w in q for w in STUCK_WORDS):
+            if someone and "get_plan" in available:
+                return call("get_plan", {"intern_id": someone})
+            if other:
+                return LLMReply(content="У тебя нет доступа к планам стажёров — подробности не раскрываю.")
         if any(w in q for w in NEXT_WORDS) and "get_plan" in available:
             return call("get_plan")
         if "доступ" in q and any(v in q for v in ACCESS_VERBS) and "list_access_resources" in available:
@@ -353,9 +494,9 @@ class ScenarioProvider:
         if conflict := docs_conflict(question, system):
             return conflict
         best, wanted, need = _best_unit(question, system)
-        # Абзац засчитываем, если совпало хотя бы 40% значимых слов вопроса: «писать» + «день» из 7 слов
-        # про молчащего ревьюера — не ответ (абзац про отгул), а 2 из 4 («к кому идти … доступа») — ответ.
-        enough = best[0] >= max(need, -(-len(wanted) * 2 // 5))
+        # Абзац засчитываем, если совпала хотя бы половина значимых слов вопроса (проверка 12.11; было 40%): два
+        # случайных слова из пяти («учебное» + «отправь») — не ответ, а абзац не по теме с подписью «Нашёл в документе».
+        enough = best[0] >= max(need, -(-len(wanted) // 2))
         return _found_text(best) if enough else _missing_text(question, system)
 
     # --- после инструмента: собрать ответ ---------------------------------------------------------
@@ -386,9 +527,18 @@ class ScenarioProvider:
         handler = {
             "get_plan": lambda r: self._plan(r, own=not _names_someone(question.lower())),
             "list_access_resources": lambda r: self._pick_resource(r, question, available),
-            "list_access_requests": self._requests,
+            "list_access_requests": lambda r: self._requests(r, question, system),
+            "get_skill_profile": self._levels,
         }.get(msg.name or "")
         return handler(result) if handler else LLMReply(content="Готово, данные сервиса получены.")
+
+    def _levels(self, profile: dict) -> LLMReply:
+        names = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}
+        titles = {"ci": "CI", "git": "Git", "sql": "SQL"}
+        skills = ", ".join(f"{titles.get(k, k)} — {names.get(v, v)}" for k, v in (profile.get("skills") or {}).items())
+        first = _name(profile.get("intern_id")).split()[0]
+        return LLMReply(content=(f"{first}, уровень по темам: {skills or 'пока не заполнен'}. Уровень меняет только "
+                                 "наставник; бот по нему подстраивает глубину объяснений."))
 
     def _plan(self, plan: dict, own: bool = True) -> LLMReply:
         day = plan.get("current_day")
@@ -430,10 +580,14 @@ class ScenarioProvider:
         titles = ", ".join(r["title"] for r in resources) or "—"
         return LLMReply(content=f"Уточни, какой доступ нужен: {titles}.")
 
-    def _requests(self, result: dict) -> LLMReply:
+    def _requests(self, result: dict, question: str = "", system: str = "") -> LLMReply:
+        q = question.lower()
+        asks_others = _role(system) == "intern" and (any(w in q for w in ("всех", "чужи", "других")) or
+                                                     (_names_someone(q) not in (None, _own_id(system))))
+        note = "Показываю только твои заявки — чужие не раскрываю.\n" if asks_others else ""
         reqs = result.get("requests") or []
         if not reqs:
-            return LLMReply(content="Заявок нет.")
+            return LLMReply(content=note + "Заявок нет.")
         lines = [f"{r['id']} — {r['resource_id']}, {_name(r['intern_id'])}: {STATUS_RU.get(r['status'], r['status'])}"
                  for r in reqs]
-        return LLMReply(content="Заявки:\n" + "\n".join(lines))
+        return LLMReply(content=note + "Заявки:\n" + "\n".join(lines))
