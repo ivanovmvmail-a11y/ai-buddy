@@ -209,12 +209,12 @@ def test_only_process_owner_closes_store_after_multiple_sessions(store, monkeypa
 @pytest.mark.parametrize("arguments,identity", [([], None), ([], ""), ([], "unknown"), ([], "system"),
     (["--user", "unknown"], ANYA), (["--user", ""], ANYA)])
 def test_invalid_startup_identity_exits_before_protocol(arguments, identity):
-    environment = {**os.environ, "DATABASE_URL": "", "LLM_PROVIDER": "echo"}
+    environment = {**os.environ, "DATABASE_URL": "", "LLM_PROVIDER": "echo", "PYTHONUTF8": "1"}
     environment.pop("MCP_USER_ID", None)
     if identity is not None:
         environment["MCP_USER_ID"] = identity
     result = subprocess.run([sys.executable, "-m", "app.mcp_server.server", *arguments], cwd=BACKEND,
-                            env=environment, input="", capture_output=True, text=True, timeout=15)
+                            env=environment, input="", capture_output=True, text=True, encoding="utf-8", timeout=15)
     assert result.returncode == 2 and result.stdout == ""
     assert ("Укажите пользователя" if identity in (None, "") or arguments == ["--user", ""] else "Неизвестный пользователь") in result.stderr
 
