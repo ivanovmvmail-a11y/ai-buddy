@@ -61,7 +61,8 @@ class OpenAICompatibleProvider:
         )
 
     async def chat(self, messages: list[Message], tools: list[ToolSpec] | None = None) -> LLMReply:
-        kwargs: dict = {"model": settings.openai_model, "messages": to_openai_messages(messages)}
+        kwargs: dict = {"model": settings.openai_model, "messages": to_openai_messages(messages),
+                        "temperature": settings.llm_temperature}
         if tools:
             kwargs["tools"] = to_openai_tools(tools)
         response = await self._client.chat.completions.create(**kwargs)

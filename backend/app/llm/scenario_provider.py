@@ -156,6 +156,47 @@ def docs_conflict(question: str, system: str) -> str | None:
     return _conflict(best, wanted, need, system) if best[0] >= need else None
 
 
+def _found_text(best: tuple[int, str, str]) -> str:
+    fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
+    return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
+
+
+def _missing_text(question: str, system: str) -> str:
+    who = "твой наставник" if _role(system) == "intern" else "коллеги из команды"
+    return (
+        "В документах, доступных тебе, этого нет — выдумывать не буду. Скорее всего подскажет "
+        f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {question} "
+        "Я поискал в документах команды, но ответа не нашёл.»")
+
+
+MISSING_PHRASES = ("этого нет", "не нашел", "нет информации", "информации об этом нет", "нет в документ", "не нашлось",
+                   "не нашла", "не найден", "не указан")
+# Вопросы, на которые отвечают инструменты, сводка плана или HR, а не абзац документа: страховку не применяем.
+_NOT_DOC_QUESTION = ("план", "заявк", "наставник", "доступ", "уровень", "навык")
+
+
+def docs_guard(question: str, system: str, reply: str) -> str | None:
+    """Страховка для любой модели (прогон GigaChat 12.11): поиск нашёл абзац, а модель говорит «этого нет» —
+    показываем абзац с источником; поиск ничего не нашёл, а модель отвечает «как обычно бывает» (IT-отдел,
+    портал), даже после «этого нет», — честное «в документах нет» и к кому идти. Ответ со ссылкой на документ не трогаем."""
+    q = question.lower().strip()
+    if THANKS.fullmatch(q) or any(q.startswith(g) for g in GREETINGS):
+        return None
+    if any(w in q for w in (*NEXT_WORDS, *STUCK_WORDS, *LEVEL_WORDS, *ORG_WORDS, *ABSENCE_WORDS, *_NOT_DOC_QUESTION)):
+        return None
+    best, wanted, need = _best_unit(question, system)
+    if len(wanted) < 2:
+        return None
+    low = reply.lower().replace("ё", "е")
+    says_missing = any(p in low for p in MISSING_PHRASES)
+    if best[0] >= need:
+        return _found_text(best) if says_missing else None
+    # Ничего не нашлось: даже честное «этого нет» модель дополняет «как обычно бывает» (сайт компании,
+    # IT-поддержка) — поэтому всегда наш ответ: нет в документах, к кому идти и готовый текст вопроса.
+    cites = any(title and title in reply for title, _ in _docs(system))
+    return None if cites else _missing_text(question, system)
+
+
 def _names_someone(q: str) -> str | None:
     """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
     return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
@@ -295,14 +336,7 @@ class ScenarioProvider:
         best, wanted, need = _best_unit(question, system)
         if best[0] >= need and (conflict := _conflict(best, wanted, need, system)):
             return conflict
-        if best[0] >= need:
-            fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
-            return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
-        who = "твой наставник" if _role(system) == "intern" else "коллеги из команды"
-        return (
-            "В документах, доступных тебе, этого нет — выдумывать не буду. Скорее всего подскажет "
-            f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {question} "
-            "Я поискал в документах команды, но ответа не нашёл.»")
+        return _found_text(best) if best[0] >= need else _missing_text(question, system)
 
     # --- после инструмента: собрать ответ ---------------------------------------------------------
 

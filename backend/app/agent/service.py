@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pydantic import ValidationError
 
 from app.llm import Message, get_llm
-from app.llm.scenario_provider import absence_rule, docs_conflict
+from app.llm.scenario_provider import absence_rule, docs_conflict, docs_guard
 from app.rag import retrieve
 
 from .actions import Action, ActionStore, InMemoryActionStore
@@ -118,6 +118,11 @@ class Agent:
                 # SPEC 3.8: к черновику заявления — правило из регламента с источником, даже если модель его опустила.
                 if any(a.tool == "create_absence_request" for a in created) and "Отгул на один день" not in text:
                     text = absence_rule(system) + text
+                # Страховка «есть в документах / нет в документах» — только для ответа без инструментов.
+                elif (not used and getattr(llm, "name", "") != "scenario"
+                      and (fixed := docs_guard(question, system, text)) and fixed != text):
+                    log.info("docs guard replaced model reply user=%s", user.id)
+                    text = fixed
                 return AgentResult(reply=text, sources=cited_sources(text, docs, question), actions=created,
                                    tools=used, refused=refused)
             messages.append(Message(role="assistant", content=reply.content, tool_calls=reply.tool_calls))

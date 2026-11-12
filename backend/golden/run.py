@@ -10,6 +10,7 @@
 («по словам», как без ключа). Состояние сервисов сбрасывается перед каждым вопросом.
 """
 import argparse
+import logging
 import json
 import sys
 import time
@@ -52,6 +53,19 @@ class Result:
     leak: bool = False
     notes: list[str] = field(default_factory=list)
     seconds: float = 0.0
+    guarded: bool = False  # ответ модели заменила страховка сервера (docs_guard) — показываем честно в отчёте
+
+
+class _GuardCounter(logging.Handler):
+    """Считает срабатывания страховки агента по его журналу (сообщение «docs guard replaced»)."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.INFO)
+        self.count = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if "docs guard replaced" in record.getMessage():
+            self.count += 1
 
 
 def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_requests: int) -> tuple[bool, bool, list[str]]:
@@ -141,8 +155,14 @@ def run_cases(provider: str, cases: list[dict] | None = None) -> list[Result]:
         mock.patch.object(rag, "get_service", lambda: rag_service),
     ):
         get_llm.cache_clear()
+        guard = _GuardCounter()
+        agent_log = logging.getLogger("ai_buddy.agent")
+        agent_log.addHandler(guard)
+        level = agent_log.level
+        agent_log.setLevel(logging.INFO)
         try:
             for case in cases:
+                guarded_before = guard.count
                 store = storage.InMemoryStore(load_seed())
                 with mock.patch.object(storage, "get_store", lambda store=store: store), \
                         mock.patch.object(service, "agent", service.build_agent()):
@@ -160,8 +180,11 @@ def run_cases(provider: str, cases: list[dict] | None = None) -> list[Result]:
                     new_requests = _count_requests(client, headers, case["user"]) - requests_before
                     ok, leak, notes = check(case, reply, sources, actions, new_requests) if res.status_code == 200 \
                         else (False, False, [f"HTTP {res.status_code}"])
-                    results.append(Result(case, reply, sources, actions, ok, leak, notes, seconds))
+                    results.append(Result(case, reply, sources, actions, ok, leak, notes, seconds,
+                                          guarded=guard.count > guarded_before))
         finally:
+            agent_log.removeHandler(guard)
+            agent_log.setLevel(level)
             get_llm.cache_clear()
     return results
 
@@ -183,6 +206,7 @@ def summary(results: list[Result]) -> dict:
         "drafts_ok": rate([r for r in results if r.case["category"] == "actions"]),
         "by_category": {c: rate([r for r in results if r.case["category"] == c]) for c in CATEGORY_TITLES},
         "avg_seconds": sum(r.seconds for r in results) / len(results) if results else 0.0,
+        "guarded": sum(r.guarded for r in results),
     }
 
 
@@ -194,6 +218,10 @@ def report(results: list[Result], provider: str) -> str:
         "",
         f"Режим модели: **{provider}** · вопросов: **{s['total']}** · прошли: **{s['passed']}** ({pct(s['pass_rate'])}) · "
         f"среднее время ответа: {s['avg_seconds']:.2f} с",
+        "",
+        f"Страховка сервера заменила ответ модели: **{s['guarded']}** из {s['total']} (🛡 в таблице) — модель сказала "
+        "«нет в документах», хотя абзац нашёлся, или посоветовала то, чего в документах нет."
+        if s["guarded"] else "Страховка сервера не понадобилась: все ответы — от модели или инструментов.",
         "",
         "Как воспроизвести: `cd backend && uv run python -m golden.run"
         + ("" if provider == "scenario" else f" --provider {provider}") + "`. Набор — `backend/golden/cases.json`.",
@@ -217,7 +245,7 @@ def report(results: list[Result], provider: str) -> str:
     lines += [f"| {title} | {pct(s['by_category'][c])} |" for c, title in CATEGORY_TITLES.items()]
     lines += ["", "## Все вопросы", "", "| # | Кто | Вопрос | Итог | Замечания |", "|---|---|---|---|---|"]
     for r in results:
-        mark = "✅" if r.passed else "❌"
+        mark = ("✅" if r.passed else "❌") + (" 🛡" if r.guarded else "")
         notes = "; ".join(r.notes) or "—"
         lines.append(f"| {r.case['id']} | {r.case['user']} | {r.case['question']} | {mark} | {notes} |")
     failed = [r for r in results if not r.passed]
