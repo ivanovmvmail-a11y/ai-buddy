@@ -105,3 +105,31 @@ describe("сравнение двух планов (SPEC 5)", () => {
     expect(await screen.findByText("Сравнение планов пока недоступно на сервере.")).toBeTruthy();
   });
 });
+
+describe("«это я уже знаю» (SPEC 4)", () => {
+  const row = async (title: string) => (await screen.findByText(title)).closest("li")!;
+
+  it("стажёр отмечает пункт — пункт не закрыт, отметку можно убрать", async () => {
+    open("intern-anya");
+    const item = await row("Практикум: ветки и pull request");
+    await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Это я уже знаю" })));
+    await waitFor(() => expect(srv.calls.find((c) => c.path === "/plan/items/anya.p.git/known")?.body).toEqual({ known: true }));
+    const marked = await row("Практикум: ветки и pull request");
+    expect(await within(marked).findByText(/Наставник решит, поднять ли уровень/)).toBeTruthy();
+    expect(within(marked).queryByRole("button", { name: "Это я уже знаю" })).toBeNull();
+    expect(srv.state.items.find((i) => i.id === "anya.p.git")!.status).toBe("not_started");
+
+    await act(async () => fireEvent.click(within(marked).getByRole("button", { name: "Убрать отметку" })));
+    await waitFor(() => expect(srv.state.items.find((i) => i.id === "anya.p.git")!.known_marked).toBe(false));
+  });
+
+  it("нет кнопки: пункт без темы, сильная тема, чужой план", async () => {
+    srv.state.profiles[0].skills.monitoring = "confident";
+    open("intern-anya");
+    expect(within(await row("Познакомиться с командой")).queryByRole("button", { name: "Это я уже знаю" })).toBeNull();
+    expect(within(await row("Изучить документы и мануалы команды")).queryByRole("button", { name: "Это я уже знаю" })).toBeNull();
+    cleanup();
+    open("mentor-petr");
+    expect(within(await row("Практикум: ветки и pull request")).queryByRole("button", { name: "Это я уже знаю" })).toBeNull();
+  });
+});

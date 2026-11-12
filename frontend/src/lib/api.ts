@@ -96,6 +96,8 @@ export const api = {
     if (!res.ok) throw new ApiError(`Ошибка сервера: ${res.status}`, res.status);
   },
   metrics: (u: string, internId?: string) => request(`/metrics${q(internId)}`, Metrics, u),
+  markKnown: (u: string, itemId: string, known: boolean) =>
+    request(`/plan/items/${encodeURIComponent(itemId)}/known`, PlanItem, u, post({ known })),
   suggestions: (u: string) => request("/skills/suggestions?status=pending", SuggestionsResponse, u),
   decideSuggestion: (u: string, id: string, accept: boolean) =>
     request(`/skills/suggestions/${encodeURIComponent(id)}/decide`, SkillSuggestion, u, post({ accept })),

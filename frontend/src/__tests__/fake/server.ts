@@ -1,7 +1,9 @@
 // Поддельный backend для тестов интерфейса: те же адреса и формы ответов, что в docs/API.md,
 // правила — упрощённая копия спеки 101 (настоящие правила и их тесты — в backend/tests/mcp).
 import { vi } from "vitest";
-import { addKirill, DEMO_USERS as BASE_USERS, initialState, KIRILL, RESOURCES, type DemoState } from "./mock-data";
+import { addKirill, DEMO_USERS as ALL_USERS, EXTRA_INTERNS, initialState, KIRILL, RESOURCES, type DemoState } from "./mock-data";
+
+const BASE_USERS = ALL_USERS.filter((u) => !EXTRA_INTERNS.has(u.id));
 import type { AbsenceRequest, Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, StageInfo } from "@/lib/types";
 
 const WORKING = ["week1", "week2"];
@@ -192,6 +194,14 @@ export function installFakeServer(): FakeServer {
     if (p === "/skills/suggestions") {
       if (srv.noAdaptive || actor.role !== "mentor") return err(404, "Не найдено");
       return ok({ suggestions: s.suggestions.filter((x) => see(x.intern_id) && x.status === "pending") });
+    }
+    m = p.match(/^\/plan\/items\/(.+)\/known$/);
+    if (m) {
+      const item = s.items.find((i) => i.id === m![1]);
+      if (!item || actor.role !== "intern" || item.intern_id !== actor.id) return err(404, "Не найдено");
+      if (!item.topic) return err(422, "У пункта нет темы");
+      item.known_marked = Boolean(body.known);
+      return ok(derived(s, item));
     }
     m = p.match(/^\/skills\/suggestions\/(.+)\/decide$/);
     if (m) {
