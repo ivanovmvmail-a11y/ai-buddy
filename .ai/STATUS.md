@@ -80,7 +80,7 @@
 
 | C2.1112 | Проверка 12.11: UTF-8, seed отгула, темы Grafana, имя в уведомлении | Codex | codex/review-1112-fixes | на ревью | [#87](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/87) | Ревью: текст, авто-обновление Grafana, паритет тем; 735 / 1134 теста, 95,68% / 98,61%; golden 81/81, утечек 0; Docker OK |
 
-| C2.access | Учебные Redash и Grafana в каталоге доступов | Codex | codex/access-redash-grafana | на ревью | — | 755 / 1176 тестов; 95,68% / 98,61%; golden 81/81, утечек 0; Docker /health=200; распознавание чата — HANDOFF Claude |
+| C2.access | Учебные Redash и Grafana в каталоге доступов | Codex | codex/access-redash-grafana | на ревью | [#90](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/90) | 755 / 1176 тестов; 95,68% / 98,61%; golden 81/81, утечек 0; Docker /health=200; распознавание чата — HANDOFF Claude |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
