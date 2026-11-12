@@ -19,6 +19,7 @@ from unittest import mock
 
 from app import async_runner, rag
 from app.agent import service
+from app.agent.users import DEMO_USERS
 from app.config import settings
 from app.llm import get_llm
 from app.mcp_server import storage
@@ -61,9 +62,12 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
     leak = False
     ok = True
     if "source" in expect:
-        if not any(expect["source"] in s for s in sources):
+        # Можно указать несколько подходящих документов: после документов «как сделать» (аудит S2) на один
+        # вопрос отвечают и общий регламент, и пошаговая инструкция.
+        wanted = expect["source"] if isinstance(expect["source"], list) else [expect["source"]]
+        if not any(w in s for w in wanted for s in sources):
             ok = False
-            notes.append(f"нет источника «{expect['source']}»")
+            notes.append(f"нет источника «{' / '.join(wanted)}»")
         if any(w in low for w in NOT_FOUND_WORDS[:2]):
             ok = False
             notes.append("ответил «нет в базе»")
@@ -78,7 +82,9 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
         if not any(w in low for w in NOT_FOUND_WORDS):
             ok = False
             notes.append("не сказал, что в базе нет")
-        if not any(w in low for w in ("наставник", "коллег", "руководител", "hr")):
+        # «Спроси у Петра Волкова» — тоже ответ «к кому идти»: имя наставника/руководителя/HR в любом падеже.
+        people = tuple(u.name.split()[0].lower().replace("ё", "е")[:4] for u in DEMO_USERS.values() if u.role != "intern")
+        if not any(w in low.replace("ё", "е") for w in ("наставник", "коллег", "руководител", "hr", *people)):
             ok = False
             notes.append("не сказал, к кому идти")
     if expect.get("hr") and "hr" not in low:

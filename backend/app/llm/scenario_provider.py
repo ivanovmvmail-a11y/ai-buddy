@@ -130,6 +130,32 @@ def _conflict(best: tuple[int, str, str], wanted: set[str], need: int, system: s
     return None
 
 
+def _best_unit(question: str, system: str) -> tuple[tuple[int, str, str], set[str], int]:
+    """Лучший абзац документов для вопроса: (совпадение, документ, текст), слова вопроса и порог совпадения."""
+    wanted = _words(question)
+    # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
+    # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
+    need = min(2, len(wanted)) or 1
+    # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
+    # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
+    best, best_key = (0, "", ""), None
+    for rank, (title, content) in enumerate(_docs(system)):
+        for heading, unit in _units(content):
+            score = _overlap(wanted, heading + " " + unit)
+            definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
+            key = (score, not definition, -rank, len(unit))
+            if best_key is None or key > best_key:
+                best, best_key = (score, title, unit), key
+    return best, wanted, need
+
+
+def docs_conflict(question: str, system: str) -> str | None:
+    """SPEC 3.7 для любой модели: если найденные документы называют разные сроки, ответ — оба варианта,
+    независимо от того, заметит ли расхождение модель (GigaChat на прогоне 12.11 выбирал один молча)."""
+    best, wanted, need = _best_unit(question, system)
+    return _conflict(best, wanted, need, system) if best[0] >= need else None
+
+
 def _names_someone(q: str) -> str | None:
     """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
     return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
@@ -190,7 +216,7 @@ def _reason(q: str) -> str:
     return "personal"
 
 
-def _regulation(system: str) -> str:
+def absence_rule(system: str) -> str:
     """Абзац регламента об отгуле из найденных документов — с источником в «кавычках»."""
     best = (0, "", "")
     wanted = {"отгул", "отпроситься", "заявление", "день", "руководитель"}
@@ -266,20 +292,7 @@ class ScenarioProvider:
         return LLMReply(content=self._from_docs(question, system))
 
     def _from_docs(self, question: str, system: str) -> str:
-        wanted = _words(question)
-        # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
-        # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
-        need = min(2, len(wanted)) or 1
-        # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
-        # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
-        best, best_key = (0, "", ""), None
-        for rank, (title, content) in enumerate(_docs(system)):
-            for heading, unit in _units(content):
-                score = _overlap(wanted, heading + " " + unit)
-                definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
-                key = (score, not definition, -rank, len(unit))
-                if best_key is None or key > best_key:
-                    best, best_key = (score, title, unit), key
+        best, wanted, need = _best_unit(question, system)
         if best[0] >= need and (conflict := _conflict(best, wanted, need, system)):
             return conflict
         if best[0] >= need:
@@ -309,7 +322,7 @@ class ScenarioProvider:
         if result.get("error"):
             return LLMReply(content="Сервис сейчас не ответил. Попробуй ещё раз чуть позже.")
         if result.get("status") == "awaiting_confirmation" and msg.name == "create_absence_request":
-            rule = _regulation(system)
+            rule = absence_rule(system)
             return LLMReply(content=(
                 f"{rule}Подготовил черновик: {result.get('summary')}. Подробности вроде врача в заявление не пишу — "
                 "только причину из списка. Проверь дату и нажми «Подтвердить»: без этого руководителю ничего не уйдёт."))

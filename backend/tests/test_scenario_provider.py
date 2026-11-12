@@ -2,7 +2,7 @@
 import json
 
 import pytest
-from .conftest import as_user
+from .conftest import as_user, text_reply
 
 from app import async_runner
 from app.agent import service
@@ -228,3 +228,11 @@ def test_conflicting_documents_show_both_and_reach_mentor(demo_docs):
 def test_consistent_documents_give_plain_answer(demo_docs):
     reply = ask(demo_docs, "Сколько ждать ревью?", "intern-ivan")["reply"]
     assert reply.startswith("Нашёл в документе") and "расходятся" not in reply
+
+
+def test_conflict_is_shown_even_if_model_would_pick_one(demo_docs, use_llm):
+    """Прогон GigaChat 12.11: модель выбирала один срок молча. Расхождение агент показывает сам, до модели."""
+    llm = use_llm(text_reply("Ревью приходит в течение рабочего дня."))
+    reply = ask(demo_docs, "Сколько ждать ревью?")["reply"]
+    assert reply.startswith("Документы расходятся")
+    assert llm.calls == []  # модель не спрашивали
