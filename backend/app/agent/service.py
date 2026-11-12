@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pydantic import ValidationError
 
 from app.llm import Message, get_llm
-from app.llm.scenario_provider import absence_rule, docs_conflict, docs_guard
+from app.llm.scenario_provider import MISSING_PHRASES, absence_rule, docs_conflict, docs_guard, search_query
 from app.rag import retrieve
 
 from .actions import Action, ActionStore, InMemoryActionStore
@@ -46,6 +46,8 @@ def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict
     (ответ «в базе нет» повторяет вопрос и не должен выглядеть как ответ по документу).
     """
     titled = {d["title"] for d in docs if f"«{d['title']}»" in reply}
+    if not titled and any(p in reply.lower().replace("ё", "е") for p in MISSING_PHRASES):
+        return []  # «в документах этого нет» — ни на какой документ не опирается (проверка 12.11, В5)
     asked = set(_WORD.findall(question.lower().replace("ё", "е")))
     words = set(_WORD.findall(reply.lower().replace("ё", "е"))) - asked
     cited: list[dict] = []
@@ -90,7 +92,8 @@ class Agent:
 
     async def answer(self, history: list[Message], user: User) -> AgentResult:
         question = next((m.content for m in reversed(history) if m.role == "user"), "")
-        docs = await retrieve(question, user, k=RAG_TOP_K)
+        # Разговорные слова («запулить», «пул реквест», «CI») дополняем словами документов — поиск их найдёт.
+        docs = await retrieve(search_query(question), user, k=RAG_TOP_K)
 
         system = SYSTEM_PROMPT + user_context(user.name, user.role.value, user.team) + await plan_context(user)
         if docs:
