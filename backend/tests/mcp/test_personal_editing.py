@@ -55,9 +55,9 @@ def test_unrelated_skill_change_does_not_undo_mentor_personalization(store,snaps
     run(hiring.set_skill_level(P,A.id,'ci','familiar'))
     assert 'anya.p.sql' in snapshot().items
     assert 'anya.p.git' not in snapshot().items
-    # Изменение именно SQL пересобирает эту тему; ручной пункт не бессрочный.
+    # Изменение своей темы тоже не отменяет явное назначение наставника.
     run(hiring.set_skill_level(P,A.id,'sql','familiar'))
-    assert 'anya.p.sql' not in snapshot().items
+    assert snapshot().items['anya.p.sql'].reason=='добавил наставник'
 
 
 def test_concurrent_additions_create_one_item_and_notification(store,snapshot):

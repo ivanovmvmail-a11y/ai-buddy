@@ -10,6 +10,12 @@ from ._system import SYSTEM_ACTOR
 from .errors import Conflict, Forbidden, NotFound
 from .models import ItemStatus, NextStep, OnboardingData, Plan, PlanItem, StageInfo, CatalogItem
 
+MANUAL_PERSONAL_REASON = "добавил наставник"
+
+
+def _personal_item_id(intern_id: str, topic: str) -> str:
+    return f"{intern_id.removeprefix('intern-')}.p.{topic}"
+
 
 def _change_status(data: OnboardingData, actor: User, item: PlanItem, status: ItemStatus,
                   reason: str | None = None, waiting_for: str | None = None, *, day: int | None = None):
@@ -145,7 +151,7 @@ def _remove_personal(data, actor, item):
 
 
 def _add_personal(data, actor, intern_id, entry, *, reason=None):
-    item = PlanItem(id=f"{intern_id.removeprefix('intern-')}.p.{entry.topic}", intern_id=intern_id,
+    item = PlanItem(id=_personal_item_id(intern_id, entry.topic), intern_id=intern_id,
         kind="personal", reason=reason or f"в карте навыков {entry.topic_title} — новичок",
         catalog_key=entry.key, topic=entry.topic, title=entry.title, summary=entry.summary,
         doc_source_id=entry.doc_source_id, practice=entry.practice, stage=entry.stage,
@@ -168,6 +174,7 @@ def _rebuild_personal(data, actor, intern_id, *, topic=None):
     for item in list(data.items.values()):
         if (item.intern_id == intern_id and item.kind == "personal" and item.status != "done"
                 and (topic is None or item.topic == topic)
+                and item.reason != MANUAL_PERSONAL_REASON
                 and profile.skills.get(item.topic) != "novice"):
             _remove_personal(data, actor, item)
     user = DEMO_USERS[intern_id]
@@ -196,11 +203,11 @@ async def add_personal_item(actor: User, intern_id: str, catalog_key: str) -> Pl
         entry = data.personal_catalog.get(catalog_key)
         if entry is None or entry.team != user.team:
             raise NotFound()
-        id = f"{intern_id.removeprefix('intern-')}.p.{entry.topic}"
+        id = _personal_item_id(intern_id, entry.topic)
         if id in data.items or any(item.intern_id == intern_id and item.catalog_key == catalog_key
                                    for item in data.items.values()):
             raise Conflict("Пункт уже в плане")
-        item = _add_personal(data, actor, intern_id, entry, reason="добавил наставник")
+        item = _add_personal(data, actor, intern_id, entry, reason=MANUAL_PERSONAL_REASON)
         return item_view(data, item)
 
 

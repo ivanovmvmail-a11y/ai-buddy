@@ -65,7 +65,7 @@
 
 | C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | [#70](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/70) | Ревью 1–4: main сохранён; нейтральное понижение, один факт на тему, явный каталог; 1033 passed / 97,95% |
 
-| C1.3 | Чекпоинт 1, 3: наставник правит персональные пункты | Codex | codex/personal-plan-editing | на ревью | [#71](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/71) | 918 passed / 98,31%; общий/done сохраняются; /health=200 |
+| C1.3 | Чекпоинт 1, 3: наставник правит персональные пункты | Codex | codex/personal-plan-editing | на ревью | [#71](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/71) | Ревью 1–3: исправленный #70/main; ручные пункты сохраняются, общий id; 1075 passed / 97,97% |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
