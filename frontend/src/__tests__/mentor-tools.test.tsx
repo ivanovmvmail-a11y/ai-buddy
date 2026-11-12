@@ -134,7 +134,7 @@ describe("«это я уже знаю» (SPEC 4)", () => {
     await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Это я уже знаю" })));
     await waitFor(() => expect(srv.calls.find((c) => c.path === "/plan/items/anya.p.git/known")?.body).toEqual({ known: true }));
     const marked = await row("Практикум: ветки и pull request");
-    expect(await within(marked).findByText(/Наставник решит, поднять ли уровень/)).toBeTruthy();
+    expect(await within(marked).findByText(/Отмечено: это я уже знаю. Наставник решит, поднять ли уровень/)).toBeTruthy();
     expect(within(marked).queryByRole("button", { name: "Это я уже знаю" })).toBeNull();
     expect(srv.state.items.find((i) => i.id === "anya.p.git")!.status).toBe("not_started");
 
@@ -171,7 +171,7 @@ describe("наставник правит персональные пункты 
     expect(within(box).getByText("Добавить пункт в план: Аня")).toBeTruthy();
     expect(within(box).queryByText(/ветки и pull request/)).toBeNull(); // уже в плане
     expect(within(box).queryByText(/учебной базе доставок/)).toBeNull(); // каталог чужой команды
-    await act(async () => fireEvent.click(within(box).getByRole("button", { name: "+ Практикум: красный пайплайн" })));
+    await act(async () => fireEvent.click(within(box).getByRole("button", { name: "Добавить в план: Практикум: красный пайплайн" })));
     const added = await row("Практикум: красный пайплайн");
     expect(within(added).getByText("персональный")).toBeTruthy();
     expect(within(added).getByText("Почему: добавил наставник")).toBeTruthy();

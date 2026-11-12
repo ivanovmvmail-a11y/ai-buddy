@@ -140,6 +140,8 @@ function CatalogPicker({ actor, internId, name }: { actor: DemoUser; internId: s
             <button
               disabled={add.isPending}
               onClick={() => add.mutate(c.key)}
+              // Имя кнопки для программ чтения с экрана — название пункта, а не подсказка (проверка 12.11)
+              aria-label={`Добавить в план: ${c.title}`}
               title={c.summary}
               className="rounded-lg border border-violet-500/40 px-2.5 py-1 text-violet-700 hover:bg-violet-500/10 disabled:opacity-50 dark:text-violet-300"
             >
@@ -247,7 +249,7 @@ function PlanRow({
       {item.status_reason && <p className="mt-1 text-xs text-orange-800 dark:text-orange-300">Причина: {item.status_reason}</p>}
       {item.known_marked && self && item.status !== "done" && (
         <p className="mt-1 text-xs text-black/55 dark:text-white/55">
-          Ты отметил: это я уже знаю. Наставник решит, поднять ли уровень.{" "}
+          Отмечено: это я уже знаю. Наставник решит, поднять ли уровень.{" "}
           <button disabled={know.isPending} onClick={() => know.mutate(false)} className="underline underline-offset-2 disabled:opacity-50">
             Убрать отметку
           </button>
