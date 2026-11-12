@@ -371,3 +371,21 @@ def test_typo_helpers():
     assert _as_sentence("как офрмить пул реквест") == "Как офрмить пул реквест?"
     assert _as_sentence("хочу в отпуск") == "Хочу в отпуск." and _as_sentence("ок!") == "Ок!"
     assert _split_actions("оформи доступ") == ("оформи доступ", "")
+
+
+@pytest.mark.parametrize("question, user, resource", [
+    ("Оформи мне доступ в Redash", "intern-anya", "redash"),
+    ("доступ в редаш", "intern-ivan", "redash"),
+    ("нужен доступ к графане", "intern-kirill", "grafana"),
+    ("Доступ в Grafana", "intern-liza", "grafana"),
+])
+def test_training_redash_grafana_access_is_a_draft(scenario, question, user, resource):
+    """Каталог #90: учебные Redash и Grafana — черновик заявки на чтение, подтверждает человек."""
+    body = ask(scenario, question, user)
+    [draft] = body["actions"]
+    assert draft["tool"] == "create_access_request" and draft["status"] == "pending"
+    assert draft["params"]["resource_id"] == resource and draft["params"]["level"] == "read"
+
+
+def test_grafana_question_without_access_is_not_a_request(scenario):
+    assert ask(scenario, "что показывает grafana")["actions"] == []
