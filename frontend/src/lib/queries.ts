@@ -16,6 +16,8 @@ export const keys = {
   metrics: (u: string, intern: string) => ["metrics", u, intern] as const,
   suggestions: (u: string) => ["suggestions", u] as const,
   compare: (u: string, a: string, b: string) => ["compare", u, a, b] as const,
+  absence: (u: string) => ["absence", u] as const,
+  absenceFacts: (u: string, intern: string) => ["absence-facts", u, intern] as const,
 };
 
 const PLAN_ROLES = new Set(["intern", "mentor", "lead", "curator"]);
@@ -108,12 +110,30 @@ export const useCompare = (actor: DemoUser, a: string, b: string, enabled: boole
     retry: false,
   });
 
+/** Заявки на отгул (SPEC 3.8): стажёру — свои, руководителю — своей команды. */
+export const useAbsenceRequests = (actor: DemoUser) =>
+  useQuery({
+    queryKey: keys.absence(actor.id),
+    queryFn: () => orEmpty(async () => (await api.absenceRequests(actor.id)).requests, []),
+    enabled: actor.role === "intern" || actor.role === "lead",
+    retry: false,
+  });
+
+/** Наставнику — только даты отсутствия своего стажёра. */
+export const useAbsenceFacts = (actor: DemoUser, internId: string) =>
+  useQuery({
+    queryKey: keys.absenceFacts(actor.id, internId),
+    queryFn: () => orEmpty(async () => (await api.absenceFacts(actor.id, internId)).facts, []),
+    enabled: actor.role === "mentor",
+    retry: false,
+  });
+
 /** После любого изменения на сервере обновляем всё, что могло измениться. */
 export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare"].map((k) =>
+      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts"].map((k) =>
         client.invalidateQueries({ queryKey: [k] }),
       ),
     );

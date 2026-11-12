@@ -1,7 +1,7 @@
 // Данные поддельного сервера для тестов интерфейса (бывший макет T2). Настоящие данные — seed имитаций
 // сервисов на backend. Всё синтетическое.
 import { DEMO_USERS } from "@/lib/users";
-import type { SkillSuggestion } from "@/lib/types";
+import type { AbsenceRequest, Reminder, SkillSuggestion } from "@/lib/types";
 import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "@/lib/types";
 
 export { DEMO_USERS };
@@ -131,12 +131,14 @@ export type DemoState = {
   profiles: SkillProfile[];
   dismissedReminders: string[];
   suggestions: SkillSuggestion[];
+  absences: AbsenceRequest[];
+  notifications: Reminder[];
 };
 
-/** Второй стажёр Петра (SPEC 3.1, решение 11.11) — только для тестов экрана сравнения: в seed backend его пока нет. */
-export const KIRILL: DemoUser = {
-  id: "intern-kirill", name: "Кирилл Егоров", role: "intern", team: "Платформа объявлений", mentor_id: "mentor-petr",
-};
+/** Второй стажёр Петра (SPEC 3.1). В поддельном сервере подключается только в тестах сравнения (`srv.addKirill()`),
+ * чтобы старые тесты «у Петра одна Аня» не менялись. */
+export const KIRILL: DemoUser = DEMO_USERS.find((u) => u.id === "intern-kirill")!;
+export const EXTRA_INTERNS = new Set(["intern-kirill", "intern-liza"]);
 
 export function addKirill(s: DemoState) {
   s.days[KIRILL.id] = 3;
@@ -176,5 +178,7 @@ export function initialState(): DemoState {
     ],
     dismissedReminders: [],
     suggestions: [],
+    absences: [],
+    notifications: [],
   };
 }

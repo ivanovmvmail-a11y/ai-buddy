@@ -8,10 +8,11 @@ import { ProfilePanel } from "@/components/ProfilePanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  accessDraftParams, actionFor, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, msgId, reminderMsg,
+  absenceNudgeMsg, accessDraftParams, actionFor, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, msgId, reminderMsg,
   nudgeMsg, useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
+import { isInfo, kindOf, sectionFor, targetOf } from "@/lib/notifications";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { savedUserId, useSession } from "@/lib/store";
 import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
@@ -53,6 +54,7 @@ async function withDemoKey<T>(call: (key?: string) => Promise<T>): Promise<T> {
 export default function Home() {
   const userId = useSession((s) => s.userId);
   const setUser = useSession((s) => s.setUser);
+  const pickIntern = useSession((s) => s.pickIntern);
   const actor = findUser(userId)!;
   const [tab, setTab] = useState<"plan" | "chat">("plan");
   const [view, setView] = useState<"plan" | "profile">("plan"); // левая колонка стажёра: план или «Мой профиль»
@@ -203,6 +205,11 @@ export default function Home() {
       say(nudgeMsg(a.requestId, a.itemTitle));
       return;
     }
+    if (a.kind === "nudge-lead") {
+      setTab("chat");
+      say(absenceNudgeMsg(findUser(actor.lead_id)?.name ?? ""));
+      return;
+    }
     if (a.kind === "snooze") {
       await api.snooze(actor.id, a.reminderId).catch(() => undefined);
       await refresh();
@@ -216,8 +223,25 @@ export default function Home() {
     else await onExplain(item, a.kind);
   }
 
-  /** Из колокольчика: показать напоминание в чате с кнопками действия. */
+  /** Из колокольчика (SPEC 3.6): кнопка ведёт туда, где действие, — к блоку на панели плана или в чат. */
   async function openReminder(r: Reminder) {
+    const section = sectionFor(r);
+    if (section) {
+      setTab("plan");
+      setView("plan");
+      if (targetOf(r) === "intern" && r.intern_id) pickIntern(r.intern_id);
+      setTimeout(() => document.querySelector(`[aria-label="${section}"]`)?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 50);
+      if (isInfo(r)) {
+        await api.doneReminder(actor.id, r.id).catch(() => undefined); // факт прочитан — из колокольчика уходит
+        await refresh();
+      }
+      return;
+    }
+    if (kindOf(r) === "absence_pending") {
+      setTab("chat");
+      say(absenceNudgeMsg(findUser(actor.lead_id)?.name ?? ""));
+      return;
+    }
     setTab("chat");
     const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
     say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));

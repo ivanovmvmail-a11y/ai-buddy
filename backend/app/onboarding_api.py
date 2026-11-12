@@ -21,7 +21,8 @@ from app.http_body import json_body
 from app.agent import analytics, explain, history, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
-from app.mcp_server import access, checklist, clock, hiring
+from app.mcp_server import absence, access, checklist, clock, hiring
+from app.mcp_server.absence_models import REASONS
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
 
 bp = Blueprint("onboarding", __name__)
@@ -121,6 +122,104 @@ class DecideIn(BaseModel):
 def decide(request_id: str):
     body = _body(DecideIn)
     return _json(async_runner.run(access.decide_request(g.user, request_id, body.approve, body.reason)))
+
+
+# --- Отгул на один день (SPEC 3.8; сервис — app/mcp_server/absence.py) ----------------------------
+
+def _absence(r) -> dict:
+    intern = DEMO_USERS.get(r.intern_id)
+    return {**_json(r), "intern_name": intern.name if intern else r.intern_id, "reason_title": REASONS[r.reason]}
+
+
+@bp.get("/absence/requests")
+def absence_requests():
+    """Стажёр — свои заявки, руководитель — своей команды; остальным 404 (решает сервис)."""
+    reqs = async_runner.run(absence.list_requests(g.user.id))
+    return {"requests": [_absence(r) for r in sorted(reqs, key=lambda r: r.created_day, reverse=True)]}
+
+
+class AbsenceDecideIn(BaseModel):
+    approve: StrictBool
+
+
+@bp.post("/absence/requests/<request_id>/decide")
+def absence_decide(request_id: str):
+    """Кнопка руководителя — это и есть решение человека: черновик сервиса готовится и подтверждается сразу."""
+    body = _body(AbsenceDecideIn)
+
+    async def run():
+        draft = await absence.draft_decision(g.user.id, request_id, body.approve)
+        return await absence.confirm_decision(g.user.id, draft.id)
+    return _absence(async_runner.run(run()))
+
+
+@bp.get("/absence/facts")
+def absence_facts():
+    """Наставнику — только «отсутствует <дата>» своего стажёра: без причины и номера заявки."""
+    intern_id = request.args.get("intern_id")
+    if not intern_id:
+        raise NotFound()
+    return {"facts": [_json(f) for f in async_runner.run(absence.list_absence_facts(g.user.id, intern_id))]}
+
+
+# --- Предложения по уровню и сравнение планов (SPEC 4, 5; сервис — app/mcp_server/hiring.py) ---------
+
+@bp.get("/skills/suggestions")
+def suggestions():
+    """Только наставнику своих стажёров; стажёру и остальным — 404 (о предложении стажёр не знает)."""
+    status = request.args.get("status", "pending") or None
+    items = async_runner.run(hiring.list_suggestions(g.user, request.args.get("intern_id"), status))
+    return {"suggestions": [_json(s) for s in items]}
+
+
+class SuggestionDecideIn(BaseModel):
+    accept: StrictBool
+
+
+@bp.post("/skills/suggestions/<suggestion_id>/decide")
+def suggestion_decide(suggestion_id: str):
+    """Кнопка наставника «Поднять уровень» / «Оставить» — решение человека, не ИИ."""
+    body = _body(SuggestionDecideIn)
+    return _json(async_runner.run(hiring.decide_suggestion(g.user, suggestion_id, body.accept)))
+
+
+class KnownIn(BaseModel):
+    known: StrictBool = True
+
+
+@bp.post("/plan/items/<item_id>/known")
+def item_known(item_id: str):
+    """Стажёр отмечает «это я уже знаю»: пункт не закрывается, наставник получает повод для предложения."""
+    body = _body(KnownIn)
+    return _json(async_runner.run(hiring.mark_known(g.user, item_id, body.known)))
+
+
+def _key(item) -> str:
+    """Ключ общего пункта без имени стажёра: «anya.w1.notes» → «w1.notes»."""
+    return item.id.split(".", 1)[1] if "." in item.id else item.id
+
+
+@bp.get("/plan/compare")
+def plan_compare():
+    """Два плана своих стажёров рядом (SPEC 5). Не рейтинг: только статусы, без процентов и сортировки."""
+    if g.user.role != Role.MENTOR:
+        raise NotFound()
+    ids = [i for i in (request.args.get("intern_ids") or "").split(",") if i]
+    if len(ids) != 2 or ids[0] == ids[1]:
+        return jsonify(detail="Нужно два разных стажёра"), 422
+    plans = [async_runner.run(checklist.get_plan(g.user, i)) for i in ids]  # чужой стажёр — 404 от сервиса
+    personal = {p.intern_id: [_json(i) for i in p.items if i.kind == "personal"] for p in plans}
+    by_key = [{_key(i): i for i in p.items if i.kind == "common"} for p in plans]
+    common = []
+    for key, first in by_key[0].items():
+        if key not in by_key[1]:
+            continue
+        common.append({
+            "key": key, "title": first.title, "stage": first.stage, "topic": first.topic,
+            "by_intern": {p.intern_id: {"status": by_key[n][key].status, "skill_level": by_key[n][key].skill_level}
+                          for n, p in enumerate(plans)},
+        })
+    return {"interns": [{"id": i, "name": DEMO_USERS[i].name} for i in ids], "common": common, "personal": personal}
 
 
 # --- Профиль и напоминания ------------------------------------------------------------------------
