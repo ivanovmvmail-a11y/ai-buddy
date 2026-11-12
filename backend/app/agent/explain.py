@@ -110,7 +110,7 @@ def _explain(item, doc, level, intern):
         heading, paragraphs = _best_section(doc, f"{item.title} {item.summary} {item.practice or ''}")
         sentences = _sentences(paragraphs)
         if level == "confident":
-            parts.append(f"Ты в этой теме уверенно, поэтому коротко. Главное из раздела «{heading}»: {sentences[0]}")
+            parts.append(f"Эту тему ты знаешь уверенно, поэтому коротко. Главное из раздела «{heading}»: {sentences[0]}")
         elif level == "familiar":
             parts.append(f"Коротко по разделу «{heading}»: " + " ".join(sentences[:2]))
         else:

@@ -151,7 +151,7 @@ export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
 const DEPTH: Record<SkillLevel, string> = {
   novice: "Разберём подробно, с примерами.",
   familiar: "Коротко по шагам:",
-  confident: "Ты в этой теме уверенно, поэтому коротко:",
+  confident: "Эту тему ты знаешь уверенно, поэтому коротко:",
 };
 
 export const explainQuestion = (item: PlanItem) =>
