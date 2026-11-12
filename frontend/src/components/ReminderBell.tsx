@@ -2,7 +2,8 @@
 
 // Колокольчик напоминаний (спека 301, SPEC 3.6): число активных напоминаний и список с действиями.
 // Само напоминание по-прежнему приходит сообщением бота; колокольчик — чтобы не потерять его в чате.
-// SPEC 3.6 (11.11): одна главная кнопка по типу уведомления; «Напомнить завтра» — только там, где ждут действия.
+// SPEC 3.6 (11.11): одна главная кнопка по типу уведомления. Там, где ждут действия, рядом тихая ссылка
+// «Напомнить завтра»; кнопки «Готово» нет — уведомление уходит само, когда дело сделано или факт открыт (проверка 12.11).
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -19,11 +20,7 @@ export function ReminderBell({ actor, onOpen }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const list = reminders.data ?? [];
 
-  const act = useMutation({
-    mutationFn: ({ id, kind }: { id: string; kind: "snooze" | "done" }) =>
-      kind === "snooze" ? api.snooze(actor.id, id) : api.doneReminder(actor.id, id),
-    onSuccess: refresh,
-  });
+  const snooze = useMutation({ mutationFn: (id: string) => api.snooze(actor.id, id), onSuccess: refresh });
 
   useEffect(() => {
     if (!open) return;
@@ -72,7 +69,7 @@ export function ReminderBell({ actor, onOpen }: Props) {
               {list.map((r) => (
                 <li key={r.id} className="rounded-lg p-2 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
                   <p>{r.text}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <button
                       onClick={() => { setOpen(false); onOpen(r); }}
                       className="rounded-full bg-[#00aaff] px-2.5 py-1 text-white"
@@ -81,26 +78,19 @@ export function ReminderBell({ actor, onOpen }: Props) {
                     </button>
                     {!isInfo(r) && (
                       <button
-                        disabled={act.isPending}
-                        onClick={() => act.mutate({ id: r.id, kind: "snooze" })}
-                        className="rounded-full border border-black/15 px-2.5 py-1 disabled:opacity-50 dark:border-white/20"
+                        disabled={snooze.isPending}
+                        onClick={() => snooze.mutate(r.id)}
+                        className="py-1 text-xs text-black/55 underline decoration-black/20 underline-offset-2 transition-colors duration-150 hover:text-black/80 disabled:opacity-50 dark:text-white/55 dark:decoration-white/25 dark:hover:text-white/80"
                       >
                         Напомнить завтра
                       </button>
                     )}
-                    <button
-                      disabled={act.isPending}
-                      onClick={() => act.mutate({ id: r.id, kind: "done" })}
-                      className="rounded-full px-2.5 py-1 text-black/60 disabled:opacity-50 dark:text-white/60"
-                    >
-                      Готово
-                    </button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-          {act.isError && <p role="alert" className="px-2 pt-1 text-red-800 dark:text-red-300">{act.error.message}</p>}
+          {snooze.isError && <p role="alert" className="px-2 pt-1 text-red-800 dark:text-red-300">{snooze.error.message}</p>}
         </div>
       )}
     </div>

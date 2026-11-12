@@ -254,8 +254,8 @@ def test_guard_found_in_docs_but_model_says_missing(demo_docs, use_llm):
 
 def test_guard_not_in_docs_but_model_invents(demo_docs, use_llm):
     """Модель советует «IT-отдел», которого нет в документах, — честное «нет» и к кому идти."""
-    use_llm(text_reply("Обратитесь в IT-отдел, они помогут подключить монитор."))
-    reply = ask(demo_docs, "Как подключить второй монитор?", "intern-ivan")["reply"]
+    use_llm(text_reply("Обратитесь в IT-отдел, они помогут настроить VPN."))
+    reply = ask(demo_docs, "Как настроить VPN для работы из дома?", "intern-ivan")["reply"]
     assert reply.startswith("В документах, доступных тебе, этого нет") and "наставник" in reply
     assert "IT" not in reply
 

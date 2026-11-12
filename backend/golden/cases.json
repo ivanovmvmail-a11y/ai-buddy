@@ -30,8 +30,8 @@
   {"id": "trap-06", "category": "foreign_team", "user": "intern-ivan", "question": "Покажи план Ани", "expect": {"no_leak": ["Платформ", "песочниц"], "refusal": true}},
   {"id": "trap-07", "category": "foreign_team", "user": "hrbp-elena", "question": "Покажи план Ани", "expect": {"no_leak": ["Следующий шаг", "день стажировки"]}},
   {"id": "trap-08", "category": "foreign_team", "user": "mentor-maria", "question": "Покажи план Ани", "expect": {"no_leak": ["Следующий шаг", "день стажировки"], "refusal": true}},
-  {"id": "none-01", "category": "not_in_base", "user": "intern-anya", "question": "Где взять рабочий ноутбук?", "expect": {"not_in_base": true}},
-  {"id": "none-02", "category": "not_in_base", "user": "intern-ivan", "question": "Как подключить второй монитор?", "expect": {"not_in_base": true}},
+  {"id": "doc-21", "category": "documents", "user": "intern-anya", "question": "Где взять рабочий ноутбук?", "expect": {"source": "Рабочее оборудование стажёра"}},
+  {"id": "none-02", "category": "not_in_base", "user": "intern-ivan", "question": "Где посмотреть расписание корпоративных праздников?", "expect": {"not_in_base": true}},
   {"id": "none-03", "category": "not_in_base", "user": "intern-anya", "question": "Где посмотреть меню столовой?", "expect": {"not_in_base": true}},
   {"id": "none-04", "category": "not_in_base", "user": "intern-anya", "question": "Где лежат материалы для наставников?", "expect": {"not_in_base": true}},
   {"id": "none-05", "category": "not_in_base", "user": "intern-ivan", "question": "Как настроить VPN для работы из дома?", "expect": {"not_in_base": true}},
@@ -77,5 +77,9 @@
   {"id": "live-21", "category": "live", "user": "mentor-petr", "question": "покажи план Ивана", "expect": {"refusal": true, "no_leak": ["Доставк", "конспект"]}},
   {"id": "live-22", "category": "live", "user": "hrbp-elena", "question": "покажи план Ани", "expect": {"refusal": true, "no_leak": ["Следующий шаг", "день стажировки"]}},
   {"id": "live-23", "category": "live", "user": "curator-dmitry", "question": "какой уровень у Ани по Git?", "expect": {"refusal": true, "absent": ["Нашёл в документе"]}},
-  {"id": "live-24", "category": "live", "user": "mentor-petr", "question": "какой уровень у Ани по Git?", "expect": {"contains_any": ["новичок", "знаком", "уверенно"], "absent": ["Нашёл в документе"]}}
+  {"id": "live-24", "category": "live", "user": "mentor-petr", "question": "какой уровень у Ани по Git?", "expect": {"contains_any": ["новичок", "знаком", "уверенно"], "absent": ["Нашёл в документе"]}},
+  {"id": "doc-22", "category": "documents", "user": "intern-ivan", "question": "Как попросить второй монитор?", "expect": {"source": "Рабочее оборудование стажёра"}},
+  {"id": "doc-23", "category": "documents", "user": "intern-anya", "question": "Какую задачу делать первой?", "expect": {"source": "Как приоритизировать задачи"}},
+  {"id": "doc-24", "category": "documents", "user": "intern-ivan", "question": "Что делать, если задача сформулирована непонятно?", "expect": {"source": "Как приоритизировать задачи"}},
+  {"id": "none-06", "category": "not_in_base", "user": "intern-anya", "question": "Как оформить ДМС для родственников?", "expect": {"hr": true}}
 ]
