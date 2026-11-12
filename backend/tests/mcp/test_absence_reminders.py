@@ -18,6 +18,7 @@ def test_waiting_new_decision_and_private_fact(store, snapshot):
     new=[r for r in reminders(OLGA) if r.kind=='absence_new']
     assert len(new)==1 and new[0].absence_request_id==req.id
     assert new[0].action.target=='absence_request'
+    assert new[0].text == 'Новая заявка на отгул от Аня Смирнова на 15.11'
     assert not any(r.kind=='absence_pending' for r in reminders(ANYA))
     run(clock.advance_day(DEMO_USERS[ANYA],ANYA))
     assert not any(r.kind=='absence_pending' for r in reminders(ANYA))
@@ -80,3 +81,16 @@ def test_lead_snooze_uses_related_intern_day_and_reactivates(store):
     assert next(v for v in reminders(OLGA) if v.id==r.id).status=='snoozed'
     run(clock.advance_day(DEMO_USERS[ANYA],ANYA))
     assert next(v for v in reminders(OLGA) if v.id==r.id).status=='active'
+
+
+@pytest.mark.parametrize('intern,lead', [
+    ('intern-anya', 'lead-olga'), ('intern-kirill', 'lead-olga'),
+    ('intern-ivan', 'lead-sergey'), ('intern-liza', 'lead-sergey'),
+])
+def test_new_absence_notification_identifies_intern_without_reason(store, intern, lead):
+    request = send(user=intern, day=date(2026, 11, 12), reason='family')
+    notice, = [r for r in reminders(lead) if r.kind == 'absence_new']
+    assert notice.text == f'Новая заявка на отгул от {DEMO_USERS[intern].name} на 12.11'
+    assert notice.intern_id == intern and notice.absence_request_id == request.id
+    assert 'family' not in notice.model_dump_json()
+    assert not any(r.kind == 'absence_new' for r in reminders('lead-sergey' if lead == 'lead-olga' else 'lead-olga'))
