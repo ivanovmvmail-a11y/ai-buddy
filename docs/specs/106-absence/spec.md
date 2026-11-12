@@ -54,8 +54,8 @@
   наставнику («почему Аня брала отгул?» → «причину не раскрываю»), не пишет медицинские подробности.
 
 ## 5. Данные
-`backend/app/mcp_server/absence.py`, `absence_models.py`, `seed/absence.json` (демо: у Ани согласованный отгул
-10.11 «учебные дела»). Описание сервиса — `backend/app/mcp_server/ABSENCE.md`.
+`backend/app/mcp_server/absence.py`, `absence_models.py`, `seed/absence.json` (демо-отгулов у Ани нет: отгул
+создаётся в демо шагом «мне завтра к врачу»; прежний отгул 10.11 убран в #87 — он приходился на первый день стажировки). Описание сервиса — `backend/app/mcp_server/ABSENCE.md`.
 
 ## 6. Интерфейс
 - Чат стажёра: карточка «Заявление на отгул · черновик» (дата, причина, решает) с «Подтвердить» / «Отменить».
@@ -89,5 +89,4 @@
 | AC-7 | `backend/tests/mcp/test_absence_reminders.py::test_absence_day_shifts_only_open_items_once_even_after_restart_tick`, `::test_rejected_absence_does_not_notify_mentor_or_shift` |
 
 ## 10. Открытые вопросы
-- Демо-отгул Ани 10.11 приходится на первый день стажировки — выглядит странно (проверка 12.11); передано Codex в
-  `.ai/HANDOFF.md`.
+- Нет. (Демо-отгул Ани 10.11 в первый день стажировки — убран в #87.)
