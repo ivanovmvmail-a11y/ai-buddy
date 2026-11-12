@@ -269,3 +269,33 @@ def test_guard_replaces_honest_missing_with_invented_advice(demo_docs, use_llm):
     use_llm(text_reply("В документах команды этого нет. Меню обычно на сайте компании."))
     reply = ask(demo_docs, "Где посмотреть меню столовой?")["reply"]
     assert reply.startswith("В документах, доступных тебе, этого нет") and "сайте" not in reply
+
+
+def test_guard_does_not_paste_random_paragraph(demo_docs, use_llm):
+    """Прогон 12.11: на чужую команду модель честно «нет», а страховка подставляла абзац про git push
+    по двум случайным словам. Слабое совпадение — не вмешиваемся."""
+    use_llm(text_reply("В документах твоей команды этого нет — спроси наставника."))
+    reply = ask(demo_docs, "Какие статусы проходит учебное отправление в Доставке?")["reply"]
+    assert "git push" not in reply and "Нашёл в документе" not in reply
+
+
+def test_guard_catches_invented_portal_in_mentor_question(demo_docs, use_llm):
+    """GigaChat-2-Max: «материалы для наставников — на корпоративном портале» (выдумка)."""
+    use_llm(text_reply("Материалы для наставников лежат на корпоративном портале в разделе «Наставничество»."))
+    reply = ask(demo_docs, "Где лежат материалы для наставников?")["reply"]
+    assert reply.startswith("В документах, доступных тебе, этого нет") and "портал" not in reply
+
+
+def test_guard_keeps_paraphrased_answer_based_on_doc(demo_docs, use_llm):
+    """Вопрос другими словами, ответ по смыслу из документа «красный пайплайн» — не подменяем."""
+    answer = ("Открой пайплайн и найди первый красный шаг. Прочитай лог ошибки с конца, повтори проверку локально, "
+              "исправь и отправь новый коммит.")
+    use_llm(text_reply(answer))
+    assert ask(demo_docs, "У меня в CI всё упало после пуша, что делать?", "intern-ivan")["reply"] == answer
+
+
+def test_no_false_conflict_without_time_question(demo_docs, use_llm):
+    """«Ревьюер молчит второй день» — не вопрос о сроке: «один день» отгула и «два дня» ревью не противоречие."""
+    use_llm(text_reply("Напиши ревьюеру в канале команды, а если молчит дальше — наставнику."))
+    reply = ask(demo_docs, "Я не понимаю, кому писать если ревьюер молчит уже второй день")["reply"]
+    assert not reply.startswith("Документы расходятся")
