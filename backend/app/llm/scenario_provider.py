@@ -381,6 +381,13 @@ def _second_note(second: str) -> str:
             "было проверить. Напиши её отдельным сообщением.")
 
 
+RESOURCE_WORDS = ("jira", "джир", "confluence", "конфлю", "redash", "редаш", "grafana", "графан", "bitbucket", "битбакет")
+
+
+def _resource_named(q: str) -> bool:
+    return any(w in q for w in RESOURCE_WORDS)
+
+
 class ScenarioProvider:
     name = "scenario"
 
@@ -479,7 +486,9 @@ class ScenarioProvider:
                 return LLMReply(content="У тебя нет доступа к планам стажёров — подробности не раскрываю.")
         if any(w in q for w in NEXT_WORDS) and "get_plan" in available:
             return call("get_plan")
-        if "доступ" in q and any(v in q for v in ACCESS_VERBS) and "list_access_resources" in available:
+        # «доступ в Redash» без глагола — тоже заявка: ресурс назван прямо (каталог #90).
+        if ("доступ" in q and (any(v in q for v in ACCESS_VERBS) or _resource_named(q))
+                and "list_access_resources" in available):
             return call("list_access_resources")
         if "заявк" in q and any(w in q for w in REQUEST_WORDS) and "list_access_requests" in available:
             return call("list_access_requests")
@@ -570,6 +579,10 @@ class ScenarioProvider:
             match = next((r for r in resources if "jira" in r["id"]), None)
         elif "confluence" in q or "конфлю" in q or "база знаний" in q:
             match = next((r for r in resources if "confluence" in r["id"]), None)
+        elif "redash" in q or "редаш" in q:
+            match = next((r for r in resources if r["id"] == "redash"), None)
+        elif "grafana" in q or "графан" in q:
+            match = next((r for r in resources if r["id"] == "grafana"), None)
         elif any(w in q for w in ("bitbucket", "битбакет", "пространств", "репозитор", "команд")):
             match = next((r for r in resources if r.get("kind") == "team_space"), None)
         if match and "create_access_request" in available:
