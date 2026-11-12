@@ -1,7 +1,7 @@
 // Данные поддельного сервера для тестов интерфейса (бывший макет T2). Настоящие данные — seed имитаций
 // сервисов на backend. Всё синтетическое.
 import { DEMO_USERS } from "@/lib/users";
-import type { AbsenceRequest, Reminder, SkillSuggestion } from "@/lib/types";
+import type { AbsenceRequest, CatalogItem, Reminder, SkillSuggestion } from "@/lib/types";
 import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "@/lib/types";
 
 export { DEMO_USERS };
@@ -101,7 +101,7 @@ function buildItems(intern: DemoUser): PlanItem[] {
       kind: s.reason ? ("personal" as const) : ("common" as const),
       reason: s.reason ?? null,
       known_marked: false,
-      catalog_key: s.reason ? `${short}.${s.key}` : null,
+      catalog_key: s.reason ? `${intern.team === "Авито Доставка" ? "delivery" : "platform"}.${s.topic}` : null,
       id: `${short}.${s.key}`,
       intern_id: intern.id,
       stage: s.stage,
@@ -123,6 +123,18 @@ function buildItems(intern: DemoUser): PlanItem[] {
       waiting_days: null,
     }));
 }
+
+/** Каталог персональных пунктов команд (SPEC 3.1). Ключ «<команда>.<тема>»; пункт стажёра — «<имя>.p.<тема>». */
+export const CATALOG: CatalogItem[] = [
+  { key: "platform.git", team: "Платформа объявлений", topic: "git", topic_title: "Git", title: "Практикум: ветки и pull request",
+    summary: "Учебный pull request в песочнице команды.", stage: "week1", in_plan: false },
+  { key: "platform.sql", team: "Платформа объявлений", topic: "sql", topic_title: "SQL", title: "Практикум: запросы к учебной базе объявлений",
+    summary: "Три запроса к вымышленным объявлениям.", stage: "week2", in_plan: false },
+  { key: "platform.ci", team: "Платформа объявлений", topic: "ci", topic_title: "CI", title: "Практикум: красный пайплайн",
+    summary: "Найди упавший шаг учебного пайплайна.", stage: "week1", in_plan: false },
+  { key: "delivery.sql", team: "Авито Доставка", topic: "sql", topic_title: "SQL", title: "Практикум: запросы к учебной базе доставок",
+    summary: "Три запроса к вымышленным отправлениям.", stage: "week2", in_plan: false },
+];
 
 export type DemoState = {
   days: Record<string, number>;

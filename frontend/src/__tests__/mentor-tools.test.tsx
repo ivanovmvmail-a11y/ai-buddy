@@ -133,3 +133,42 @@ describe("«это я уже знаю» (SPEC 4)", () => {
     expect(within(await row("Практикум: ветки и pull request")).queryByRole("button", { name: "Это я уже знаю" })).toBeNull();
   });
 });
+
+describe("наставник правит персональные пункты (SPEC 3.1)", () => {
+  const row = async (title: string) => (await screen.findByText(title)).closest("li")!;
+
+  it("убирает персональный пункт; у общего кнопки нет", async () => {
+    open("mentor-petr");
+    const item = await row("Практикум: ветки и pull request");
+    await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Убрать из плана" })));
+    await waitFor(() => expect(srv.state.items.some((i) => i.id === "anya.p.git")).toBe(false));
+    await waitFor(() => expect(screen.queryByText("Практикум: ветки и pull request")).toBeNull());
+    expect(within(await row("Завести конспект встреч с наставником")).queryByRole("button", { name: "Убрать из плана" })).toBeNull();
+  });
+
+  it("добавляет пункт из каталога команды — «для тебя» с причиной «добавил наставник»", async () => {
+    open("mentor-petr");
+    const box = await screen.findByRole("region", { name: "Каталог пунктов" });
+    expect(within(box).getByText("Добавить пункт в план: Аня")).toBeTruthy();
+    expect(within(box).queryByText(/ветки и pull request/)).toBeNull(); // уже в плане
+    expect(within(box).queryByText(/учебной базе доставок/)).toBeNull(); // каталог чужой команды
+    await act(async () => fireEvent.click(within(box).getByRole("button", { name: "+ Практикум: красный пайплайн" })));
+    const added = await row("Практикум: красный пайплайн");
+    expect(within(added).getByText("персональный")).toBeTruthy();
+    expect(within(added).getByText("Почему: добавил наставник")).toBeTruthy();
+    expect(srv.calls.find((c) => c.method === "POST" && c.path === "/plan/items")?.body)
+      .toEqual({ intern_id: "intern-anya", catalog_key: "platform.ci" });
+  });
+
+  it("стажёр и сервер без каталога (404) — ни кнопок, ни ошибок", async () => {
+    open("intern-anya");
+    expect(within(await row("Практикум: ветки и pull request")).queryByRole("button", { name: "Убрать из плана" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Каталог пунктов" })).toBeNull();
+    cleanup();
+    srv.noAdaptive = true;
+    open("mentor-petr");
+    await screen.findByRole("region", { name: "Мои стажёры" });
+    expect(screen.queryByRole("region", { name: "Каталог пунктов" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
