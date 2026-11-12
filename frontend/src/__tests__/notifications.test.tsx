@@ -61,10 +61,23 @@ describe("колокольчик и сообщения бота (SPEC 3.6)", () 
     const dialog = await bell();
     const item = within(dialog).getByText(/Наставник отметил/).closest("li")!;
     expect(within(item).queryByRole("button", { name: "Напомнить завтра" })).toBeNull();
+    expect(within(item).getAllByRole("button")).toHaveLength(1); // проверка 12.11: одна кнопка, без «Готово»
     await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Открыть" })));
     await waitFor(() => expect(srv.calls.some((c) => c.path === "/reminders/REM-x/done")).toBe(true));
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("button", { name: /Напоминания: \d/ })).toBeNull());
+  });
+
+  it("«В план добавлен пункт…» уходит из колокольчика после «Открыть», хотя ведёт в чат", async () => {
+    srv.state.notifications.push(note({
+      id: "REM-p", kind: "personal_item_added", action: { label: "Открыть", target: "plan_item" },
+      text: "В план добавлен пункт для тебя: Практикум: SQL (добавил наставник)",
+    }));
+    open("intern-anya");
+    const dialog = await bell();
+    const item = within(dialog).getByText(/В план добавлен пункт/).closest("li")!;
+    await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Открыть" })));
+    await waitFor(() => expect(srv.calls.some((c) => c.path === "/reminders/REM-p/done")).toBe(true));
   });
 
   it("наставник: «Бот предлагает…» — «Решить» ведёт к блоку предложений и не закрывает уведомление", async () => {
@@ -81,6 +94,7 @@ describe("колокольчик и сообщения бота (SPEC 3.6)", () 
     const dialog = await bell();
     const item = within(dialog).getByText(/Бот предлагает/).closest("li")!;
     expect(within(item).getByRole("button", { name: "Напомнить завтра" })).toBeTruthy();
+    expect(within(item).queryByRole("button", { name: "Готово" })).toBeNull();
     await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Решить" })));
     expect(await screen.findByRole("region", { name: "Предложения бота" })).toBeTruthy();
     expect(srv.calls.some((c) => c.path === "/reminders/REM-s/done")).toBe(false);
