@@ -140,3 +140,19 @@ def test_plan_context_has_today_for_model(scenario):
     from app.agent.onboarding_tools import plan_context
     from app.agent.users import DEMO_USERS
     assert "Сегодня: 2026-11-11." in async_runner.run(plan_context(DEMO_USERS["intern-anya"]))
+
+
+def test_model_without_rule_still_gets_regulation(client, use_llm, monkeypatch):
+    """Прогон GigaChat 12.11: модель готовила черновик, но не ссылалась на регламент — агент добавляет правило сам."""
+    from app.agent import service
+    from golden.run import _demo_rag
+    from app import async_runner
+    from .conftest import tool_reply, text_reply
+    rag = async_runner.run(_demo_rag())
+    monkeypatch.setattr(service, "retrieve", lambda query, user, k=4: rag.retrieve(query, user, k))
+    use_llm(tool_reply("create_absence_request", {"day": "2026-11-12", "reason": "personal"}),
+            text_reply("Подготовил черновик. Проверь и нажми «Подтвердить»."))
+    body = ask(client, "Мне завтра к врачу, как отпроситься?")
+    assert body["reply"].startswith("По документу «Отгул на один день»")
+    assert {"title": "Отгул на один день", "url": None} in body["sources"]
+    assert body["actions"][0]["tool"] == "create_absence_request"

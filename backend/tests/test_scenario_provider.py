@@ -2,7 +2,7 @@
 import json
 
 import pytest
-from .conftest import as_user
+from .conftest import as_user, text_reply
 
 from app import async_runner
 from app.agent import service
@@ -228,3 +228,44 @@ def test_conflicting_documents_show_both_and_reach_mentor(demo_docs):
 def test_consistent_documents_give_plain_answer(demo_docs):
     reply = ask(demo_docs, "Сколько ждать ревью?", "intern-ivan")["reply"]
     assert reply.startswith("Нашёл в документе") and "расходятся" not in reply
+
+
+def test_conflict_is_shown_even_if_model_would_pick_one(demo_docs, use_llm):
+    """Прогон GigaChat 12.11: модель выбирала один срок молча. Расхождение агент показывает сам, до модели."""
+    llm = use_llm(text_reply("Ревью приходит в течение рабочего дня."))
+    reply = ask(demo_docs, "Сколько ждать ревью?")["reply"]
+    assert reply.startswith("Документы расходятся")
+    assert llm.calls == []  # модель не спрашивали
+
+
+def test_guard_found_in_docs_but_model_says_missing(demo_docs, use_llm):
+    """Прогон GigaChat 12.11: документ первый в поиске, а модель «в документах этого нет» — показываем абзац."""
+    use_llm(text_reply("В документах команды этого нет. Спроси наставника."))
+    reply = ask(demo_docs, "Что делать, если пайплайн красный?", "intern-ivan")["reply"]
+    assert reply.startswith("Нашёл в документе «Что делать, если пайплайн красный»")
+
+
+def test_guard_not_in_docs_but_model_invents(demo_docs, use_llm):
+    """Модель советует «IT-отдел», которого нет в документах, — честное «нет» и к кому идти."""
+    use_llm(text_reply("Обратитесь в IT-отдел, они помогут подключить монитор."))
+    reply = ask(demo_docs, "Как подключить второй монитор?", "intern-ivan")["reply"]
+    assert reply.startswith("В документах, доступных тебе, этого нет") and "наставник" in reply
+    assert "IT" not in reply
+
+
+@pytest.mark.parametrize("question,answer", [
+    ("Привет!", "Привет! Чем помочь?"),
+    ("Как оформить отпуск?", "Это к HR BP — Елене Морозовой."),
+    ("Какой у меня уровень по Git?", "Git — новичок."),
+    ("Как оформить pull request?", "По документу «Регламент учебного код-ревью»: открой PR в основную ветку."),
+])
+def test_guard_keeps_good_or_non_doc_answers(demo_docs, use_llm, question, answer):
+    use_llm(text_reply(answer))
+    assert ask(demo_docs, question)["reply"] == answer
+
+
+def test_guard_replaces_honest_missing_with_invented_advice(demo_docs, use_llm):
+    """Прогон 12.11: «в документах нет, но обычно меню на сайте компании» — выдумка после честной фразы."""
+    use_llm(text_reply("В документах команды этого нет. Меню обычно на сайте компании."))
+    reply = ask(demo_docs, "Где посмотреть меню столовой?")["reply"]
+    assert reply.startswith("В документах, доступных тебе, этого нет") and "сайте" not in reply

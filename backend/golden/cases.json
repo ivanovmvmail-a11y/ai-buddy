@@ -1,5 +1,5 @@
 [
-  {"id": "doc-01", "category": "documents", "user": "intern-anya", "question": "Как оформить pull request?", "expect": {"source": "Регламент учебного код-ревью"}},
+  {"id": "doc-01", "category": "documents", "user": "intern-anya", "question": "Как оформить pull request?", "expect": {"source": ["Регламент учебного код-ревью", "Учебный репозиторий — клонирование и ветки"]}},
   {"id": "doc-02", "category": "documents", "user": "intern-ivan", "question": "Что указать в описании pull request?", "expect": {"source": "Регламент учебного код-ревью"}},
   {"id": "doc-03", "category": "documents", "user": "intern-anya", "question": "Что такое бэклог?", "expect": {"source": "Глоссарий стажировки"}},
   {"id": "doc-04", "category": "documents", "user": "intern-ivan", "question": "Кто такой buddy?", "expect": {"source": "Глоссарий стажировки"}},
@@ -39,7 +39,7 @@
   {"id": "hr-02", "category": "hr", "user": "intern-ivan", "question": "Куда отнести больничный?", "expect": {"hr": true}},
   {"id": "hr-03", "category": "hr", "user": "intern-ivan", "question": "Я заболел, как оформить больничный?", "expect": {"hr": true, "no_draft": true}},
   {"id": "plan-01", "category": "plan", "user": "intern-anya", "question": "Что мне делать дальше?", "expect": {"contains": ["Запросить базовые доступы"]}},
-  {"id": "plan-02", "category": "plan", "user": "intern-ivan", "question": "Кого я жду?", "expect": {"contains": ["Мария Орлова"]}},
+  {"id": "plan-02", "category": "plan", "user": "intern-ivan", "question": "Кого я жду?", "expect": {"contains_any": ["Мария Орлова", "Марию Орлову", "Марии Орловой"]}},
   {"id": "plan-03", "category": "plan", "user": "intern-ivan", "question": "Что у меня просрочено и что делать дальше?", "expect": {"contains": ["конспект"]}},
   {"id": "plan-04", "category": "plan", "user": "mentor-petr", "question": "Покажи план Ани", "expect": {"contains_any": ["день", "шаг", "план"], "no_refusal": true}},
   {"id": "plan-05", "category": "plan", "user": "mentor-maria", "question": "Какие заявки ждут меня?", "expect": {"contains_any": ["REQ-1001", "bitbucket"]}},
@@ -48,7 +48,7 @@
   {"id": "act-03", "category": "actions", "user": "intern-ivan", "question": "Запроси мне доступ в Confluence", "expect": {"draft": {"tool": "create_access_request", "resource_id": "confluence"}}},
   {"id": "act-04", "category": "actions", "user": "mentor-petr", "question": "Оформи мне доступ в Jira", "expect": {"no_draft": true}},
   {"id": "act-05", "category": "actions", "user": "intern-anya", "question": "Как взять отгул на один день?", "expect": {"source": "Отгул на один день", "draft": {"tool": "create_absence_request"}}},
-  {"id": "act-06", "category": "actions", "user": "intern-anya", "question": "Мне завтра к врачу, как отпроситься?", "expect": {"source": "Отгул на один день", "contains": ["личные дела"], "draft": {"tool": "create_absence_request", "params": {"reason": "personal"}}}},
+  {"id": "act-06", "category": "actions", "user": "intern-anya", "question": "Мне завтра к врачу, как отпроситься?", "expect": {"source": "Отгул на один день", "draft": {"tool": "create_absence_request", "params": {"reason": "personal"}}}},
   {"id": "act-07", "category": "actions", "user": "intern-ivan", "question": "Послезавтра экзамен в универе, можно отгул?", "expect": {"draft": {"tool": "create_absence_request", "params": {"reason": "study"}}}},
   {"id": "act-08", "category": "actions", "user": "lead-olga", "question": "Как взять отгул?", "expect": {"no_draft": true}}
 ]

@@ -7,6 +7,9 @@ class Settings(BaseSettings):
 
     # gigachat | openai | echo  (echo — заглушка без ключей, для разработки)
     llm_provider: str = "scenario"
+    # Случайность ответов модели: низкая — строже держит правило «нет в документах — так и скажи» и даёт
+    # одинаковый ответ от прогона к прогону (прогон GigaChat 12.11). 0 у GigaChat не допускается.
+    llm_temperature: float = 0.1
 
     # GigaChat (https://developers.sber.ru/studio)
     gigachat_credentials: str = ""  # Authorization Key из личного кабинета

@@ -130,6 +130,73 @@ def _conflict(best: tuple[int, str, str], wanted: set[str], need: int, system: s
     return None
 
 
+def _best_unit(question: str, system: str) -> tuple[tuple[int, str, str], set[str], int]:
+    """Лучший абзац документов для вопроса: (совпадение, документ, текст), слова вопроса и порог совпадения."""
+    wanted = _words(question)
+    # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
+    # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
+    need = min(2, len(wanted)) or 1
+    # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
+    # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
+    best, best_key = (0, "", ""), None
+    for rank, (title, content) in enumerate(_docs(system)):
+        for heading, unit in _units(content):
+            score = _overlap(wanted, heading + " " + unit)
+            definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
+            key = (score, not definition, -rank, len(unit))
+            if best_key is None or key > best_key:
+                best, best_key = (score, title, unit), key
+    return best, wanted, need
+
+
+def docs_conflict(question: str, system: str) -> str | None:
+    """SPEC 3.7 для любой модели: если найденные документы называют разные сроки, ответ — оба варианта,
+    независимо от того, заметит ли расхождение модель (GigaChat на прогоне 12.11 выбирал один молча)."""
+    best, wanted, need = _best_unit(question, system)
+    return _conflict(best, wanted, need, system) if best[0] >= need else None
+
+
+def _found_text(best: tuple[int, str, str]) -> str:
+    fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
+    return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
+
+
+def _missing_text(question: str, system: str) -> str:
+    who = "твой наставник" if _role(system) == "intern" else "коллеги из команды"
+    return (
+        "В документах, доступных тебе, этого нет — выдумывать не буду. Скорее всего подскажет "
+        f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {question} "
+        "Я поискал в документах команды, но ответа не нашёл.»")
+
+
+MISSING_PHRASES = ("этого нет", "не нашел", "нет информации", "информации об этом нет", "нет в документ", "не нашлось",
+                   "не нашла", "не найден", "не указан")
+# Вопросы, на которые отвечают инструменты, сводка плана или HR, а не абзац документа: страховку не применяем.
+_NOT_DOC_QUESTION = ("план", "заявк", "наставник", "доступ", "уровень", "навык")
+
+
+def docs_guard(question: str, system: str, reply: str) -> str | None:
+    """Страховка для любой модели (прогон GigaChat 12.11): поиск нашёл абзац, а модель говорит «этого нет» —
+    показываем абзац с источником; поиск ничего не нашёл, а модель отвечает «как обычно бывает» (IT-отдел,
+    портал), даже после «этого нет», — честное «в документах нет» и к кому идти. Ответ со ссылкой на документ не трогаем."""
+    q = question.lower().strip()
+    if THANKS.fullmatch(q) or any(q.startswith(g) for g in GREETINGS):
+        return None
+    if any(w in q for w in (*NEXT_WORDS, *STUCK_WORDS, *LEVEL_WORDS, *ORG_WORDS, *ABSENCE_WORDS, *_NOT_DOC_QUESTION)):
+        return None
+    best, wanted, need = _best_unit(question, system)
+    if len(wanted) < 2:
+        return None
+    low = reply.lower().replace("ё", "е")
+    says_missing = any(p in low for p in MISSING_PHRASES)
+    if best[0] >= need:
+        return _found_text(best) if says_missing else None
+    # Ничего не нашлось: даже честное «этого нет» модель дополняет «как обычно бывает» (сайт компании,
+    # IT-поддержка) — поэтому всегда наш ответ: нет в документах, к кому идти и готовый текст вопроса.
+    cites = any(title and title in reply for title, _ in _docs(system))
+    return None if cites else _missing_text(question, system)
+
+
 def _names_someone(q: str) -> str | None:
     """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
     return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
@@ -190,7 +257,7 @@ def _reason(q: str) -> str:
     return "personal"
 
 
-def _regulation(system: str) -> str:
+def absence_rule(system: str) -> str:
     """Абзац регламента об отгуле из найденных документов — с источником в «кавычках»."""
     best = (0, "", "")
     wanted = {"отгул", "отпроситься", "заявление", "день", "руководитель"}
@@ -266,30 +333,10 @@ class ScenarioProvider:
         return LLMReply(content=self._from_docs(question, system))
 
     def _from_docs(self, question: str, system: str) -> str:
-        wanted = _words(question)
-        # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
-        # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
-        need = min(2, len(wanted)) or 1
-        # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
-        # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
-        best, best_key = (0, "", ""), None
-        for rank, (title, content) in enumerate(_docs(system)):
-            for heading, unit in _units(content):
-                score = _overlap(wanted, heading + " " + unit)
-                definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
-                key = (score, not definition, -rank, len(unit))
-                if best_key is None or key > best_key:
-                    best, best_key = (score, title, unit), key
+        best, wanted, need = _best_unit(question, system)
         if best[0] >= need and (conflict := _conflict(best, wanted, need, system)):
             return conflict
-        if best[0] >= need:
-            fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
-            return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
-        who = "твой наставник" if _role(system) == "intern" else "коллеги из команды"
-        return (
-            "В документах, доступных тебе, этого нет — выдумывать не буду. Скорее всего подскажет "
-            f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {question} "
-            "Я поискал в документах команды, но ответа не нашёл.»")
+        return _found_text(best) if best[0] >= need else _missing_text(question, system)
 
     # --- после инструмента: собрать ответ ---------------------------------------------------------
 
@@ -309,7 +356,7 @@ class ScenarioProvider:
         if result.get("error"):
             return LLMReply(content="Сервис сейчас не ответил. Попробуй ещё раз чуть позже.")
         if result.get("status") == "awaiting_confirmation" and msg.name == "create_absence_request":
-            rule = _regulation(system)
+            rule = absence_rule(system)
             return LLMReply(content=(
                 f"{rule}Подготовил черновик: {result.get('summary')}. Подробности вроде врача в заявление не пишу — "
                 "только причину из списка. Проверь дату и нажми «Подтвердить»: без этого руководителю ничего не уйдёт."))

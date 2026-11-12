@@ -64,7 +64,7 @@ class GigaChatProvider:
         self._client = make_client()
 
     async def chat(self, messages: list[Message], tools: list[ToolSpec] | None = None) -> LLMReply:
-        payload: dict = {"messages": to_gigachat_messages(messages)}
+        payload: dict = {"messages": to_gigachat_messages(messages), "temperature": settings.llm_temperature}
         if tools:
             payload["functions"] = to_gigachat_functions(tools)
             payload["function_call"] = "auto"
