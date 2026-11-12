@@ -151,6 +151,8 @@ function PlanRow({
 }: { item: PlanItem; actor: DemoUser; isNext: boolean; level?: SkillLevel; onExplain: Props["onExplain"]; onDo: Props["onDo"] }) {
   const refresh = useRefresh();
   const mark = useMutation({ mutationFn: () => api.setStatus(actor.id, item.id, "done"), onSuccess: refresh });
+  // SPEC 4: «это я уже знаю» — повод для предложения наставнику; пункт не закрывается, уровень решает наставник.
+  const know = useMutation({ mutationFn: (known: boolean) => api.markKnown(actor.id, item.id, known), onSuccess: refresh });
   const working = isWorking(item.stage);
   const st = STATUS[item.status];
   const self = actor.id === item.intern_id;
@@ -160,6 +162,7 @@ function PlanRow({
   const hint = lvl && self ? HINT[lvl] : undefined;
   const personal = item.kind === "personal";
   const short = seesSkills && !personal && lvl === "confident";
+  const canKnow = self && working && item.owner_role === "intern" && !!item.topic && item.status !== "done" && lvl !== "confident";
 
   return (
     <li
@@ -207,7 +210,16 @@ function PlanRow({
         </p>
       )}
       {item.status_reason && <p className="mt-1 text-xs text-orange-800 dark:text-orange-300">Причина: {item.status_reason}</p>}
+      {item.known_marked && self && item.status !== "done" && (
+        <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+          Ты отметил: это я уже знаю. Наставник решит, поднять ли уровень.{" "}
+          <button disabled={know.isPending} onClick={() => know.mutate(false)} className="underline underline-offset-2 disabled:opacity-50">
+            Убрать отметку
+          </button>
+        </p>
+      )}
       {mark.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{mark.error.message}</p>}
+      {know.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{know.error.message}</p>}
       {working && (
         <div className="mt-2 flex flex-wrap gap-2">
           <button onClick={() => onExplain(item)} className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
@@ -216,6 +228,15 @@ function PlanRow({
           {canRequestAccess(actor, item) && (
             <button onClick={() => onDo(item)} className="rounded-lg bg-[#00aaff] px-2.5 py-1 text-sm font-medium text-white hover:bg-[#0099e6]">
               Сделать за меня
+            </button>
+          )}
+          {canKnow && !item.known_marked && (
+            <button
+              disabled={know.isPending}
+              onClick={() => know.mutate(true)}
+              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+            >
+              Это я уже знаю
             </button>
           )}
           {canMarkDone(actor, item) && (

@@ -46,6 +46,11 @@ DEMO_USERS: dict[str, User] = {
              mentor_id="mentor-petr", lead_id="lead-olga"),
         User(id="intern-ivan", name="Иван Кузнецов", role=Role.INTERN, team="Авито Доставка",
              mentor_id="mentor-maria", lead_id="lead-sergey"),
+        # Вторые стажёры у наставников — для экрана сравнения планов (SPEC 3.1, 5; решение 11.11).
+        User(id="intern-kirill", name="Кирилл Егоров", role=Role.INTERN, team="Платформа объявлений",
+             mentor_id="mentor-petr", lead_id="lead-olga"),
+        User(id="intern-liza", name="Лиза Ковалёва", role=Role.INTERN, team="Авито Доставка",
+             mentor_id="mentor-maria", lead_id="lead-sergey"),
         User(id="mentor-petr", name="Пётр Волков", role=Role.MENTOR, team="Платформа объявлений", lead_id="lead-olga"),
         User(id="mentor-maria", name="Мария Орлова", role=Role.MENTOR, team="Авито Доставка", lead_id="lead-sergey"),
         User(id="lead-olga", name="Ольга Новикова", role=Role.LEAD, team="Платформа объявлений"),
