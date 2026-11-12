@@ -225,16 +225,14 @@ export default function Home() {
 
   /** Из колокольчика (SPEC 3.6): кнопка ведёт туда, где действие, — к блоку на панели плана или в чат. */
   async function openReminder(r: Reminder) {
+    // Факт прочитан — из колокольчика уходит, куда бы ни вела кнопка (кнопки «Готово» больше нет).
+    if (isInfo(r)) void api.doneReminder(actor.id, r.id).then(refresh, () => undefined);
     const section = sectionFor(r);
     if (section) {
       setTab("plan");
       setView("plan");
       if (targetOf(r) === "intern" && r.intern_id) pickIntern(r.intern_id);
       setTimeout(() => document.querySelector(`[aria-label="${section}"]`)?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 50);
-      if (isInfo(r)) {
-        await api.doneReminder(actor.id, r.id).catch(() => undefined); // факт прочитан — из колокольчика уходит
-        await refresh();
-      }
       return;
     }
     if (kindOf(r) === "absence_pending") {

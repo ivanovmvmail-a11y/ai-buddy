@@ -208,25 +208,20 @@ describe("экран «план + чат» на API", () => {
     expect(screen.queryByLabelText("новые сообщения")).toBeNull();
   });
 
-  it("колокольчик (спека 301): число, «Открыть в чате», «Готово» убирает напоминание", async () => {
+  it("колокольчик (спека 301): число, одна кнопка «Открыть в чате», без «Готово»", async () => {
     open("intern-ivan");
     const bell = await screen.findByRole("button", { name: /Напоминания: \d/ });
     const count = Number(bell.getAttribute("aria-label")!.match(/\d+/)![0]);
     await click(bell);
     const dialog = screen.getByRole("dialog", { name: "Напоминания" });
     expect(within(dialog).getAllByRole("listitem")).toHaveLength(count);
-    const first = within(dialog).getAllByRole("listitem")[0];
-    await click(within(first).getByRole("button", { name: "Готово" }));
-    await waitFor(() => expect(srv.calls.some((c) => c.method === "POST" && c.path.endsWith("/done"))).toBe(true));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: count > 1 ? `Напоминания: ${count - 1}` : "Напоминаний нет" })).toBeTruthy(),
-    );
+    // Проверка 12.11: одна главная кнопка; просроченный пункт уходит сам, когда он закрыт
+    expect(within(dialog).queryAllByRole("button", { name: "Готово" })).toHaveLength(0);
     const before = useChat.getState().messages.length;
-    if (count > 1) {
-      await click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Открыть в чате" })[0]);
-      expect(screen.queryByRole("dialog")).toBeNull();
-      await waitFor(() => expect(useChat.getState().messages.length).toBe(before + 1));
-    }
+    await click(within(dialog).getAllByRole("button", { name: "Открыть в чате" })[0]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(useChat.getState().messages.length).toBe(before + 1));
+    expect(srv.calls.some((c) => c.method === "POST" && c.path.endsWith("/done"))).toBe(false);
   });
 
   it("колокольчик: «Напомнить завтра», пусто, закрытие по Escape", async () => {
