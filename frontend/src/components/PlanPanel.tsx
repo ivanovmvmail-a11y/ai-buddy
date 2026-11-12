@@ -61,11 +61,12 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
 
   return (
     <div className="space-y-5 p-4 sm:p-5">
-      {actor.role !== "intern" && <InternCards actor={actor} />}
-
+      {/* Наставнику сначала то, что ждёт решения, и сравнение планов (главная идея), потом карточки (проверка 12.11). */}
       {actor.role === "mentor" && <Approvals actor={actor} />}
       {actor.role === "mentor" && <SkillSuggestions actor={actor} />}
       {actor.role === "mentor" && <ComparePlans actor={actor} />}
+
+      {actor.role !== "intern" && <InternCards actor={actor} />}
       {(actor.role === "lead" || actor.role === "intern") && <AbsenceRequests actor={actor} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
