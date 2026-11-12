@@ -1,5 +1,5 @@
 # Автопроверка каждого PR и каждого коммита в main:
-#   backend  — тесты + отчёт о покрытии (артефакт coverage-backend)
+#   backend  — тесты на памяти и на настоящем PostgreSQL + pgvector + отчёт о покрытии (артефакт coverage-backend)
 #   frontend — линтер, тесты с покрытием (порог 80% строк), сборка
 #   docker   — `docker compose up` на чистой машине, как у экспертов, и проверка, что всё отвечает
 name: CI
@@ -28,10 +28,15 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Установить зависимости
         run: uv sync --frozen --extra mcp
-      - name: Тесты с покрытием (без ключей, LLM — заглушка)
+      - name: Образ PostgreSQL + pgvector для тестов с настоящей базой
+        # тесты сами поднимают временный контейнер из этого образа и удаляют его (--pull=never)
+        run: docker pull --quiet pgvector/pgvector:pg17
+      - name: Тесты с покрытием на памяти и настоящем PostgreSQL (без ключей, LLM — заглушка)
         env:
           LLM_PROVIDER: echo
-        run: uv run --extra mcp pytest --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+        run: >-
+          uv run --extra mcp pytest --mcp-postgres --rag-postgres
+          --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
       - name: Сохранить отчёт о покрытии
         if: always()
         uses: actions/upload-artifact@v4
