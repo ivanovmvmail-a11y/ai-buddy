@@ -104,6 +104,10 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
     if expect.get("hr") and "hr" not in low:
         ok = False
         notes.append("не направил к HR BP")
+    for text in expect.get("absent", []):
+        if text.lower() in low:
+            ok = False
+            notes.append(f"лишнее «{text}»")
     for text in expect.get("contains", []):
         if text.lower() not in low:
             ok = False
@@ -148,6 +152,9 @@ def run_cases(provider: str, cases: list[dict] | None = None) -> list[Result]:
     from app.main import create_app
 
     cases = cases if cases is not None else json.loads(CASES.read_text(encoding="utf-8"))
+    # «Только с моделью»: вопрос другими словами, чем в документе, — поиск по словам без ключа его честно не найдёт.
+    if provider == "scenario":
+        cases = [c for c in cases if not c.get("model_only")]
     rag_service = async_runner.run(_demo_rag())
     results: list[Result] = []
     with (

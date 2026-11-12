@@ -36,7 +36,7 @@ STUCK_WORDS = ("завис", "жд", "просроч", "как дела", "ка�
 LEVEL_WORDS = ("мой уровень", "уровень по", "какой у меня уровень", "что я знаю", "мои навыки", "карта навыков")
 STOP = {"который", "когда", "почему", "сделать", "нужно", "можно", "такой", "этого", "через", "после", "чтобы",
         "только", "какой", "какие", "какая", "мне", "меня", "есть", "надо", "подскажи", "пожалуйста", "расскажи",
-        "такое", "такая", "такие", "этот", "этом", "where", "what"}
+        "такое", "такая", "такие", "этот", "этом", "если", "where", "what"}
 NAMES = {"intern-anya": ("аня", "ани", "аню", "анн"), "intern-ivan": ("иван", "ваня", "вани"),
          "intern-kirill": ("кирилл",), "intern-liza": ("лиза", "лизы", "лизу", "лиз")}
 STATUS_RU = {"created": "создана", "pending_approval": "на согласовании", "granted": "доступ выдан", "rejected": "отклонена"}
@@ -149,9 +149,14 @@ def _best_unit(question: str, system: str) -> tuple[tuple[int, str, str], set[st
     return best, wanted, need
 
 
+TIME_WORDS = ("сколько", "срок", "когда", "как долго", "как быстро", "через какое время", "за какое время")
+
+
 def docs_conflict(question: str, system: str) -> str | None:
     """SPEC 3.7 для любой модели: если найденные документы называют разные сроки, ответ — оба варианта,
     независимо от того, заметит ли расхождение модель (GigaChat на прогоне 12.11 выбирал один молча)."""
+    if not any(w in question.lower() for w in TIME_WORDS):
+        return None  # расхождение в сроках важно только для вопроса о сроке (иначе «один день» отгула ≠ «два дня» ревью)
     best, wanted, need = _best_unit(question, system)
     return _conflict(best, wanted, need, system) if best[0] >= need else None
 
@@ -172,7 +177,18 @@ def _missing_text(question: str, system: str) -> str:
 MISSING_PHRASES = ("этого нет", "не нашел", "нет информации", "информации об этом нет", "нет в документ", "не нашлось",
                    "не нашла", "не найден", "не указан")
 # Вопросы, на которые отвечают инструменты, сводка плана или HR, а не абзац документа: страховку не применяем.
-_NOT_DOC_QUESTION = ("план", "заявк", "наставник", "доступ", "уровень", "навык")
+_NOT_DOC_QUESTION = ("план", "заявк", "мой наставник", "кто наставник", "кто мой", "доступ", "уровень", "навык")
+
+
+def _strong(score: int, wanted: set[str]) -> bool:
+    """Совпала большая часть вопроса — не два случайных слова («учебный» + «отправь» ≠ статусы отправления)."""
+    return score >= min(len(wanted), max(2, -(-len(wanted) * 3 // 5)))
+
+
+def _leans_on_docs(reply: str, question: str, system: str) -> bool:
+    """Ответ по смыслу опирается на документ (≥4 значимых слова абзаца, кроме слов вопроса), даже без названия."""
+    words = _words(reply) - _words(question)
+    return any(len(words & _words(content)) >= 4 or (title and title in reply) for title, content in _docs(system))
 
 
 def docs_guard(question: str, system: str, reply: str) -> str | None:
@@ -190,11 +206,12 @@ def docs_guard(question: str, system: str, reply: str) -> str | None:
     low = reply.lower().replace("ё", "е")
     says_missing = any(p in low for p in MISSING_PHRASES)
     if best[0] >= need:
-        return _found_text(best) if says_missing else None
+        # Абзац нашёлся уверенно, а модель «этого нет» — показываем абзац; при слабом совпадении не вмешиваемся.
+        return _found_text(best) if says_missing and _strong(best[0], wanted) else None
     # Ничего не нашлось: даже честное «этого нет» модель дополняет «как обычно бывает» (сайт компании,
-    # IT-поддержка) — поэтому всегда наш ответ: нет в документах, к кому идти и готовый текст вопроса.
-    cites = any(title and title in reply for title, _ in _docs(system))
-    return None if cites else _missing_text(question, system)
+    # IT-поддержка) — поэтому наш ответ: нет в документах, к кому идти и готовый текст вопроса. Ответ, который
+    # по смыслу опирается на документ (вопрос задан другими словами, чем в документе), не трогаем.
+    return None if _leans_on_docs(reply, question, system) else _missing_text(question, system)
 
 
 def _names_someone(q: str) -> str | None:
@@ -333,10 +350,13 @@ class ScenarioProvider:
         return LLMReply(content=self._from_docs(question, system))
 
     def _from_docs(self, question: str, system: str) -> str:
-        best, wanted, need = _best_unit(question, system)
-        if best[0] >= need and (conflict := _conflict(best, wanted, need, system)):
+        if conflict := docs_conflict(question, system):
             return conflict
-        return _found_text(best) if best[0] >= need else _missing_text(question, system)
+        best, wanted, need = _best_unit(question, system)
+        # Абзац засчитываем, если совпало хотя бы 40% значимых слов вопроса: «писать» + «день» из 7 слов
+        # про молчащего ревьюера — не ответ (абзац про отгул), а 2 из 4 («к кому идти … доступа») — ответ.
+        enough = best[0] >= max(need, -(-len(wanted) * 2 // 5))
+        return _found_text(best) if enough else _missing_text(question, system)
 
     # --- после инструмента: собрать ответ ---------------------------------------------------------
 
