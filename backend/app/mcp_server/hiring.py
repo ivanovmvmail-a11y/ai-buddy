@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from . import checklist, events, storage
 from .notifications import notify
-from ._domain import known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view, suggestion_status
+from ._domain import SKILL_LEVEL_LABELS, SKILL_LEVEL_ORDER, known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view, suggestion_status
 from .errors import Conflict, Forbidden, NotFound
 from .models import SkillLevel, SkillProfile, SkillSuggestion, PlanItem
 from ._system import SYSTEM_ACTOR
@@ -59,9 +59,17 @@ def _set_level(data, actor, profile, topic, level, *, accepted_suggestion_id=Non
         target = DEMO_USERS.get(intern_id)
         if target is not None:
             title = _topic_title(data, topic, target.team)
-            label = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}[level]
-            notify(data, intern_id, intern_id, "skill_changed", uuid4().hex,
-                   f"Наставник отметил: {title} — {label}. План обновился", "plan")
+            # Один актуальный факт по теме; snooze не должен оживить старый уровень.
+            for reminder in data.reminders.values():
+                if (reminder.user_id == intern_id and reminder.kind == "skill_changed"
+                        and reminder.action is not None and reminder.action.topic == topic
+                        and reminder.status != "done"):
+                    reminder.status, reminder.snooze_until_day = "done", None
+            promotion = level != "novice" and (previous is None
+                or SKILL_LEVEL_ORDER.index(level) > SKILL_LEVEL_ORDER.index(previous))
+            text = (f"Наставник отметил: {title} — {SKILL_LEVEL_LABELS[level]}. План обновился" if promotion
+                    else f"План по теме {title} обновился. Открой актуальные пункты")
+            notify(data, intern_id, intern_id, "skill_changed", uuid4().hex, text, "plan", topic=topic)
 
 
 SUGGESTION_THRESHOLD = 2

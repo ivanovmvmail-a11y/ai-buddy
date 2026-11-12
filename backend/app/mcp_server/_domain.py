@@ -9,6 +9,9 @@ from app.agent.users import DEMO_USERS, Role, User, can_view_intern
 from .errors import NotFound
 from .models import AccessLevel, ItemStatus, OnboardingData, PlanItem, SkillLevel, SuggestionStatus
 
+SKILL_LEVEL_LABELS = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}
+SKILL_LEVEL_ORDER = tuple(SKILL_LEVEL_LABELS)
+
 WORK_STAGES = ("week1", "week2")
 STAGES = (*WORK_STAGES, "month1", "month2", "after3m")
 nonempty = TypeAdapter(Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)])

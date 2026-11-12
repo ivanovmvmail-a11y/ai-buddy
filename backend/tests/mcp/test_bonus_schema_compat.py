@@ -57,7 +57,7 @@ def test_old_schema_stays_in_postgres_and_recovers_after_live_migration(onboardi
             with psycopg.connect(dsn,autocommit=True) as connection:
                 assert connection.execute("SELECT status FROM plan_items WHERE id='anya.w1.notes'").fetchone()==('done',)
                 # SQL приходит после автодеплоя; пул и процесс не перезапускаются.
-                for pattern in ('*_service_drafts.sql','*_mentor_inbox.sql','*_absence.sql','*_self_check.sql','*_reminder_kinds.sql','*_notification_links.sql'):
+                for pattern in ('*_service_drafts.sql','*_mentor_inbox.sql','*_absence.sql','*_self_check.sql','*_reminder_kinds.sql','*_skill_suggestions.sql','*_notification_links.sql'):
                     for path in sorted(MIGRATION.parent.glob(pattern)): connection.execute(path.read_text(encoding="utf-8"))
             draft=run(prepare())
             assert run(drafts.get_draft('intern-anya',draft.id)).status=='pending'

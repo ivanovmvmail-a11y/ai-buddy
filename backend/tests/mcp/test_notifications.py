@@ -11,20 +11,18 @@ def own(user):
     return run(clock.list_reminders(user))
 
 
-def test_skill_change_addition_dedup_and_plan_removal(store,snapshot):
-    assert not any(r.kind in {'skill_changed','personal_item_added'} for r in own(A))
+def test_skill_change_rebuild_emits_one_fact_and_no_personal_notice(store,snapshot):
     run(hiring.set_skill_level(P,A.id,'testing','novice'))
     notifications=own(A)
-    added=next(r for r in notifications if r.kind=='personal_item_added')
-    changed=next(r for r in notifications if r.kind=='skill_changed')
-    assert added.plan_item_id=='anya.p.testing' and added.action.target=='plan_item'
-    assert 'новичок' in added.text and changed.action.target=='plan'
+    assert len(notifications)==1 and notifications[0].kind=='skill_changed'
+    assert notifications[0].action.topic=='testing' and 'новичок' not in notifications[0].text
+    assert snapshot().items['anya.p.testing'].kind=='personal'
     run(hiring.set_skill_level(P,A.id,'testing','novice'))
     assert own(A)==notifications
     run(hiring.set_skill_level(P,A.id,'testing','familiar'))
-    removed=next(r for r in own(A) if r.id==added.id)
-    assert removed.status=='done' and removed.plan_item_id is None
-    assert len([r for r in own(A) if r.kind=='skill_changed'])==2
+    assert next(r for r in own(A) if r.id==notifications[0].id).status=='done'
+    assert len([r for r in own(A) if r.status=='active'])==1
+    assert not any(r.kind=='personal_item_added' for r in own(A))
     assert 'anya.p.testing' not in snapshot().items
 
 
