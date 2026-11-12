@@ -61,6 +61,7 @@
 | 56 | Золотой набор на GigaChat: 55/55 дважды (страховка 9–11), утечек 0; GigaChat-2-Max на 16 трудных — страховка 5 (рекомендация в README); температура 0.1; противоречие только для вопросов о сроке; ревью #71 | Claude | claude/golden-gigachat | готово | #75, #76 | backend 665; сценарный 53/53 |
 | 57 | Наставник правит персональные пункты: HTTP каталога, «Добавить пункт в план», «Убрать из плана» (SPEC 3.1); повторное ревью #70, #71 | Claude | claude/mentor-plan-editing | готово | #77 | backend 703, frontend 94; проверено вживую |
 | 58 | CI: тесты backend и на настоящем PostgreSQL + pgvector (--mcp-postgres --rag-postgres), аудит D2; правка .github разрешена Мишей 11.11 | Claude | claude/ci-postgres | на ревью | | только .github/workflows/ci.yml |
+| 59 | README: подключение ключа GigaChat по письму организаторов — провайдер, модель, переменные (в т.ч. GIGACHAT_SCOPE для корпоративного ключа), перезапуск, проверка | Claude | claude/readme-gigachat-key | на ревью | | только README |
 
 | C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 | C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
