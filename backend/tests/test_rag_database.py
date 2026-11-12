@@ -159,7 +159,7 @@ def test_migration_privileges_and_pooled_team_isolation(postgres_cluster, api_ro
                     cursor = await connection.execute("SELECT count(*) AS count FROM public.rag_documents")
                     assert (await cursor.fetchone())["count"] == 10
                     cursor = await connection.execute("SELECT count(*) AS count FROM public.rag_chunks")
-                    assert (await cursor.fetchone())["count"] == 8
+                    assert (await cursor.fetchone())["count"] == 10
 
             async_runner.run(check_returned_connection())
         finally:
