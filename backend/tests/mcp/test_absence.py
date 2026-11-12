@@ -177,3 +177,12 @@ def test_rls_hides_both_draft_and_request_even_with_select_grant(store):
         finally:
             connection.execute(sql.SQL('DROP OWNED BY {}').format(sql.Identifier(reader)))
             connection.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(reader)))
+
+
+def test_clean_seed_has_no_first_day_absence_for_anya(store):
+    assert run(absence.list_requests(ANYA)) == []
+    assert run(absence.list_absence_facts(PETR, ANYA)) == []
+    request = send()
+    assert run(absence.list_absence_facts(PETR, ANYA)) == []
+    decide(request)
+    assert [fact.day for fact in run(absence.list_absence_facts(PETR, ANYA))] == [DAY]

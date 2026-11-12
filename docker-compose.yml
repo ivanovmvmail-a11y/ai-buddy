@@ -61,6 +61,7 @@ services:
     volumes:
       - ./ops/grafana/init.sh:/provision/init.sh:ro
       - ./supabase/migrations/20261111100000_grafana_metrics.sql:/provision/metrics.sql:ro
+      - ./supabase/migrations/20261112160125_grafana_topic_titles.sql:/provision/topic_titles.sql:ro
       - grafana-secret:/secrets
     depends_on:
       db:

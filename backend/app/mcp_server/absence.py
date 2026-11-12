@@ -71,7 +71,7 @@ async def confirm_absence(user_id: str, draft_id: str) -> AbsenceRequest:
         drafts.finish(draft, request.id)
         events._record(data, user, 'absence_requested', {'status': 'pending'})
         notify(data, request.lead_id, request.intern_id, 'absence_new', request.id,
-               f"Новая заявка на отгул на {request.day:%d.%m}", 'absence_request', absence_request_id=request.id)
+               f"Новая заявка на отгул: {target.name}, {request.day:%d.%m}", 'absence_request', absence_request_id=request.id)
         return request.model_copy(deep=True)
 
 
