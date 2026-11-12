@@ -99,3 +99,42 @@ def test_new_interns_have_plans_and_mentors_see_two(client):
     assert {i["id"] for i in get(client, "/interns", "mentor-maria").get_json()["interns"]} == {"intern-ivan", "intern-liza"}
     for intern in ("intern-kirill", "intern-liza"):
         assert get(client, "/plan", intern).status_code == 200
+
+
+# --- Правка персональных пунктов наставником (SPEC 3.1, 5; сервис — checklist.add/remove_personal_item) ----
+
+def test_catalog_only_for_own_mentor(client):
+    items = get(client, "/plan/catalog?intern_id=intern-anya", "mentor-petr").get_json()["items"]
+    assert items and all(c["team"] == "Платформа объявлений" for c in items)
+    assert any(c["topic"] == "git" and c["in_plan"] for c in items)
+    for user in ("intern-anya", "mentor-maria", "lead-olga", "curator-dmitry"):
+        assert get(client, "/plan/catalog?intern_id=intern-anya", user).status_code == 404
+    assert get(client, "/plan/catalog", "mentor-petr").status_code == 404
+
+
+def test_mentor_adds_and_removes_personal_item(client):
+    catalog = get(client, "/plan/catalog?intern_id=intern-anya", "mentor-petr").get_json()["items"]
+    free = next(c for c in catalog if not c["in_plan"])
+    res = post(client, "/plan/items", {"intern_id": "intern-anya", "catalog_key": free["key"]}, "mentor-petr")
+    assert res.status_code == 201
+    item = res.get_json()
+    assert item["kind"] == "personal" and item["reason"] == "добавил наставник"
+    assert item["id"] in {i["id"] for i in personal(client)}
+    assert post(client, "/plan/items", {"intern_id": "intern-anya", "catalog_key": free["key"]},
+                "mentor-petr").status_code == 409
+    bell = get(client, "/reminders", "intern-anya").get_json()["reminders"]
+    assert any(r["kind"] == "personal_item_added" for r in bell)
+
+    assert client.delete(f"/plan/items/{item['id']}", headers=as_user("mentor-maria")).status_code == 404
+    assert client.delete(f"/plan/items/{item['id']}", headers=as_user("intern-anya")).status_code == 404
+    assert client.delete(f"/plan/items/{item['id']}", headers=as_user("mentor-petr")).status_code == 204
+    assert item["id"] not in {i["id"] for i in personal(client)}
+    assert client.delete(f"/plan/items/{item['id']}", headers=as_user("mentor-petr")).status_code == 404
+
+
+def test_common_item_cannot_be_removed_and_foreign_key_hidden(client):
+    common = next(i for i in get(client, "/plan", "intern-anya").get_json()["items"] if i["kind"] == "common")
+    assert client.delete(f"/plan/items/{common['id']}", headers=as_user("mentor-petr")).status_code == 403
+    foreign = next(c for c in get(client, "/plan/catalog?intern_id=intern-ivan", "mentor-maria").get_json()["items"])
+    assert post(client, "/plan/items", {"intern_id": "intern-anya", "catalog_key": foreign["key"]},
+                "mentor-petr").status_code == 404
