@@ -65,9 +65,23 @@ npm run dev
 | `curator-dmitry` | Дмитрий Соколов | куратор стажировки | Avito Start |
 
 ## Подключение GigaChat
+**Провайдер:** GigaChat (Сбер). **Модель:** `GigaChat-2` (рекомендуем, см. таблицу ниже). Документация провайдера: [developers.sber.ru/docs/ru/gigachat](https://developers.sber.ru/docs/ru/gigachat/api/overview).
+
 1. [developers.sber.ru/studio](https://developers.sber.ru/studio) → создать проект GigaChat API → скопировать **Authorization Key**.
-2. В `backend/.env`: `LLM_PROVIDER=gigachat`, `GIGACHAT_CREDENTIALS=<ключ>`.
-3. Сертификат Минцифры уже лежит в репозитории (`backend/certs/russian_trusted_root_ca.cer`, источник — [gosuslugi.ru/crt](https://www.gosuslugi.ru/crt)) и подключается автоматически. Ничего делать не нужно.
+2. Создать файл настроек: `cp backend/.env.example backend/.env`.
+3. В `backend/.env` заполнить переменные:
+
+   | Переменная | Значение |
+   |---|---|
+   | `LLM_PROVIDER` | `gigachat` |
+   | `GIGACHAT_CREDENTIALS` | Authorization Key из шага 1 |
+   | `GIGACHAT_SCOPE` | версия API ключа: `GIGACHAT_API_PERS` — физлицо (по умолчанию), `GIGACHAT_API_B2B` — ИП/юрлицо, пакеты токенов, `GIGACHAT_API_CORP` — ИП/юрлицо, оплата по факту. **Должна совпадать с ключом**, иначе GigaChat отказывает в доступе |
+   | `GIGACHAT_MODEL` | `GigaChat-2` (по умолчанию; `GigaChat-2-Max` — тоже работает) |
+
+4. Перезапустить: `docker compose up --build` (без Docker — перезапустить backend, см. «Запуск для разработки»).
+5. Проверить: http://localhost:8000/health показывает `"llm_provider": "gigachat"`, а в шапке сайта нет надписи «сценарный режим (без ключа модели)» — значит, отвечает модель.
+
+Сертификат Минцифры уже лежит в репозитории (`backend/certs/russian_trusted_root_ca.cer`, источник — [gosuslugi.ru/crt](https://www.gosuslugi.ru/crt)) и подключается автоматически. Ничего делать не нужно.
 
 **Какую модель выбрать (провайдер для проверки — GigaChat).**
 
