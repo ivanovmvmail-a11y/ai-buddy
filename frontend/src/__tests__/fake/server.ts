@@ -216,7 +216,7 @@ export function installFakeServer(): FakeServer {
         ...s.items.find((i) => i.intern_id === target.id)!, id: `${target.id.replace("intern-", "")}.p.${entry.topic}`,
         kind: "personal", reason: "добавил наставник", catalog_key: entry.key, topic: entry.topic, title: entry.title,
         summary: entry.summary, stage: entry.stage, owner_role: "intern", status: "not_started", resource_id: null,
-        doc_source_id: null, practice: null, due_day: 10, known_marked: false, status_reason: null,
+        doc_source_id: null, practice: null, practice_check: false, due_day: 10, known_marked: false, status_reason: null,
       };
       s.items.push(item);
       return { status: 201, body: derived(s, item) };
@@ -230,6 +230,17 @@ export function installFakeServer(): FakeServer {
       if (item.status === "done") return err(409, "Закрытый пункт остаётся в плане");
       s.items = s.items.filter((i) => i !== item);
       return { status: 204, body: null };
+    }
+    m = p.match(/^\/plan\/items\/(.+)\/practice$/);
+    if (m) {
+      const item = s.items.find((i) => i.id === m![1]);
+      if (!item || actor.role !== "intern" || item.intern_id !== actor.id || !item.practice_check) return err(404, "Не найдено");
+      const passed = String(body.answer).includes("коммит");
+      return ok({
+        passed, found: passed ? ["коммит с понятным сообщением"] : [], missing: passed ? [] : ["как сохранить изменения в истории?"],
+        text: passed ? "Задание выполнено: коммит с понятным сообщением. Можно отметить пункт «Готово»." : "Почти. Подумай: как сохранить изменения в истории?.",
+        source: { title: "Учебный репозиторий — клонирование и ветки", url: null },
+      });
     }
     m = p.match(/^\/plan\/items\/(.+)\/known$/);
     if (m) {

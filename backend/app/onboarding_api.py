@@ -18,7 +18,7 @@ from pydantic_core import to_jsonable_python
 from app import async_runner
 from app.config import settings
 from app.http_body import json_body
-from app.agent import analytics, explain, history, service
+from app.agent import analytics, explain, history, practice, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
 from app.mcp_server import absence, access, checklist, clock, hiring
@@ -79,7 +79,25 @@ def interns():
 
 @bp.get("/plan")
 def plan():
-    return _json(async_runner.run(checklist.get_plan(g.user, _intern_id())))
+    data = _json(async_runner.run(checklist.get_plan(g.user, _intern_id())))
+    # Спека 107: у пункта есть проверяемое задание — интерфейс покажет стажёру «Сдать задание».
+    for item in data.get("items", []):
+        item["practice_check"] = practice.has_check(item.get("practice"))
+    return data
+
+
+class PracticeIn(BaseModel):
+    answer: str = Field(min_length=1, max_length=2000)
+
+
+@bp.post("/plan/items/<item_id>/practice")
+def item_practice(item_id: str):
+    """Спека 107: проверка ответа на задание пункта по фактам из учебного документа — без модели.
+    Только стажёр и только свой пункт; текст ответа не сохраняется, в события — только «засчитано / нет»."""
+    body = _body(PracticeIn)
+    result = async_runner.run(practice.submit(g.user, item_id, body.answer))
+    async_runner.run(analytics.record_practice(g.user, item_id=item_id, topic=result["topic"], passed=result["passed"]))
+    return jsonify(result)
 
 
 class StatusIn(BaseModel):

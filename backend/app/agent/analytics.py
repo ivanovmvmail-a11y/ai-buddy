@@ -76,6 +76,15 @@ async def record_explained(user: User, *, answer_id: str, title: str, with_sourc
                         tools=["explain_item"], refused=False, drafts=0, latency_ms=latency_ms)
 
 
+async def record_practice(user: User, *, item_id: str, topic: str | None, passed: bool) -> None:
+    """Спека 107: задание на практике сдано — засчитано или нет. Без текста ответа."""
+    try:
+        await events.log_event(SYSTEM_ACTOR, "practice_checked",
+                               {**_who(user), "item_id": item_id, "topic": topic, "passed": passed})
+    except Exception:  # аналитика не должна ломать проверку
+        log.exception("practice_checked not recorded user=%s", user.id)
+
+
 async def record_feedback(user: User, answer_id: str, useful: bool) -> None:
     answered = await events.list_events(SYSTEM_ACTOR, type="question_answered")
     if not any(e.payload.get("answer_id") == answer_id and e.payload.get("user_id") == user.id for e in answered):

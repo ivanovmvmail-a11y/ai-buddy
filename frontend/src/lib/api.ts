@@ -3,7 +3,7 @@ import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
   CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
-  PlanCompare, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
+  PlanCompare, PracticeResult, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
   SkillSuggestion, SuggestionsResponse, WeeklySummary,
 } from "./types";
 
@@ -112,6 +112,8 @@ export const api = {
       throw new ApiError(detailText(body.detail, res.status), res.status);
     }
   },
+  practice: (u: string, itemId: string, answer: string) =>
+    request(`/plan/items/${encodeURIComponent(itemId)}/practice`, PracticeResult, u, post({ answer })),
   markKnown: (u: string, itemId: string, known: boolean) =>
     request(`/plan/items/${encodeURIComponent(itemId)}/known`, PlanItem, u, post({ known })),
   suggestions: (u: string) => request("/skills/suggestions?status=pending", SuggestionsResponse, u),

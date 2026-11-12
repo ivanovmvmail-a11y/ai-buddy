@@ -75,7 +75,7 @@ const PERSONAL: Record<string, Array<ItemSeed & { reason: string }>> = {
   "intern-anya": [
     { key: "p.git", stage: "week1", owner: "intern", due: 6, topic: "git", doc: "demo:11-git-workflow.md",
       title: "Практикум: ветки и pull request", summary: "Учебный pull request в песочнице команды.",
-      reason: "в карте навыков Git — новичок" },
+      practice: "Создай учебную ветку, коммит и pull request.", reason: "в карте навыков Git — новичок" },
   ],
   "intern-kirill": [
     { key: "p.sql", stage: "week2", owner: "intern", due: 10, topic: "sql", doc: "demo:06-platform-lifecycle.md",
@@ -101,6 +101,7 @@ function buildItems(intern: DemoUser): PlanItem[] {
       kind: s.reason ? ("personal" as const) : ("common" as const),
       reason: s.reason ?? null,
       known_marked: false,
+      practice_check: Boolean(s.reason && s.practice),
       catalog_key: s.reason ? `${intern.team === "Авито Доставка" ? "delivery" : "platform"}.${s.topic}` : null,
       id: `${short}.${s.key}`,
       intern_id: intern.id,
