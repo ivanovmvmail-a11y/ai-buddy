@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 METRICS = ROOT / 'supabase/migrations/20261111100000_grafana_metrics.sql'
 DASHBOARD = ROOT / 'ops/grafana/dashboards/onboarding.json'
 API_PERMISSIONS = METRICS.with_name('20261111103913_grafana_revoke_api_roles.sql')
+TOPIC_TITLES = METRICS.with_name('20261112160125_grafana_topic_titles.sql')
 
 
 @pytest.fixture
@@ -50,11 +51,14 @@ def test_metrics_migration_handles_empty_legacy_database_and_repeated_provisioni
             apply_onboarding_migrations(owner)
         owner.execute(METRICS.read_text(encoding='utf-8'))
         owner.execute(METRICS.read_text(encoding='utf-8'))
+        owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
+        owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
         assert owner.execute('SELECT count(*) FROM grafana_answers').fetchone() == (0,)
         assert owner.execute('SELECT count(*) FROM grafana_feedback').fetchone() == (0,)
         if not has_onboarding:
             apply_onboarding_migrations(owner)
             owner.execute(METRICS.read_text(encoding='utf-8'))
+            owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
             owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system','question_answered',%s)",
                           (Jsonb({'intern_id': 'intern-anya', 'topic': 'git'}),))
             assert owner.execute('SELECT count(*) FROM grafana_answers').fetchone() == (1,)
@@ -72,6 +76,7 @@ def test_panel_sql_matches_metrics_and_reader_cannot_read_private_tables_or_writ
     with psycopg.connect(**params, autocommit=True) as owner:
         apply_onboarding_migrations(owner)
         owner.execute(METRICS.read_text(encoding='utf-8'))
+        owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
         owner.execute("ALTER ROLE ai_buddy_grafana LOGIN PASSWORD 'grafana-test-only'")
         for payload in answers + [{'user_id': 'mentor-petr', 'topic': 'git', 'with_source': True}]:
             owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system','question_answered',%s)",
@@ -130,7 +135,9 @@ def test_grafana_views_revoke_supabase_default_grants_and_keep_datasource(onboar
                             assert owner.execute(sql.SQL('SELECT count(*) FROM public.{}').format(sql.Identifier(view))).fetchone() == (1,)
                 owner.execute(API_PERMISSIONS.read_text(encoding='utf-8'))
                 owner.execute(API_PERMISSIONS.read_text(encoding='utf-8'))  # Повторное применение безопасно.
-                owner.execute(METRICS.read_text(encoding='utf-8'))  # Повторный Docker init не возвращает grants.
+                owner.execute(METRICS.read_text(encoding='utf-8'))  # Старый SQL сохраняет ACL.
+                owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
+                owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
                 for role in api_roles:
                     for view in views:
                         assert owner.execute("SELECT has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE,DELETE')",
@@ -192,3 +199,29 @@ def test_new_event_with_virtual_future_day_is_visible_in_current_time_window(met
         with psycopg.connect(**metrics_database) as connection:
             assert connection.execute('SELECT count(*) FROM public.grafana_answers WHERE ts BETWEEN %s AND %s',(start,end)).fetchone()==(1,)
     finally: async_runner.run(store.close())
+
+
+def test_topic_titles_are_russian_in_view_and_actual_dashboard_queries(metrics_database):
+    titles = {
+        'hr': 'орг. вопросы (HR)', 'access': 'доступы', 'git': 'git и ревью',
+        'environment': 'окружение и запуск', 'tasks': 'задачи', 'plan': 'план',
+        'people': 'к кому идти', 'other': 'другое', 'unknown': 'другое', None: 'другое',
+    }
+    with psycopg.connect(**metrics_database, autocommit=True) as owner:
+        apply_onboarding_migrations(owner)
+        owner.execute(METRICS.read_text(encoding='utf-8'))
+        owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
+        owner.execute(TOPIC_TITLES.read_text(encoding='utf-8'))
+        for index, (topic, title) in enumerate(titles.items()):
+            owner.execute("INSERT INTO events (ts,user_id,role,team,type,payload) VALUES (now(),'system','system','system','question_answered',%s)",
+                          (Jsonb({'intern_id': 'intern-anya', 'topic': topic, 'not_in_base': True, 'latency_ms': index}),))
+            assert owner.execute('SELECT topic FROM grafana_answers WHERE latency_ms=%s', (index,)).fetchone() == (title,)
+        with owner.transaction():
+            owner.execute('SET LOCAL ROLE ai_buddy_grafana')
+            for panel in json.loads(DASHBOARD.read_text(encoding='utf-8'))['panels']:
+                query = panel['targets'][0]['rawSql']
+                if 'GROUP BY topic' not in query:
+                    continue
+                rows = owner.execute(query.replace('$__timeFilter(ts)', 'true')).fetchall()
+                assert {row[0] for row in rows} == set(titles.values())
+                assert next(row[1] for row in rows if row[0] == 'другое') == 3
