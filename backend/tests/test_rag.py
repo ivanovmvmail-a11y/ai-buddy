@@ -25,7 +25,7 @@ def service():
 
 @pytest.fixture
 def demo(service):
-    assert run(ingest_directory(service)) == (20, 20)
+    assert run(ingest_directory(service)) == (22, 22)
     return service
 
 
@@ -46,7 +46,7 @@ def test_delivery_intern_never_sees_platform_documents(demo):
     """Точный запрос по чужому документу не даёт доступа даже при большом k."""
     for query in ("Лиловый конструктор", "Бумажный каталог", "Картонный дирижабль"):
         hits = run(demo.retrieve(query, DEMO_USERS["intern-ivan"], k=100))
-        assert len(hits) == 14  # 8 общих + 6 своей команды
+        assert len(hits) == 16  # 10 общих + 6 своей команды
         assert all("Платформа объявлений" not in hit["title"] for hit in hits)
         assert all(query not in hit["content"] for hit in hits)
         assert any("Авито Доставка" in hit["title"] for hit in hits)
@@ -285,13 +285,13 @@ def test_overlap_starts_on_word_boundary(separator, overlap):
 
 def test_demo_metadata_and_repeat_load(demo):
     documents = [read_document(path, path.name) for path in sorted(DEMO_DOCS.glob("*.md"))]
-    assert len(documents) == 20
-    assert sum(document.team is None for document in documents) == 8
+    assert len(documents) == 22
+    assert sum(document.team is None for document in documents) == 10
     assert sum(document.team == "Авито Доставка" for document in documents) == 6
     assert sum(document.team == "Платформа объявлений" for document in documents) == 6
     assert all(not document.content.startswith("---") for document in documents)
-    assert run(ingest_directory(demo)) == (20, 20)
-    assert len(demo.store.documents) == 20
+    assert run(ingest_directory(demo)) == (22, 22)
+    assert len(demo.store.documents) == 22
 
 
 @pytest.mark.parametrize("text", ["# Missing metadata", "---\ntitle: t", "---\ntitle: t\n---\nbody",
@@ -340,7 +340,7 @@ def test_cli_without_database(capsys):
 def test_cli_uses_shared_async_runner(service, monkeypatch, capsys):
     monkeypatch.setattr("app.rag.ingest.get_service", lambda: service)
     main(["--directory", str(DEMO_DOCS)])
-    assert "Loaded 20 documents, 20 chunks" in capsys.readouterr().out
+    assert "Loaded 22 documents, 22 chunks" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("stage", ["success", "metadata", "embedder", "storage"])
@@ -367,7 +367,7 @@ def test_cli_closes_store_on_same_loop_after_success_or_failure(service, monkeyp
         monkeypatch.setattr(service.store, "upsert", failed_storage)
     if stage == "success":
         main(["--directory", str(directory)])
-        assert "Loaded 20 documents" in capsys.readouterr().out
+        assert "Loaded 22 documents" in capsys.readouterr().out
     else:
         with pytest.raises(ValueError if stage == "metadata" else RuntimeError):
             main(["--directory", str(directory)])
