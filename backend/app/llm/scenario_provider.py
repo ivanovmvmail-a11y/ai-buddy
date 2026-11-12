@@ -9,6 +9,7 @@
 """
 import json
 import re
+from datetime import date, timedelta
 from typing import Any
 
 from app.agent.users import DEMO_USERS, Role
@@ -17,7 +18,14 @@ from .base import LLMReply, Message, ToolCall, ToolSpec
 
 DOCS_MARKER = "Контекст из документов команды"
 
-ORG_WORDS = ("отпуск", "больнич", "отгул", "зарплат", "компенсац", "справк", "дмс", "увольн", "трудов", "командиров")
+ORG_WORDS = ("отпуск", "больнич", "отгул", "заболел", "зарплат", "компенсац", "справк", "дмс", "увольн", "трудов", "командиров")
+# SPEC 3.8: отгул на один день — не к HR, а заявление руководителю (если инструмент доступен — стажёру).
+ABSENCE_WORDS = ("отгул", "отпрос", "к врачу", "ко врачу", "не смогу прийти", "не приду", "не выйду", "пропустить день",
+                 "взять выходной", "на прием", "на приём", "на экзамен", "отлучиться")
+HR_ONLY = ("отпуск", "больнич", "заболел", "декрет", "увольн")
+FAMILY_WORDS = ("семь", "семей", "ребен", "ребён", "родител", "мам", "пап", "свадьб", "бабушк", "дедушк")
+STUDY_WORDS = ("учеб", "учёб", "экзамен", "сесси", "зачет", "зачёт", "универ", "институт", "диплом", "защит")
+MONTHS = ("январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр")
 NEXT_WORDS = ("дальше", "следующ", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня")
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
 REQUEST_WORDS = ("мои", "статус", "какие", "ждут", "список", "покажи")
@@ -29,7 +37,8 @@ LEVEL_WORDS = ("мой уровень", "уровень по", "какой у м
 STOP = {"который", "когда", "почему", "сделать", "нужно", "можно", "такой", "этого", "через", "после", "чтобы",
         "только", "какой", "какие", "какая", "мне", "меня", "есть", "надо", "подскажи", "пожалуйста", "расскажи",
         "такое", "такая", "такие", "этот", "этом", "where", "what"}
-NAMES = {"intern-anya": ("аня", "ани", "аню", "анн"), "intern-ivan": ("иван", "ваня", "вани")}
+NAMES = {"intern-anya": ("аня", "ани", "аню", "анн"), "intern-ivan": ("иван", "ваня", "вани"),
+         "intern-kirill": ("кирилл",), "intern-liza": ("лиза", "лизы", "лизу", "лиз")}
 STATUS_RU = {"created": "создана", "pending_approval": "на согласовании", "granted": "доступ выдан", "rejected": "отклонена"}
 
 
@@ -145,6 +154,54 @@ def _days(n: int) -> str:
     return f"{n} дней"
 
 
+def _today(system: str) -> date | None:
+    """Сегодняшняя дата стажёра из сводки плана в системном сообщении («Сегодня: 2026-11-11.»)."""
+    found = re.search(r"Сегодня: (\d{4}-\d{2}-\d{2})", system)
+    return date.fromisoformat(found.group(1)) if found else None
+
+
+def _absence_day(q: str, today: date) -> date:
+    """«послезавтра», «сегодня», «14.11», «14 ноября»; по умолчанию — завтра. Прошлое → завтра (задним числом нельзя)."""
+    if "послезавтра" in q:
+        return today + timedelta(days=2)
+    if "сегодня" in q:
+        return today
+    day, month = None, 0
+    if found := re.search(r"(?<!\d)(\d{1,2})\.(\d{1,2})(?!\d)", q):
+        day, month = int(found.group(1)), int(found.group(2))
+    elif found := re.search(r"(\d{1,2})\s+([а-яё]+)", q):
+        month = next((i + 1 for i, m in enumerate(MONTHS) if found.group(2).startswith(m)), None)
+        day = int(found.group(1)) if month else None
+    if day:
+        try:
+            wanted = date(today.year, month, day)
+        except ValueError:
+            wanted = None
+        if wanted and wanted >= today:
+            return wanted
+    return today + timedelta(days=1)
+
+
+def _reason(q: str) -> str:
+    if any(w in q for w in STUDY_WORDS):
+        return "study"
+    if any(w in q for w in FAMILY_WORDS):
+        return "family"
+    return "personal"
+
+
+def _regulation(system: str) -> str:
+    """Абзац регламента об отгуле из найденных документов — с источником в «кавычках»."""
+    best = (0, "", "")
+    wanted = {"отгул", "отпроситься", "заявление", "день", "руководитель"}
+    for title, content in _docs(system):
+        for heading, unit in _units(content):
+            score = _overlap(wanted, heading + " " + unit)
+            if score > best[0]:
+                best = (score, title, unit)
+    return f"По документу «{best[1]}»: {best[2]}\n\n" if best[0] >= 2 else ""
+
+
 def _hr_name() -> str:
     return next((u.name for u in DEMO_USERS.values() if u.role == Role.HRBP), "HR BP")
 
@@ -181,6 +238,11 @@ class ScenarioProvider:
                 return LLMReply(content=(
                     f"По профилю: {levels.group(1)}. Уровень ставит наставник; я использую его только чтобы "
                     "объяснять подробнее или короче, а не для оценки."))
+        if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
+                and not any(w in q for w in HR_ONLY)):
+            today = _today(system)
+            if today:
+                return call("create_absence_request", {"day": _absence_day(q, today).isoformat(), "reason": _reason(q)})
         if any(w in q for w in ORG_WORDS):
             return LLMReply(content=(
                 f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
@@ -246,6 +308,11 @@ class ScenarioProvider:
                                     "Посмотреть, на что можно подать заявку, — спроси «какие доступы можно запросить?».")
         if result.get("error"):
             return LLMReply(content="Сервис сейчас не ответил. Попробуй ещё раз чуть позже.")
+        if result.get("status") == "awaiting_confirmation" and msg.name == "create_absence_request":
+            rule = _regulation(system)
+            return LLMReply(content=(
+                f"{rule}Подготовил черновик: {result.get('summary')}. Подробности вроде врача в заявление не пишу — "
+                "только причину из списка. Проверь дату и нажми «Подтвердить»: без этого руководителю ничего не уйдёт."))
         if result.get("status") == "awaiting_confirmation":
             return LLMReply(content=f"Подготовил черновик: {result.get('summary')}. Проверь и нажми «Подтвердить» — "
                                     "без этого ничего не отправится.")

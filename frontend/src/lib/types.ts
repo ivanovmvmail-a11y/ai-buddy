@@ -23,6 +23,7 @@ export type DemoUser = {
   role: Role;
   team: string;
   mentor_id?: string | null;
+  lead_id?: string | null; // руководитель — решает заявки на отгул (SPEC 3.8)
 };
 
 export const PlanItem = z.object({
@@ -107,9 +108,23 @@ export const SkillProfile = z.object({
 });
 export type SkillProfile = z.infer<typeof SkillProfile>;
 
+// SPEC 3.6 (11.11): единые уведомления. kind/action/ссылки — из контракта docs/API.md; у старого сервера их нет.
+export const ReminderKind = z.enum([
+  "plan_item", "access_request", "skill_changed", "personal_item_added", "skill_suggestion",
+  "absence_pending", "absence_decided", "absence_today", "absence_new", "absence_fact",
+]);
+export type ReminderKind = z.infer<typeof ReminderKind>;
+export const ReminderTarget = z.enum(["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern"]);
+export type ReminderTarget = z.infer<typeof ReminderTarget>;
+
 export const Reminder = z.object({
   id: z.string(),
   user_id: z.string(),
+  kind: ReminderKind.optional(),
+  action: z.object({ label: z.string(), target: ReminderTarget }).nullable().optional(),
+  intern_id: z.string().nullable().optional(),
+  absence_request_id: z.string().nullable().optional(),
+  suggestion_id: z.string().nullable().optional(),
   plan_item_id: z.string().nullable(),
   request_id: z.string().nullable(),
   text: z.string(),
@@ -225,3 +240,21 @@ export const PlanCompare = z.object({
   personal: z.record(z.string(), z.array(PlanItem)),
 });
 export type PlanCompare = z.infer<typeof PlanCompare>;
+
+// SPEC 3.8 (11.11): отгул на один день. Причина — закрытый список, без медицинских подробностей.
+export const AbsenceRequest = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  intern_name: z.string(),
+  lead_id: z.string(),
+  day: z.string(),
+  reason: z.enum(["personal", "family", "study"]),
+  reason_title: z.string(),
+  status: z.enum(["pending", "approved", "rejected"]),
+  created_day: z.number(),
+  decided_day: z.number().nullable().optional(),
+});
+export type AbsenceRequest = z.infer<typeof AbsenceRequest>;
+export const AbsenceRequestsResponse = z.object({ requests: z.array(AbsenceRequest) });
+/** Наставнику — только факт «отсутствует <дата>», без причины и номера заявки. */
+export const AbsenceFactsResponse = z.object({ facts: z.array(z.object({ intern_id: z.string(), day: z.string() })) });

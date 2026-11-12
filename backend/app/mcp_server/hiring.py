@@ -4,9 +4,10 @@ from uuid import uuid4
 
 from . import checklist, events, storage
 from .notifications import notify
-from ._domain import known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view
+from ._domain import SKILL_LEVEL_LABELS, SKILL_LEVEL_ORDER, known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view, suggestion_status
 from .errors import Conflict, Forbidden, NotFound
 from .models import SkillLevel, SkillProfile, SkillSuggestion, PlanItem
+from ._system import SYSTEM_ACTOR
 
 
 async def get_skill_profile(actor: User, intern_id: str) -> SkillProfile:
@@ -31,10 +32,22 @@ async def set_skill_level(actor: User, intern_id: str, topic: str, level: SkillL
         return profile.model_copy(deep=True)
 
 
-def _set_level(data, actor, profile, topic, level):
+def _set_level(data, actor, profile, topic, level, *, accepted_suggestion_id=None):
     intern_id = profile.intern_id
     if profile.skills.get(topic) != level:
         previous = profile.skills.get(topic)
+        for suggestion in data.suggestions.values():
+            if (suggestion.intern_id == intern_id and suggestion.topic == topic
+                    and suggestion.status == "pending" and suggestion.id != accepted_suggestion_id):
+                suggestion.status = "dismissed"
+                suggestion.decided_day = data.interns[intern_id].current_day
+                for reminder in data.reminders.values():
+                    if reminder.suggestion_id == suggestion.id:
+                        reminder.status, reminder.snooze_until_day = "done", None
+                events._record(data, actor, "skill_suggestion_decided", {
+                    "intern_id": intern_id, "suggestion_id": suggestion.id, "topic": topic,
+                    "status": "dismissed", "cause": "manual_skill_change",
+                })
         profile.skills[topic] = level
         profile.updated_by = actor.id
         profile.updated_at = timestamp(data, intern_id)
@@ -43,11 +56,20 @@ def _set_level(data, actor, profile, topic, level):
             "intern_id": intern_id, "topic": topic, "from": previous, "to": level,
             "day": data.interns[intern_id].current_day,
         })
-        title = next((c.topic_title for c in data.personal_catalog.values()
-                      if c.topic == topic and c.team == DEMO_USERS[intern_id].team), topic)
-        label = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}[level]
-        notify(data, intern_id, intern_id, "skill_changed", uuid4().hex,
-               f"Наставник отметил: {title} — {label}. План обновился", "plan")
+        target = DEMO_USERS.get(intern_id)
+        if target is not None:
+            title = _topic_title(data, topic, target.team)
+            # Один актуальный факт по теме; snooze не должен оживить старый уровень.
+            for reminder in data.reminders.values():
+                if (reminder.user_id == intern_id and reminder.kind == "skill_changed"
+                        and reminder.action is not None and reminder.action.topic == topic
+                        and reminder.status != "done"):
+                    reminder.status, reminder.snooze_until_day = "done", None
+            promotion = level != "novice" and (previous is None
+                or SKILL_LEVEL_ORDER.index(level) > SKILL_LEVEL_ORDER.index(previous))
+            text = (f"Наставник отметил: {title} — {SKILL_LEVEL_LABELS[level]}. План обновился" if promotion
+                    else f"План по теме {title} обновился. Открой актуальные пункты")
+            notify(data, intern_id, intern_id, "skill_changed", uuid4().hex, text, "plan", topic=topic)
 
 
 SUGGESTION_THRESHOLD = 2
@@ -55,12 +77,14 @@ SUGGESTION_THRESHOLD = 2
 
 def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None):
     profile = data.profiles.get(intern_id)
-    if profile is None or not topic:
+    if not data._suggestions_available or profile is None or not topic:
         return
     level = profile.skills.get(topic)
     if level not in {"novice", "familiar"}:
         return
-    target = DEMO_USERS[intern_id]
+    target = DEMO_USERS.get(intern_id)
+    if target is None or target.role != Role.INTERN:
+        return
     mentor = DEMO_USERS.get(target.mentor_id)
     if mentor is None or mentor.role != Role.MENTOR or mentor.team != target.team:
         return
@@ -79,14 +103,13 @@ def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None)
     if pending:
         pending.evidence = sorted(set(pending.evidence + evidence))
         return
-    title = next((c.topic_title for c in data.personal_catalog.values()
-                  if c.topic == topic and c.team == target.team), topic)
+    title = _topic_title(data, topic, target.team)
     suggestion = SkillSuggestion(id=f"SUG-{uuid4().hex}", intern_id=intern_id, mentor_id=mentor.id,
         topic=topic, from_level=level, to_level="familiar" if level == "novice" else "confident",
-        basis='отмечено «это я уже знаю»' if known_item else f"закрыто {len(closed)} пункта по теме {title}",
+        basis='отмечено «это я уже знаю»' if known_item else _closed_basis(len(closed), title),
         evidence=evidence, created_day=data.interns[intern_id].current_day)
     data.suggestions[suggestion.id] = suggestion
-    events._record(data, target, "skill_suggestion_created", {
+    events._record(data, SYSTEM_ACTOR, "skill_suggestion_created", {
         "intern_id": intern_id, "suggestion_id": suggestion.id, "topic": topic,
     })
     notify(data, mentor.id, intern_id, "skill_suggestion", suggestion.id,
@@ -94,11 +117,27 @@ def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None)
            "skill_suggestion", suggestion_id=suggestion.id)
 
 
+def _topic_title(data, topic, team):
+    return next((c.topic_title for c in data.personal_catalog.values()
+                 if c.topic == topic and c.team == team), topic)
+
+
+def _closed_basis(count, title):
+    if count % 10 == 1 and count % 100 != 11:
+        phrase = f"закрыт {count} пункт"
+    elif 2 <= count % 10 <= 4 and not 12 <= count % 100 <= 14:
+        phrase = f"закрыто {count} пункта"
+    else:
+        phrase = f"закрыто {count} пунктов"
+    return f"{phrase} по теме {title}"
+
+
 def _suggestion_view(data, suggestion):
-    target = DEMO_USERS[suggestion.intern_id]
-    title = next((c.topic_title for c in data.personal_catalog.values()
-                  if c.topic == suggestion.topic and c.team == target.team), suggestion.topic)
-    return suggestion.model_copy(update={"intern_name": target.name, "topic_title": title}, deep=True)
+    target = DEMO_USERS.get(suggestion.intern_id)
+    if target is None or target.role != Role.INTERN:
+        return None
+    return suggestion.model_copy(update={"intern_name": target.name,
+        "topic_title": _topic_title(data, suggestion.topic, target.team)}, deep=True)
 
 
 async def list_suggestions(actor: User, intern_id: str | None = None, status: str | None = "pending") -> list[SkillSuggestion]:
@@ -109,12 +148,19 @@ async def list_suggestions(actor: User, intern_id: str | None = None, status: st
         if intern_id is not None:
             require_intern(data, actor, intern_id, private=True)
         if status is not None:
-            from typing import Literal
-            from pydantic import TypeAdapter
-            status = TypeAdapter(Literal["pending", "accepted", "dismissed"]).validate_python(status)
-        return [_suggestion_view(data, s) for s in reversed(list(data.suggestions.values()))
-                if s.mentor_id == actor.id and DEMO_USERS[s.intern_id].mentor_id == actor.id
-                and (intern_id is None or s.intern_id == intern_id) and (status is None or s.status == status)]
+            status = suggestion_status.validate_python(status)
+        result = []
+        for suggestion in reversed(list(data.suggestions.values())):
+            if (suggestion.mentor_id != actor.id or (intern_id is not None and suggestion.intern_id != intern_id)
+                    or (status is not None and suggestion.status != status)):
+                continue
+            target = DEMO_USERS.get(suggestion.intern_id)
+            if target is None or target.mentor_id != actor.id:
+                continue
+            view = _suggestion_view(data, suggestion)
+            if view is not None:
+                result.append(view)
+        return result
 
 
 async def decide_suggestion(actor: User, suggestion_id: str, accept: bool) -> SkillSuggestion:
@@ -133,7 +179,8 @@ async def decide_suggestion(actor: User, suggestion_id: str, accept: bool) -> Sk
         if accept:
             if profile.skills.get(suggestion.topic) != suggestion.from_level:
                 raise Conflict("Уровень уже изменён; оставьте предложение без изменения")
-            _set_level(data, actor, profile, suggestion.topic, suggestion.to_level)
+            _set_level(data, actor, profile, suggestion.topic, suggestion.to_level,
+                       accepted_suggestion_id=suggestion.id)
         suggestion.status = "accepted" if accept else "dismissed"
         suggestion.decided_day = data.interns[suggestion.intern_id].current_day
         for reminder in data.reminders.values():
@@ -143,7 +190,10 @@ async def decide_suggestion(actor: User, suggestion_id: str, accept: bool) -> Sk
             "intern_id": suggestion.intern_id, "suggestion_id": suggestion.id,
             "topic": suggestion.topic, "status": suggestion.status,
         })
-        return _suggestion_view(data, suggestion)
+        view = _suggestion_view(data, suggestion)
+        if view is None:
+            raise NotFound()
+        return view
 
 
 async def mark_known(actor: User, item_id: str, known: bool = True) -> PlanItem:

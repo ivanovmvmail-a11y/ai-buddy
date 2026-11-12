@@ -1,6 +1,7 @@
 // Лента чата. Приветствие и напоминания собираются из данных сервера (план, заявки, напоминания).
 // Объяснение пункта: с настоящей моделью — вопрос в /chat; без ключа (LLM_PROVIDER=scenario или echo) —
 // сценарный ответ из тех же данных плана и профиля (SPEC, раздел 8).
+import { isInfo, kindOf } from "./notifications";
 import { create } from "zustand";
 import { findUser } from "./users";
 import { waitedFor } from "./plan-logic";
@@ -12,7 +13,8 @@ import type {
 export type BotAction =
   | { label: string; kind: "do" | "explain" | "steps" | "who"; itemId: string; internId: string }
   | { label: string; kind: "snooze"; reminderId: string }
-  | { label: string; kind: "nudge"; requestId: string; itemTitle: string };
+  | { label: string; kind: "nudge"; requestId: string; itemTitle: string }
+  | { label: string; kind: "nudge-lead" };
 
 export type Msg = {
   id: string;
@@ -122,9 +124,24 @@ export function nudgeMsg(requestId: string, itemTitle: string): Msg {
   );
 }
 
+/** Заявка на отгул ждёт решения (SPEC 3.8): готовый текст руководителю — бот сам не отправляет (SPEC 3.7). */
+export function absenceNudgeMsg(leadName: string): Msg {
+  return scripted(
+    `Черновик сообщения руководителю${leadName ? ` (${leadName})` : ""}, можно скопировать:
+
+` +
+      "«Здравствуйте! Подскажите, пожалуйста, получится посмотреть моё заявление на отгул? " +
+      "Оно ждёт решения уже несколько дней. Спасибо!»",
+  );
+}
+
 export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
+  // Уведомление-факт («Наставник отметил…», «Отгул согласован») — без кнопок: ничего делать не нужно.
+  if (isInfo(r) || kindOf(r) === "skill_suggestion" || kindOf(r) === "absence_new") return scripted(`🔔 ${r.text}`);
   const actions: BotAction[] = [];
-  if (r.request_id) {
+  if (kindOf(r) === "absence_pending") {
+    actions.push({ label: "Написать руководителю", kind: "nudge-lead" });
+  } else if (r.request_id) {
     actions.push({ label: "Написать наставнику", kind: "nudge", requestId: r.request_id, itemTitle: item?.title ?? "" });
   } else if (item) actions.push({ ...actionFor(item), label: item.resource_id && item.status !== "waiting" ? "Сделать сейчас" : "Объяснить" });
   actions.push({ label: "Напомнить позже", kind: "snooze", reminderId: r.id });

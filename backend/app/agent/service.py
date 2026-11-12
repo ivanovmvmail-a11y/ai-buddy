@@ -12,7 +12,7 @@ from .actions import Action, ActionStore, InMemoryActionStore
 from .demo_tools import register_demo_tools
 from .onboarding_tools import plan_context, register_onboarding_tools
 from .prompts import SYSTEM_PROMPT, user_context
-from .tools import NOT_FOUND_MESSAGE, ToolExecutor, ToolRegistry, check_access, to_tool_content
+from .tools import NOT_FOUND_MESSAGE, ToolExecutor, ToolRegistry, check_access, draft_title, to_tool_content
 from .users import User
 
 log = logging.getLogger("ai_buddy.agent")
@@ -182,7 +182,7 @@ class Agent:
             raise ActionForbidden("Нет прав на это действие")
         if tool.precheck and not await tool.precheck(user, args):
             raise ActionNotFound(NOT_FOUND_MESSAGE)
-        title = tool.describe(args) if tool.describe else tool.description
+        title = draft_title(tool, args, user)
         return await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
 
     async def cancel(self, user: User, action_id: str) -> Action:

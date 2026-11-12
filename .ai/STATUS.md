@@ -54,12 +54,16 @@
 | 48 | Ревью Codex #59 (повторно), #61, #62; поддельный сервер фронта — новые документы пунктов, как в #62 | Claude | claude/mock-howto-links | на ревью | | frontend 64 |
 | 49 | Чекпоинт 1: SPEC — персональный план, предложения по уровню, отгул, уведомления; записка Codex | Claude | claude/spec-adaptive-plan | готово | #64, #65 | только документы; [API]-контракт — отдельный PR claude/api-adaptive-plan |
 | 50 | План: метки «для всех / для тебя», «почему», «ты это умеешь — коротко» (SPEC 3.1) | Claude | claude/plan-labels | готово | #66 | frontend 70; персональные пункты придут от сервера после каталога Codex |
-| 51 | Экран наставника: «Бот предлагает поднять уровень» и сравнение двух планов (SPEC 4, 5) | Claude | claude/mentor-suggestions-compare | на ревью | | frontend 77; на поддельном сервере, на настоящем появится после Codex (п. 0–2 HANDOFF) |
+| 51 | Экран наставника: «Бот предлагает поднять уровень» и сравнение двух планов (SPEC 4, 5) | Claude | claude/mentor-suggestions-compare | готово | #69 | frontend 77; на поддельном сервере, на настоящем появится после Codex (п. 0–2 HANDOFF) |
+| 53 | Отгул в чате: «мне завтра к врачу» → черновик заявления; решение руководителя; наставнику только дата (SPEC 3.8) | Claude | claude/absence-chat | готово | #72 | поверх #46 Codex; backend 566 / 95%, frontend 83, золотой набор 52; путь пройден в браузере |
+| 54 | Экран наставника на настоящем сервере: HTTP предложений, «это я уже знаю», сравнение планов; Кирилл и Лиза во входе (SPEC 4, 5) | Claude | claude/suggestions-http | готово | #73 | backend 652, frontend 85; путь пройден в браузере; ревью #68 (2 раза) |
+| 55 | Единые уведомления в интерфейсе: одна кнопка по типу (Открыть / Решить / Напомнить), факты без «Напомнить завтра»; ревью #70 (SPEC 3.6) | Claude | claude/notifications-ui | на ревью | | frontend 91; отгул проверен вживую; skill_changed/skill_suggestion — после #70 |
 
 | C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 | C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
-| C1.2 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | 884 passed / 98,23%; после #67/#46; решение только наставником |
-| C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | [#70](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/70) | 893 passed / 98,29%; зависит от #67/#46/#68; /health=200 |
+| C1.2 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | Ревью 1–6: optional SQL, безопасный реестр, dismissed при ручной смене; 932 passed / 98,04%, покрытие не снизилось |
+
+| C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | [#70](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/70) | Ревью 1–4: main сохранён; нейтральное понижение, один факт на тему, явный каталог; 1033 passed / 97,95% |
 
 | C1.3 | Чекпоинт 1, 3: наставник правит персональные пункты | Codex | codex/personal-plan-editing | на ревью | [#71](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/71) | 918 passed / 98,31%; общий/done сохраняются; /health=200 |
 
