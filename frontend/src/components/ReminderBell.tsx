@@ -2,9 +2,11 @@
 
 // Колокольчик напоминаний (спека 301, SPEC 3.6): число активных напоминаний и список с действиями.
 // Само напоминание по-прежнему приходит сообщением бота; колокольчик — чтобы не потерять его в чате.
+// SPEC 3.6 (11.11): одна главная кнопка по типу уведомления; «Напомнить завтра» — только там, где ждут действия.
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { actionLabel, isInfo } from "@/lib/notifications";
 import { useReminders, useRefresh } from "@/lib/queries";
 import type { DemoUser, Reminder } from "@/lib/types";
 
@@ -75,15 +77,17 @@ export function ReminderBell({ actor, onOpen }: Props) {
                       onClick={() => { setOpen(false); onOpen(r); }}
                       className="rounded-full bg-[#00aaff] px-2.5 py-1 text-white"
                     >
-                      Открыть в чате
+                      {actionLabel(r)}
                     </button>
-                    <button
-                      disabled={act.isPending}
-                      onClick={() => act.mutate({ id: r.id, kind: "snooze" })}
-                      className="rounded-full border border-black/15 px-2.5 py-1 disabled:opacity-50 dark:border-white/20"
-                    >
-                      Напомнить завтра
-                    </button>
+                    {!isInfo(r) && (
+                      <button
+                        disabled={act.isPending}
+                        onClick={() => act.mutate({ id: r.id, kind: "snooze" })}
+                        className="rounded-full border border-black/15 px-2.5 py-1 disabled:opacity-50 dark:border-white/20"
+                      >
+                        Напомнить завтра
+                      </button>
+                    )}
                     <button
                       disabled={act.isPending}
                       onClick={() => act.mutate({ id: r.id, kind: "done" })}
