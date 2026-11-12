@@ -194,6 +194,34 @@ def item_known(item_id: str):
     return _json(async_runner.run(hiring.mark_known(g.user, item_id, body.known)))
 
 
+@bp.get("/plan/catalog")
+def plan_catalog():
+    """Каталог персональных пунктов команды стажёра (SPEC 3.1) — только его наставнику; у записи `in_plan`."""
+    intern_id = request.args.get("intern_id")
+    if not intern_id:
+        raise NotFound()
+    return {"items": [_json(c) for c in async_runner.run(checklist.list_catalog(g.user, intern_id))]}
+
+
+class PersonalItemIn(BaseModel):
+    intern_id: str
+    catalog_key: str = Field(min_length=1, max_length=80)
+
+
+@bp.post("/plan/items")
+def plan_item_add():
+    """Наставник добавляет стажёру пункт из каталога его команды — решение человека, reason «добавил наставник»."""
+    body = _body(PersonalItemIn)
+    return _json(async_runner.run(checklist.add_personal_item(g.user, body.intern_id, body.catalog_key))), 201
+
+
+@bp.delete("/plan/items/<item_id>")
+def plan_item_remove(item_id: str):
+    """Наставник убирает незакрытый персональный пункт; общий — 403, закрытый — 409, чужой — 404."""
+    async_runner.run(checklist.remove_personal_item(g.user, item_id))
+    return "", 204
+
+
 def _key(item) -> str:
     """Ключ общего пункта без имени стажёра: «anya.w1.notes» → «w1.notes»."""
     return item.id.split(".", 1)[1] if "." in item.id else item.id

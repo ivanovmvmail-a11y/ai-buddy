@@ -17,6 +17,7 @@ export const keys = {
   suggestions: (u: string) => ["suggestions", u] as const,
   compare: (u: string, a: string, b: string) => ["compare", u, a, b] as const,
   absence: (u: string) => ["absence", u] as const,
+  catalog: (u: string, intern: string) => ["catalog", u, intern] as const,
   absenceFacts: (u: string, intern: string) => ["absence-facts", u, intern] as const,
 };
 
@@ -110,6 +111,15 @@ export const useCompare = (actor: DemoUser, a: string, b: string, enabled: boole
     retry: false,
   });
 
+/** Каталог персональных пунктов команды стажёра — только наставнику (SPEC 3.1). */
+export const useCatalog = (actor: DemoUser, internId: string | undefined) =>
+  useQuery({
+    queryKey: keys.catalog(actor.id, internId ?? ""),
+    queryFn: () => orEmpty(async () => (await api.catalog(actor.id, internId!)).items, []),
+    enabled: actor.role === "mentor" && !!internId,
+    retry: false,
+  });
+
 /** Заявки на отгул (SPEC 3.8): стажёру — свои, руководителю — своей команды. */
 export const useAbsenceRequests = (actor: DemoUser) =>
   useQuery({
@@ -133,7 +143,7 @@ export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts"].map((k) =>
+      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts", "catalog"].map((k) =>
         client.invalidateQueries({ queryKey: [k] }),
       ),
     );

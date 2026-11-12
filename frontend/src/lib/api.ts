@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
-  AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
+  CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
   PlanCompare, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
   SkillSuggestion, SuggestionsResponse, WeeklySummary,
 } from "./types";
@@ -96,6 +96,22 @@ export const api = {
     if (!res.ok) throw new ApiError(`Ошибка сервера: ${res.status}`, res.status);
   },
   metrics: (u: string, internId?: string) => request(`/metrics${q(internId)}`, Metrics, u),
+  catalog: (u: string, internId: string) => request(`/plan/catalog${q(internId)}`, CatalogResponse, u),
+  addPersonal: (u: string, internId: string, catalogKey: string) =>
+    request("/plan/items", PlanItem, u, post({ intern_id: internId, catalog_key: catalogKey })),
+  /** DELETE отвечает 204 без тела — поэтому мимо общего request(). */
+  removePersonal: async (u: string, itemId: string) => {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/plan/items/${encodeURIComponent(itemId)}`, { method: "DELETE", headers: { "X-User-Id": u } });
+    } catch {
+      throw new ApiError(OFFLINE, 0);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(detailText(body.detail, res.status), res.status);
+    }
+  },
   markKnown: (u: string, itemId: string, known: boolean) =>
     request(`/plan/items/${encodeURIComponent(itemId)}/known`, PlanItem, u, post({ known })),
   suggestions: (u: string) => request("/skills/suggestions?status=pending", SuggestionsResponse, u),

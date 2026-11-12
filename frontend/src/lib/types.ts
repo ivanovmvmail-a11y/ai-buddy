@@ -258,3 +258,17 @@ export type AbsenceRequest = z.infer<typeof AbsenceRequest>;
 export const AbsenceRequestsResponse = z.object({ requests: z.array(AbsenceRequest) });
 /** Наставнику — только факт «отсутствует <дата>», без причины и номера заявки. */
 export const AbsenceFactsResponse = z.object({ facts: z.array(z.object({ intern_id: z.string(), day: z.string() })) });
+
+// SPEC 3.1 (11.11): каталог персональных пунктов команды — наставник добавляет из него пункт стажёру.
+export const CatalogItem = z.object({
+  key: z.string(),
+  team: z.string(),
+  topic: z.string(),
+  topic_title: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  stage: Stage,
+  in_plan: z.boolean(),
+});
+export type CatalogItem = z.infer<typeof CatalogItem>;
+export const CatalogResponse = z.object({ items: z.array(CatalogItem) });

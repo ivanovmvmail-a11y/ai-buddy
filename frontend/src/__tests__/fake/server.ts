@@ -1,7 +1,7 @@
 // Поддельный backend для тестов интерфейса: те же адреса и формы ответов, что в docs/API.md,
 // правила — упрощённая копия спеки 101 (настоящие правила и их тесты — в backend/tests/mcp).
 import { vi } from "vitest";
-import { addKirill, DEMO_USERS as ALL_USERS, EXTRA_INTERNS, initialState, KIRILL, RESOURCES, type DemoState } from "./mock-data";
+import { addKirill, CATALOG, DEMO_USERS as ALL_USERS, EXTRA_INTERNS, initialState, KIRILL, RESOURCES, type DemoState } from "./mock-data";
 
 const BASE_USERS = ALL_USERS.filter((u) => !EXTRA_INTERNS.has(u.id));
 import type { AbsenceRequest, Action, DemoUser, Plan, PlanItem, Reminder, SkillLevel, StageInfo } from "@/lib/types";
@@ -200,6 +200,36 @@ export function installFakeServer(): FakeServer {
     if (p === "/skills/suggestions") {
       if (srv.noAdaptive || actor.role !== "mentor") return err(404, "Не найдено");
       return ok({ suggestions: s.suggestions.filter((x) => see(x.intern_id) && x.status === "pending") });
+    }
+    if (p === "/plan/catalog") {
+      const target = DEMO_USERS.find((u) => u.id === url.searchParams.get("intern_id"));
+      if (srv.noAdaptive || actor.role !== "mentor" || target?.mentor_id !== actor.id) return err(404, "Не найдено");
+      const keys = new Set(s.items.filter((i) => i.intern_id === target.id).map((i) => i.catalog_key));
+      return ok({ items: CATALOG.filter((c) => c.team === target.team).map((c) => ({ ...c, in_plan: keys.has(c.key) })) });
+    }
+    if (p === "/plan/items" && method === "POST") {
+      const target = DEMO_USERS.find((u) => u.id === body.intern_id);
+      const entry = CATALOG.find((c) => c.key === body.catalog_key);
+      if (actor.role !== "mentor" || target?.mentor_id !== actor.id || !entry || entry.team !== target.team) return err(404, "Не найдено");
+      if (s.items.some((i) => i.intern_id === target.id && i.catalog_key === entry.key)) return err(409, "Пункт уже в плане");
+      const item: PlanItem = {
+        ...s.items.find((i) => i.intern_id === target.id)!, id: `${target.id.replace("intern-", "")}.p.${entry.topic}`,
+        kind: "personal", reason: "добавил наставник", catalog_key: entry.key, topic: entry.topic, title: entry.title,
+        summary: entry.summary, stage: entry.stage, owner_role: "intern", status: "not_started", resource_id: null,
+        doc_source_id: null, practice: null, due_day: 10, known_marked: false, status_reason: null,
+      };
+      s.items.push(item);
+      return { status: 201, body: derived(s, item) };
+    }
+    m = p.match(/^\/plan\/items\/([^/]+)$/);
+    if (m && method === "DELETE") {
+      const item = s.items.find((i) => i.id === m![1]);
+      const target = item && DEMO_USERS.find((u) => u.id === item.intern_id);
+      if (!item || actor.role !== "mentor" || target?.mentor_id !== actor.id) return err(404, "Не найдено");
+      if (item.kind !== "personal") return err(403, "Общий пункт нельзя убрать");
+      if (item.status === "done") return err(409, "Закрытый пункт остаётся в плане");
+      s.items = s.items.filter((i) => i !== item);
+      return { status: 204, body: null };
     }
     m = p.match(/^\/plan\/items\/(.+)\/known$/);
     if (m) {

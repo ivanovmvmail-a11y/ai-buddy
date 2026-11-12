@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { canMarkDone, canRequestAccess, isWorking, STAGE_TITLES, waitedFor } from "@/lib/plan-logic";
-import { useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
+import { useCatalog, useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import { InternCards } from "./InternCards";
 import { ComparePlans, SkillSuggestions } from "./MentorTools";
@@ -91,6 +91,8 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
 
       <Ladder ladder={p.ladder} />
 
+      {actor.role === "mentor" && <CatalogPicker actor={actor} internId={p.intern_id} name={intern?.name.split(" ")[0] ?? ""} />}
+
       {STAGES.map((stage) => {
         const items = p.items.filter((i) => i.stage === stage);
         if (!items.length) return null;
@@ -116,6 +118,36 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
         );
       })}
     </div>
+  );
+}
+
+/** Наставник добавляет стажёру пункт из каталога команды (SPEC 3.1): только то, чего ещё нет в плане. */
+function CatalogPicker({ actor, internId, name }: { actor: DemoUser; internId: string; name: string }) {
+  const catalog = useCatalog(actor, internId);
+  const refresh = useRefresh();
+  const add = useMutation({ mutationFn: (key: string) => api.addPersonal(actor.id, internId, key), onSuccess: refresh });
+  const free = (catalog.data ?? []).filter((c) => !c.in_plan);
+  if (!free.length) return null;
+  return (
+    <section aria-label="Каталог пунктов" className="rounded-xl border border-dashed border-violet-500/40 p-3 text-sm">
+      <h3 className="font-semibold">Добавить пункт в план{name ? `: ${name}` : ""}</h3>
+      <p className="mb-2 text-xs text-black/50 dark:text-white/50">Из каталога команды. Общие пункты не меняются.</p>
+      {add.isError && <p role="alert" className="mb-2 text-red-700 dark:text-red-300">{add.error.message}</p>}
+      <ul className="flex flex-wrap gap-2">
+        {free.map((c) => (
+          <li key={c.key}>
+            <button
+              disabled={add.isPending}
+              onClick={() => add.mutate(c.key)}
+              title={c.summary}
+              className="rounded-lg border border-violet-500/40 px-2.5 py-1 text-violet-700 hover:bg-violet-500/10 disabled:opacity-50 dark:text-violet-300"
+            >
+              + {c.title}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -153,6 +185,8 @@ function PlanRow({
   const mark = useMutation({ mutationFn: () => api.setStatus(actor.id, item.id, "done"), onSuccess: refresh });
   // SPEC 4: «это я уже знаю» — повод для предложения наставнику; пункт не закрывается, уровень решает наставник.
   const know = useMutation({ mutationFn: (known: boolean) => api.markKnown(actor.id, item.id, known), onSuccess: refresh });
+  // SPEC 3.1: наставник убирает персональный пункт своего стажёра (общие и закрытые — нельзя).
+  const remove = useMutation({ mutationFn: () => api.removePersonal(actor.id, item.id), onSuccess: refresh });
   const working = isWorking(item.stage);
   const st = STATUS[item.status];
   const self = actor.id === item.intern_id;
@@ -220,6 +254,7 @@ function PlanRow({
       )}
       {mark.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{mark.error.message}</p>}
       {know.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{know.error.message}</p>}
+      {remove.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{remove.error.message}</p>}
       {working && (
         <div className="mt-2 flex flex-wrap gap-2">
           <button onClick={() => onExplain(item)} className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
@@ -228,6 +263,15 @@ function PlanRow({
           {canRequestAccess(actor, item) && (
             <button onClick={() => onDo(item)} className="rounded-lg bg-[#00aaff] px-2.5 py-1 text-sm font-medium text-white hover:bg-[#0099e6]">
               Сделать за меня
+            </button>
+          )}
+          {actor.role === "mentor" && personal && item.status !== "done" && (
+            <button
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:text-white/70 dark:hover:bg-white/10"
+            >
+              Убрать из плана
             </button>
           )}
           {canKnow && !item.known_marked && (
