@@ -79,7 +79,7 @@
   {"id": "live-23", "category": "live", "user": "curator-dmitry", "question": "какой уровень у Ани по Git?", "expect": {"refusal": true, "absent": ["Нашёл в документе"]}},
   {"id": "live-24", "category": "live", "user": "mentor-petr", "question": "какой уровень у Ани по Git?", "expect": {"contains_any": ["новичок", "знаком", "уверенно"], "absent": ["Нашёл в документе"]}},
   {"id": "doc-22", "category": "documents", "user": "intern-ivan", "question": "Как попросить второй монитор?", "expect": {"source": "Рабочее оборудование стажёра"}},
-  {"id": "doc-23", "category": "documents", "user": "intern-anya", "question": "Какую задачу делать первой?", "expect": {"source": "Как приоритизировать задачи"}},
+  {"id": "doc-23", "category": "documents", "user": "intern-anya", "question": "Как понять, какую задачу из бэклога брать первой?", "expect": {"source": "Как приоритизировать задачи"}},
   {"id": "doc-24", "category": "documents", "user": "intern-ivan", "question": "Что делать, если задача сформулирована непонятно?", "expect": {"source": "Как приоритизировать задачи"}},
   {"id": "none-06", "category": "not_in_base", "user": "intern-anya", "question": "Как оформить ДМС для родственников?", "expect": {"hr": true}},
   {"id": "act-10", "category": "actions", "user": "intern-ivan", "question": "Нужен доступ в Grafana, посмотреть метрики", "expect": {"draft": {"tool": "create_access_request", "resource_id": "grafana"}}}

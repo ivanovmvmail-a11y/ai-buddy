@@ -388,6 +388,64 @@ def _resource_named(q: str) -> bool:
     return any(w in q for w in RESOURCE_WORDS)
 
 
+def policy_reply(q: str, question: str, system: str, available: set[str]) -> str | None:
+    """Ответы по правилам продукта, одинаковые для любой модели. Прогон GigaChat 12.11: модель отвечала туманно
+    («обратитесь к системе»), а наставнику советовала «обратиться к её наставнику». Агент применяет их до модели."""
+    q = q.lower()
+    role = _role(system)
+    someone = _names_someone(q)
+    other = someone if someone and someone != _own_id(system) else None
+    if any(w in q for w in OFF_WORK):
+        return ("Я помогаю только со стажировкой: следующий шаг по плану, документы команды, заявки на доступ и "
+                "отгул. Спроси, например, «что мне делать дальше?» или «как оформить pull request?».")
+    if "наставник" in q and "материал" in q and role == "intern":
+        return ("Материалы для наставников стажёру недоступны — подробности не раскрываю. В документах, доступных "
+                "тебе, этого нет; если нужен конкретный документ для работы, спроси наставника.")
+    if any(w in q for w in LEVEL_WORDS) and other:
+        if role == "intern":
+            return ("Это данные другого стажёра — их я не показываю. Могу рассказать про твой уровень по темам: "
+                    "спроси «какой у меня уровень?».")
+        if "get_skill_profile" not in available:
+            return "Уровень по темам видят только стажёр и его наставник — тебе эти данные недоступны."
+    if role == "intern" and any(w in q for w in APPROVE_WORDS):
+        return ("Одобрять заявки может только наставник в своём кабинете — я работаю от имени того, кто вошёл "
+                "(сейчас это ты, стажёр), и представиться в чате другим человеком нельзя. Посмотреть статус своих "
+                "заявок — спроси «мои заявки».")
+    if role == "intern" and any(w in q for w in ADMIN_WORDS):
+        mentor = re.search(r"Наставник: ([^.]+)\.", system)
+        who = mentor.group(1) if mentor else "твой наставник"
+        return (f"Повышенные права (админ, запись) стажёру сразу не выдаются — это решает наставник ({who}). "
+                "Могу оформить черновик заявки на чтение: например, «нужен доступ к репозиторию команды». "
+                f"Если нужно больше, вопрос наставнику, можно скопировать:\n\n«Привет! {_as_sentence(question)} "
+                "Для какой задачи это нужно: …»")
+    if role in ("mentor", "lead") and any(w in q for w in ("отгул", "отсутств")) and \
+            any(w in q for w in ("почему", "причин", "зачем")):
+        where = ("Причина — в заявлении, в блоке «Заявки на отгул» на твоём экране." if role == "lead" else
+                 "Наставник видит только дату отсутствия (она в карточке стажёра), причину — руководитель.")
+        return f"Причину отгула в чате не раскрываю. {where}"
+    return None
+
+
+def named_intern_plan(question: str, system: str) -> str | None:
+    """«Что у Ани зависло?» от наставника, руководителя или куратора → id стажёра, чей план нужно загрузить
+    до ответа модели (прогон GigaChat 12.11: модель отвечала «не могу посмотреть», не вызывая инструмент)."""
+    q = question.lower()
+    if _role(system) not in ("mentor", "lead", "curator"):
+        return None
+    someone = _names_someone(q)
+    if someone and ("план" in q or any(w in q for w in STUCK_WORDS)):
+        return someone
+    return None
+
+
+def split_actions(question: str) -> tuple[str, str]:
+    return _split_actions(question)
+
+
+def second_note(second: str) -> str:
+    return _second_note(second)
+
+
 class ScenarioProvider:
     name = "scenario"
 
@@ -416,14 +474,8 @@ class ScenarioProvider:
         other = someone if someone and someone != _own_id(system) else None
         if THANKS.fullmatch(q):
             return LLMReply(content="Пожалуйста! Если появится вопрос — спрашивай. Следующий шаг всегда виден в плане слева.")
-        if any(w in q for w in OFF_WORK):
-            return LLMReply(content=(
-                "Я помогаю только со стажировкой: следующий шаг по плану, документы команды, заявки на доступ и "
-                "отгул. Спроси, например, «что мне делать дальше?» или «как оформить pull request?»."))
-        if "наставник" in q and "материал" in q and role == "intern":
-            return LLMReply(content=(
-                "Материалы для наставников стажёру недоступны — подробности не раскрываю. В документах, доступных "
-                "тебе, этого нет; если нужен конкретный документ для работы, спроси наставника."))
+        if (text := policy_reply(q, question, system, available)) is not None:
+            return LLMReply(content=text)
         if "наставник" in q and any(w in q for w in ("кто", "мой", "моего", "как зовут", "связат", "написать")):
             mentor = re.search(r"Наставник: ([^.]+)\.", system)
             if mentor:
@@ -437,38 +489,13 @@ class ScenarioProvider:
                     f"Твой руководитель — {lead.group(1)}. Связаться — в рабочем мессенджере команды. К руководителю — "
                     "заявления на отгул и вопросы о целях стажировки; по задачам и доступам сначала к наставнику."))
         if any(w in q for w in LEVEL_WORDS):
-            if other and role == "intern":
-                return LLMReply(content=(
-                    "Это данные другого стажёра — их я не показываю. Могу рассказать про твой уровень по темам: "
-                    "спроси «какой у меня уровень?»."))
-            if other and "get_skill_profile" in available:
+            if other:  # стажёру и роли без права policy_reply уже ответил
                 return call("get_skill_profile", {"intern_id": other})
-            if other:
-                return LLMReply(content=(
-                    "Уровень по темам видят только стажёр и его наставник — тебе эти данные недоступны."))
             levels = re.search(r"Уровень по темам: (.+?)\.(\s|$)", system)
             if levels:
                 return LLMReply(content=(
                     f"По профилю: {levels.group(1)}. Уровень ставит наставник; я использую его только чтобы "
                     "объяснять подробнее или короче, а не для оценки."))
-        if role == "intern" and any(w in q for w in APPROVE_WORDS):
-            return LLMReply(content=(
-                "Одобрять заявки может только наставник в своём кабинете — я работаю от имени того, кто вошёл "
-                "(сейчас это ты, стажёр), и представиться в чате другим человеком нельзя. Посмотреть статус своих "
-                "заявок — спроси «мои заявки»."))
-        if role == "intern" and any(w in q for w in ADMIN_WORDS):
-            mentor = re.search(r"Наставник: ([^.]+)\.", system)
-            who = mentor.group(1) if mentor else "твой наставник"
-            return LLMReply(content=(
-                f"Повышенные права (админ, запись) стажёру сразу не выдаются — это решает наставник ({who}). "
-                "Могу оформить черновик заявки на чтение: например, «нужен доступ к репозиторию команды». "
-                f"Если нужно больше, вопрос наставнику, можно скопировать:\n\n«Привет! {_as_sentence(question)} "
-                "Для какой задачи это нужно: …»"))
-        if role in ("mentor", "lead") and any(w in q for w in ("отгул", "отсутств")) and \
-                any(w in q for w in ("почему", "причин", "зачем")):
-            where = ("Причина — в заявлении, в блоке «Заявки на отгул» на твоём экране." if role == "lead" else
-                     "Наставник видит только дату отсутствия (она в карточке стажёра), причину — руководитель.")
-            return LLMReply(content=f"Причину отгула в чате не раскрываю. {where}")
         if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
                 and not any(w in q for w in HR_ONLY)):
             today = _today(system)
