@@ -96,10 +96,12 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
         notes.append("отказал, хотя доступ есть")
     if "draft" in expect:
         want = expect["draft"]
-        match = [a for a in actions if a["tool"] == want["tool"] and a["params"].get("resource_id") == want["resource_id"]]
+        params = want.get("params", {"resource_id": want.get("resource_id")} if "resource_id" in want else {})
+        match = [a for a in actions if a["tool"] == want["tool"]
+                 and all(a["params"].get(k) == v for k, v in params.items())]
         if not match or any(a["status"] != "pending" for a in match):
             ok = False
-            notes.append(f"нет черновика {want['tool']}({want['resource_id']})")
+            notes.append(f"нет черновика {want['tool']}({params})")
         if new_requests:
             ok = False
             notes.append("заявка создана без подтверждения")

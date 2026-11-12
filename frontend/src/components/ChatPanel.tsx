@@ -5,6 +5,7 @@ import { api, type ChatMessage } from "@/lib/api";
 import { approverText, msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
 import { useRefresh, useResources } from "@/lib/queries";
 import { findUser } from "@/lib/users";
+import { dayText } from "./AbsencePanel";
 import type { AccessRequest, DemoUser } from "@/lib/types";
 
 type Props = { actor: DemoUser; onAction: (a: BotAction) => void };
@@ -155,6 +156,9 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
   );
 }
 
+// Закрытый список причин (SPEC 3.8): подробности вроде врача в заявление не попадают.
+const ABSENCE_REASONS: Record<string, string> = { personal: "личные дела", family: "семейные дела", study: "учебные дела" };
+
 function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
   const update = useChat((s) => s.update);
   const push = useChat((s) => s.push);
@@ -165,6 +169,7 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
   const params = draft.params as Record<string, string | undefined>;
   const resource = resources.data?.find((r) => r.id === params.resource_id);
   const isAccess = draft.tool === "create_access_request";
+  const isAbsence = draft.tool === "create_absence_request";
 
   async function run(kind: "confirm" | "cancel") {
     setPending(true);
@@ -179,6 +184,11 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
             ? `Готово: заявка ${req.id} — доступ к «${resource?.title ?? req.resource_id}» выдан. Пункт плана закрыт.`
             : `Заявка ${req?.id} создана и ушла на согласование: ${findUser(req?.approver_id)?.name ?? "согласующий"}. Пункт плана ждёт ответа — я напомню, если затянется.`,
         });
+      } else if (result.status === "done" && isAbsence) {
+        push({
+          id: msgId(), role: "assistant", kind: "text", scripted: true,
+          content: `Заявление ушло руководителю: ${findUser(actor.lead_id)?.name ?? "руководитель команды"}. Решение придёт уведомлением, а если затянется — я напомню.`,
+        });
       } else if (result.status === "failed") {
         push({ id: msgId(), role: "assistant", kind: "error", content: `Не получилось: ${result.error}` });
       }
@@ -192,13 +202,21 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
 
   return (
     <div className="mt-2 rounded-xl border border-black/10 bg-[var(--background)] p-3 text-sm dark:border-white/15">
-      <div className="mb-1.5 font-semibold">{isAccess ? "Заявка на доступ · черновик" : "Черновик действия"}</div>
+      <div className="mb-1.5 font-semibold">
+        {isAccess ? "Заявка на доступ · черновик" : isAbsence ? "Заявление на отгул · черновик" : "Черновик действия"}
+      </div>
       {isAccess ? (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-black/55 dark:text-white/55">Ресурс</dt><dd>{resource?.title ?? params.resource_id}</dd>
           <dt className="text-black/55 dark:text-white/55">Права</dt><dd>{LEVELS[params.level ?? "read"]} (минимально достаточные)</dd>
           <dt className="text-black/55 dark:text-white/55">Обоснование</dt><dd>{params.justification}</dd>
           <dt className="text-black/55 dark:text-white/55">Согласует</dt><dd>{approverText(resource, actor, params.level ?? "read")}</dd>
+        </dl>
+      ) : isAbsence ? (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt className="text-black/55 dark:text-white/55">Дата</dt><dd>{params.day ? dayText(params.day) : "—"}, один день</dd>
+          <dt className="text-black/55 dark:text-white/55">Причина</dt><dd>{ABSENCE_REASONS[params.reason ?? "personal"]}</dd>
+          <dt className="text-black/55 dark:text-white/55">Решает</dt><dd>{findUser(actor.lead_id)?.name ?? "руководитель команды"}</dd>
         </dl>
       ) : (
         <div>{draft.title}</div>
