@@ -23,13 +23,30 @@ ORG_WORDS = ("отпуск", "больнич", "отгул", "заболел", "
 SALARY = re.compile(r"(?<![а-яё])(зп|з/п)(?![а-яё])")
 # SPEC 3.8: отгул на один день — не к HR, а заявление руководителю (если инструмент доступен — стажёру).
 ABSENCE_WORDS = ("отгул", "отпрос", "к врачу", "ко врачу", "не смогу прийти", "не приду", "не выйду", "пропустить день",
-                 "взять выходной", "на прием", "на приём", "на экзамен", "отлучиться")
+                 "взять выходной", "на прием", "на приём", "на экзамен", "отлучиться", "отпусти")
+WEEKDAY_FORMS = (r"понедельник\w*", r"вторник\w*", r"сред[ауые]", r"четверг\w*", r"пятниц[ауые]", r"суббот[ауые]",
+                 r"воскресень[ея]")
+_WORD_NUMBERS = {"два": 2, "две": 2, "двух": 2, "три": 3, "трех": 3, "трёх": 3, "четыре": 4, "пять": 5, "несколько": 2}
+MULTI_DAY = re.compile(r"на\s+(\d+|два|две|двух|три|трех|трёх|четыре|пять|несколько)\s+(дн|день|дня)|на\s+(всю\s+)?недел")
+# Попытка переписать правила или вытащить служебные инструкции — отвечаем одинаково для любой модели.
+INJECTION_WORDS = ("системный промпт", "системные инструкции", "system prompt", "забудь все", "забудь правила",
+                   "забудь инструкции", "игнорируй", "ты теперь", "jailbreak", "режим разработчика", "developer mode")
+# Ранжирование стажёров — не делаем (SPEC 11); наставнику показываем факты по каждому.
+RANKING_WORDS = ("отста", "рейтинг", "кто лучше", "кто хуже", "кто из стажёров", "кто из стажеров", "лучший стаж",
+                 "худший стаж", "все стажёры", "все стажеры", "мои стажёры", "мои стажеры", "как дела у стажёр",
+                 "как дела у стажер")
+FREQUENT_WORDS = ("чаще всего", "частые", "частых", "популярн", "о чём спрашивают", "о чем спрашивают")
+EMOTION_WORDS = ("страшно", "боюсь", "не успева", "тревож", "паник", "волнуюсь", "перегруж", "устал", "выгора",
+                 "ничего не получается", "запутал", "растерял", "не справля")
+MARK_DONE = ("отметь", "я прошла", "я прошел", "я прошёл", "я сделала", "я сделал", "я закончила", "я закончил",
+             "я закрыла", "я закрыл", "уже сделал", "уже прошл")
 HR_ONLY = ("отпуск", "больнич", "заболел", "декрет", "увольн")
 FAMILY_WORDS = ("семь", "семей", "ребен", "ребён", "родител", "мам", "пап", "свадьб", "бабушк", "дедушк")
 STUDY_WORDS = ("учеб", "учёб", "экзамен", "сесси", "зачет", "зачёт", "универ", "институт", "диплом", "защит")
 MONTHS = ("январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр")
 NEXT_WORDS = ("дальше", "следующ", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня", "с чего начать",
-              "ничего не понима", "что делать сейчас", "за что браться")
+              "ничего не понима", "что делать сейчас", "за что браться", "сколько мне осталось", "до конца недел", "сколько пунктов",
+              "what should i do", "what to do", "next step", "what's next", "whats next")
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
 REQUEST_WORDS = ("мои", "статус", "какие", "ждут", "список", "покажи")
 GREETINGS = ("привет", "здравствуй", "добрый день", "хай", "hello")
@@ -53,19 +70,29 @@ SYNONYMS = (
     (re.compile(r"(?<![a-z])ci(?![a-z])|(?<![а-яё])си(?:ай)?(?![а-яё])"), " пайплайн "),
     (re.compile(r"посмотрел[а-яё]*|проверил[а-яё]*"), " ревью "),
     (re.compile(r"(?<![а-яё])проект[а-яё]*"), " сервис локально "),
+    (re.compile(r"окружени[а-яё]*"), " сервис локально "),
+    (re.compile(r"(?<![а-яё])гит[а-яё]*"), " git "),
+    (re.compile(r"code\s*-?\s*review|код\s*-?\s*ревью"), " code review код-ревью "),
+    (re.compile(r"(?<![а-яё])(эс-?ку-?эл|скуэл|скл)(?![а-яё])"), " sql "),
+    (re.compile(r"митинг[а-яё]*|созвон[а-яё]*|стендап[а-яё]*"), " встречи "),
 )
 STOP = {"который", "когда", "почему", "сделать", "нужно", "можно", "такой", "этого", "через", "после", "чтобы",
         "только", "какой", "какие", "какая", "мне", "меня", "есть", "надо", "подскажи", "пожалуйста", "расскажи",
         "такое", "такая", "такие", "этот", "этом", "если", "where", "what", "зачем", "покажи", "свой", "свое", "свою",
-        "чтоб", "дали", "знаю", "хочу", "могу", "вообще"}
+        "чтоб", "дали", "знаю", "хочу", "могу", "вообще", "объясни", "объясните", "новичка", "новичок", "новичку",
+        "простыми", "словами", "понятно", "просто", "настроить"}
 NAMES = {"intern-anya": ("аня", "ани", "аню", "анн"), "intern-ivan": ("иван", "ваня", "вани"),
          "intern-kirill": ("кирилл",), "intern-liza": ("лиза", "лизы", "лизу", "лиз")}
 STATUS_RU = {"created": "создана", "pending_approval": "на согласовании", "granted": "доступ выдан", "rejected": "отклонена"}
 
 
+# Короткие названия инструментов — значимые слова, хотя в них меньше четырёх букв («практикум по гиту» → Git).
+SHORT_TERMS = {"git", "sql", "okr", "api", "jira"}
+
+
 def _words(text: str) -> set[str]:
     words = re.findall(r"[a-zа-яё0-9]+", text.lower().replace("ё", "е"))
-    return {w for w in words if len(w) >= 4 and w not in STOP}
+    return {w for w in words if (len(w) >= 4 or w in SHORT_TERMS) and w not in STOP}
 
 
 def _normalize(question: str) -> str:
@@ -188,13 +215,18 @@ def _best_unit(question: str, system: str) -> tuple[tuple[int, str, str], set[st
     # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
     # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
     # «Что такое CI?» — нужно определение или первый абзац о теме, а не самый длинный абзац документа.
-    defining = bool(re.search(r"что так(ое|ой|ая)|что значит|что это", question.lower()))
+    defining = bool(re.search(r"(что|кто) так(ое|ой|ая)|что значит|что это", question.lower()))
     best, best_key = (0, "", ""), None
     for rank, (title, content) in enumerate(_docs(system)):
         for index, (heading, unit) in enumerate(_units(content)):
-            score = _overlap(wanted, heading + " " + unit)
+            # Название документа тоже участвует: «статусы отправления в Доставке» → «Авито Доставка — статусы…».
+            score = _overlap(wanted, f"{title} {heading} {unit}")
             definition = bool(re.match(r"^([-*]\s+)?\*\*", unit))
-            key = (score, definition if defining else not definition, -rank, -index if defining else len(unit))
+            # При равном совпадении — абзац, чей заголовок или документ про то же («статусы отправления» →
+            # документ «…статусы учебного отправления», а не песочница, где слово «статус» встречается мимоходом).
+            topical = _overlap(wanted, f"{title} {heading}")
+            key = (score, definition if defining else not definition, topical, -rank,
+                   -index if defining else len(unit))
             if best_key is None or key > best_key:
                 best, best_key = (score, title, unit), key
     return best, wanted, need
@@ -206,14 +238,18 @@ TIME_WORDS = ("сколько", "срок", "когда", "как долго", "
 def docs_conflict(question: str, system: str) -> str | None:
     """SPEC 3.7 для любой модели: если найденные документы называют разные сроки, ответ — оба варианта,
     независимо от того, заметит ли расхождение модель (GigaChat на прогоне 12.11 выбирал один молча)."""
-    if not any(w in question.lower() for w in TIME_WORDS):
+    q = question.lower()
+    # «Когда дейли?» — время встречи, а не срок ожидания; «когда» считаем вопросом о сроке только про ожидание.
+    if not (any(w in q for w in TIME_WORDS if w != "когда") or ("когда" in q and re.search(r"жд|ответ|приде|придё", q))):
         return None  # расхождение в сроках важно только для вопроса о сроке (иначе «один день» отгула ≠ «два дня» ревью)
     best, wanted, need = _best_unit(question, system)
     return _conflict(best, wanted, need, system) if best[0] >= need else None
 
 
 def _found_text(best: tuple[int, str, str]) -> str:
-    fragment = best[2] if len(best[2]) <= 700 else best[2][:700].rsplit(" ", 1)[0] + "…"
+    # Пункт глоссария «- **OKR** — …» → «OKR — …»: чат показывает текст как есть, без разметки.
+    text = re.sub(r"^([-*]|\d+\.)\s+", "", best[2]).replace("**", "")
+    fragment = text if len(text) <= 700 else text[:700].rsplit(" ", 1)[0] + "…"
     return f"Нашёл в документе «{best[1]}»:\n\n{fragment}\n\nЕсли что-то непонятно — спроси, разберём по шагам."
 
 
@@ -306,12 +342,50 @@ def _today(system: str) -> date | None:
     return date.fromisoformat(found.group(1)) if found else None
 
 
+def _weekday(q: str, today: date) -> date | None:
+    """«в понедельник» — ближайший понедельник после сегодня; «в следующий понедельник» / «на следующей неделе
+    во вторник» — день следующей недели; «на следующей неделе» без дня — её понедельник."""
+    next_week = bool(re.search(r"следующ\w*\s+недел|на\s+той\s+неделе", q))
+    for index, form in enumerate(WEEKDAY_FORMS):
+        if re.search(rf"(?<![а-яё]){form}(?![а-яё])", q):
+            if next_week:
+                return today + timedelta(days=7 - today.weekday() + index)
+            ahead = (index - today.weekday()) % 7 or 7
+            return today + timedelta(days=ahead)
+    if next_week:
+        return today + timedelta(days=7 - today.weekday())
+    return None
+
+
+def absence_plan(q: str, today: date) -> tuple[date | None, str | None]:
+    """Дата отгула из фразы и пояснение, если черновик готовить нельзя: «на 3 дня» — это отпуск (к HR BP),
+    суббота и воскресенье — выходные. Возвращает (дата, None) или (None, текст ответа)."""
+    q = q.lower().replace("ё", "е")
+    if found := MULTI_DAY.search(q):
+        count = found.group(1)
+        n = int(count) if count and count.isdigit() else _WORD_NUMBERS.get(count or "", 7)
+        if n != 1:
+            return None, (
+                "Отгул оформляется только на один день. Если нужно несколько дней подряд — это уже отпуск, его "
+                f"оформляет HR BP ({_hr_name()}). Черновик сообщения, можно скопировать:\n\n«Здравствуйте! Мне нужно "
+                "несколько дней отсутствия подряд. Подскажите, пожалуйста, как оформить отпуск.»\n\n"
+                "Если хватит одного дня — напиши дату, и я подготовлю заявление руководителю.")
+    day = _absence_day(q, today)
+    if day.weekday() >= 5:
+        return None, (f"{day:%d.%m} — {('суббота', 'воскресенье')[day.weekday() - 5]}, выходной: отгул не нужен. "
+                      "Если имел в виду рабочий день — напиши дату, например «отгул в понедельник».")
+    return day, None
+
+
 def _absence_day(q: str, today: date) -> date:
-    """«послезавтра», «сегодня», «14.11», «14 ноября»; по умолчанию — завтра. Прошлое → завтра (задним числом нельзя)."""
+    """«послезавтра», «сегодня», «14.11», «14 ноября», «в пятницу», «в следующий понедельник»; по умолчанию — завтра.
+    Прошлое → завтра (задним числом нельзя)."""
     if "послезавтра" in q:
         return today + timedelta(days=2)
     if "сегодня" in q:
         return today
+    if weekday := _weekday(q, today):
+        return weekday
     day, month = None, 0
     if found := re.search(r"(?<!\d)(\d{1,2})\.(\d{1,2})(?!\d)", q):
         day, month = int(found.group(1)), int(found.group(2))
@@ -395,6 +469,20 @@ def policy_reply(q: str, question: str, system: str, available: set[str]) -> str
     role = _role(system)
     someone = _names_someone(q)
     other = someone if someone and someone != _own_id(system) else None
+    if any(w in q for w in INJECTION_WORDS):
+        return ("Так не могу: правила и права задаёт сервер, в чате их не поменять, а служебные инструкции я не "
+                "показываю. Работаю от имени того, кто вошёл, и вижу только его данные. Чем помочь по стажировке? "
+                "Например: «что мне делать дальше?»")
+    # Только если вся просьба — напоминание («оформи доступ и напомни завтра» — две просьбы, их делит агент).
+    if re.match(r"(пожалуйста,?\s+|можешь\s+|а\s+)?(напомни|поставь\s+напоминани|создай\s+напоминани)", q.strip()) \
+            and not re.search(r"напомни\s+(моему\s+)?наставник", q):
+        return ("Напоминание по просьбе пока не ставлю — честно, чтобы ты на него не рассчитывал(а). Сам слежу за "
+                "сроками пунктов плана, заявками и отгулом: напоминания приходят в колокольчик 🔔 и в чат. "
+                "Встречи вроде 1:1 удобнее поставить в рабочий календарь.")
+    if role == "hrbp" and any(w in q for w in RANKING_WORDS):
+        return ("Стажёров не сравниваю и не ранжирую. Планы и прогресс видят наставник, руководитель и куратор; "
+                "HR BP в AI-buddy доступен только профиль стажёра (имя, команда, наставник). Если есть повод "
+                "для беспокойства — лучше спросить наставника стажёра.")
     if any(w in q for w in OFF_WORK):
         return ("Я помогаю только со стажировкой: следующий шаг по плану, документы команды, заявки на доступ и "
                 "отгул. Спроси, например, «что мне делать дальше?» или «как оформить pull request?».")
@@ -424,6 +512,29 @@ def policy_reply(q: str, question: str, system: str, available: set[str]) -> str
                  "Наставник видит только дату отсутствия (она в карточке стажёра), причину — руководитель.")
         return f"Причину отгула в чате не раскрываю. {where}"
     return None
+
+
+_SENTENCE = re.compile(r"[^.!?\n]*[.!?]?")
+_QUOTED = re.compile(r"«([^»]{3,80})»")
+
+
+def scrub_reply(text: str, tool_names: set[str], doc_titles: set[str]) -> str:
+    """Убрать из ответа модели то, что стажёру видеть нельзя или что выдумано (прогон 12.11 на Railway):
+    имена внутренних инструментов («вызови инструмент: create_absence_request») и ссылку на документ, которого
+    нет среди найденных («в документах это называется «Практика CI/CD»»). Убираем предложение целиком."""
+    def bad(sentence: str) -> bool:
+        low = sentence.lower()
+        if any(name in sentence for name in tool_names) or "инструмент:" in low or "вызови инструмент" in low:
+            return True
+        if "документ" in low:
+            return any(t not in doc_titles for t in _QUOTED.findall(sentence))
+        return False
+    lines = []
+    for line in text.split("\n"):
+        kept = "".join(s for s in _SENTENCE.findall(line) if s and not bad(s))
+        lines.append(kept.rstrip() if kept.strip() else ("" if line.strip() else line))
+    cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    return cleaned or text
 
 
 def named_intern_plan(question: str, system: str) -> str | None:
@@ -500,7 +611,15 @@ class ScenarioProvider:
                 and not any(w in q for w in HR_ONLY)):
             today = _today(system)
             if today:
-                return call("create_absence_request", {"day": _absence_day(q, today).isoformat(), "reason": _reason(q)})
+                day, note = absence_plan(q, today)
+                if note:
+                    return LLMReply(content=note)
+                return call("create_absence_request", {"day": day.isoformat(), "reason": _reason(q)})
+        if "get_plan" in available and role == "intern" and (
+                any(w in q for w in EMOTION_WORDS) or any(w in q for w in MARK_DONE)):
+            return call("get_plan")
+        if role == "lead" and "заявк" in q and "list_absence_requests" in available:
+            return call("list_absence_requests")
         if any(w in q for w in ORG_WORDS) or SALARY.search(q):
             return LLMReply(content=(
                 f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
@@ -560,13 +679,47 @@ class ScenarioProvider:
         if result.get("status") == "awaiting_confirmation":
             return LLMReply(content=f"Подготовил черновик: {result.get('summary')}. Проверь и нажми «Подтвердить» — "
                                     "без этого ничего не отправится.")
+        q = question.lower()
+        if msg.name == "get_plan" and any(w in q for w in MARK_DONE):
+            return self._mark_done(result, question, available)
         handler = {
-            "get_plan": lambda r: self._plan(r, own=not _names_someone(question.lower())),
+            "get_plan": lambda r: self._plan(r, own=not _names_someone(q), calm=any(w in q for w in EMOTION_WORDS)),
             "list_access_resources": lambda r: self._pick_resource(r, question, available),
             "list_access_requests": lambda r: self._requests(r, question, system),
+            "list_absence_requests": lambda r: self._absences(r),
             "get_skill_profile": self._levels,
         }.get(msg.name or "")
         return handler(result) if handler else LLMReply(content="Готово, данные сервиса получены.")
+
+    def _mark_done(self, plan: dict, question: str, available: set[str]) -> LLMReply:
+        """«Отметь, что я прошла практикум по Git» → черновик отметки «сделано» у самого похожего своего пункта."""
+        wanted = _query_words(question) - {"отметь", "прошла", "прошел", "сделала", "сделал", "закончила", "закончил",
+                                           "закрыла", "закрыл", "уже"}
+        mine = [i for i in plan.get("items") or [] if i.get("owner_role") == "intern" and i.get("status") != "done"]
+        scored = sorted(((_overlap(wanted, i["title"]), i) for i in mine), key=lambda p: -p[0])
+        if not scored or scored[0][0] == 0 or "set_plan_item_status" not in available:
+            open_items = ", ".join(f"«{i['title']}»" for i in mine[:4]) or "—"
+            return LLMReply(content=("Не понял, какой пункт отметить. Твои незакрытые пункты: "
+                                     f"{open_items}. Напиши название или нажми «Готово» у пункта в плане слева."))
+        item = scored[0][1]
+        if item.get("resource_id"):
+            return LLMReply(content=(f"Пункт «{item['title']}» закрывается заявкой на доступ, а не отметкой: нажми у "
+                                     "него «Сделать за меня» — подготовлю черновик заявки."))
+        return LLMReply(tool_calls=[ToolCall(id="scn_set_plan_item_status", name="set_plan_item_status",
+                                             arguments={"item_id": item["id"], "status": "done",
+                                                        "title": item["title"]})])
+
+    def _absences(self, result: dict) -> LLMReply:
+        reasons = {"personal": "личные дела", "family": "семейные дела", "study": "учебные дела"}
+        reqs = result.get("requests") or []
+        pending = [r for r in reqs if r.get("status") in ("pending", "submitted", "created")]
+        if not pending:
+            return LLMReply(content="Сейчас ничего не ждёт твоего решения: новых заявлений на отгул нет. "
+                                    "Когда стажёр подаст заявление, оно появится в колокольчике 🔔 и в блоке «Заявки на отгул».")
+        lines = [f"• {_name(r.get('intern_id'))} — {date.fromisoformat(r['day']):%d.%m}, "
+                 f"{reasons.get(r.get('reason'), r.get('reason'))}" for r in pending]
+        return LLMReply(content="Ждут твоего решения — заявления на отгул:\n" + "\n".join(lines) +
+                                "\n\nРешить можно в блоке «Заявки на отгул» слева: «Согласовать» или «Отклонить».")
 
     def _levels(self, profile: dict) -> LLMReply:
         names = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}
@@ -576,10 +729,19 @@ class ScenarioProvider:
         return LLMReply(content=(f"{first}, уровень по темам: {skills or 'пока не заполнен'}. Уровень меняет только "
                                  "наставник; бот по нему подстраивает глубину объяснений."))
 
-    def _plan(self, plan: dict, own: bool = True) -> LLMReply:
+    def _plan(self, plan: dict, own: bool = True, calm: bool = False) -> LLMReply:
         day = plan.get("current_day")
         first = _name(plan.get("intern_id")).split()[0]
         lines = [f"Сейчас {day}-й день стажировки." if own else f"{first}: {day}-й день стажировки."]
+        items = plan.get("items") or []
+        if own and items:
+            done = sum(1 for i in items if i.get("status") == "done")
+            left = 14 - int(day or 0)
+            tail = f", до конца недель 1–2 — {_days(left)}" if left > 0 else ""
+            lines.append(f"Недели 1–2: закрыто {done} из {len(items)}{tail}.")
+        if calm:
+            lines.insert(0, "Понимаю, в первые недели так бывает у многих — это нормально. Не нужно делать всё сразу, "
+                            "давай по одному шагу.")
         step = plan.get("next_step")
         if step:
             late = " Срок уже прошёл — лучше заняться им первым." if step.get("overdue") else ""
@@ -596,6 +758,10 @@ class ScenarioProvider:
             lines.append("Зависших пунктов нет.")
         if not step and not plan.get("waiting"):
             lines.append("Свои пункты недель 1–2 закрыты — дальше «Месяц 1».")
+        if calm:
+            lines.append("Если задач слишком много — покажи список наставнику и попросите вместе выбрать главное: "
+                         "приоритет определяет команда, а не стажёр в одиночку (документ «Как приоритизировать "
+                         "задачи»). Застрял(а) — пиши наставнику сразу, ждать встречи 1:1 не нужно.")
         return LLMReply(content="\n".join(lines))
 
     def _pick_resource(self, result: dict, question: str, available: set[str]) -> LLMReply:
@@ -610,7 +776,7 @@ class ScenarioProvider:
             match = next((r for r in resources if r["id"] == "redash"), None)
         elif "grafana" in q or "графан" in q:
             match = next((r for r in resources if r["id"] == "grafana"), None)
-        elif any(w in q for w in ("bitbucket", "битбакет", "пространств", "репозитор", "команд")):
+        elif any(w in q for w in ("bitbucket", "битбакет", "пространств", "репозитор", "команд", "гит", "git")):
             match = next((r for r in resources if r.get("kind") == "team_space"), None)
         if match and "create_access_request" in available:
             justification = f"Нужно для стажировки: {question}"[:300]
