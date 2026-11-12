@@ -77,31 +77,50 @@ describe("сравнение двух планов (SPEC 5)", () => {
   it("Пётр сравнивает Аню и Кирилла: общие совпадают, персональные разные, с причиной", async () => {
     srv.addKirill();
     open("mentor-petr");
-    const btn = await screen.findByRole("button", { name: "Сравнить планы: Аня и Кирилл" });
-    await act(async () => fireEvent.click(btn));
+    // Проверка 12.11: сравнение открыто сразу и стоит выше карточек стажёров.
+    const region = await screen.findByRole("region", { name: "Сравнение планов" });
+    expect(within(region).getByRole("heading", { name: "Сравнить планы: Аня и Кирилл" })).toBeTruthy();
+    const cards = screen.getByRole("region", { name: "Мои стажёры" });
+    expect(region.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const anya = await screen.findByRole("group", { name: "План: Аня Смирнова" });
     const kirill = screen.getByRole("group", { name: "План: Кирилл Егоров" });
     expect(within(anya).getByText("Практикум: ветки и pull request")).toBeTruthy();
     expect(within(anya).getByText("Почему: в карте навыков Git — новичок")).toBeTruthy();
     expect(within(kirill).getByText("Практикум: запросы к учебной базе объявлений")).toBeTruthy();
     expect(within(kirill).queryByText("Практикум: ветки и pull request")).toBeNull();
-    const region = screen.getByRole("region", { name: "Сравнение планов" });
+    expect(within(region).getByText("Персональные")).toBeTruthy();
+    expect(within(region).queryByText(/для тебя/i)).toBeNull(); // у наставника не «для тебя»
     expect(within(region).getByText(/Для всех · 14/)).toBeTruthy();
+    // общие приглушены и свёрнуты до 4, остальные — по кнопке
+    const common = within(region).getByRole("list", { name: "Общие пункты" });
+    expect(within(common).getAllByRole("listitem")).toHaveLength(4);
+    await act(async () => fireEvent.click(within(region).getByRole("button", { name: "Показать все общие (14)" })));
+    expect(within(common).getAllByRole("listitem")).toHaveLength(14);
+    expect(within(region).getAllByText(/^оба: |: .* · /).length).toBeGreaterThan(0);
     expect(within(region).getByText(/Это не рейтинг/)).toBeTruthy();
     expect(within(region).queryByText(/%/)).toBeNull(); // без процентов «кто лучше»
   });
 
-  it("у наставника один стажёр — кнопки сравнения нет", async () => {
+  it("у наставника один стажёр — сравнения нет", async () => {
     open("mentor-petr");
     await screen.findByRole("region", { name: "Мои стажёры" });
-    expect(screen.queryByRole("button", { name: /Сравнить планы/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Сравнение планов" })).toBeNull();
+  });
+
+  it("сравнение можно свернуть и развернуть", async () => {
+    srv.addKirill();
+    open("mentor-petr");
+    await screen.findByRole("group", { name: "План: Аня Смирнова" });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Свернуть" })));
+    expect(screen.queryByRole("group", { name: "План: Аня Смирнова" })).toBeNull();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Развернуть" })));
+    expect(await screen.findByRole("group", { name: "План: Аня Смирнова" })).toBeTruthy();
   });
 
   it("сервер ещё без сравнения (404) — понятная подпись", async () => {
     srv.addKirill();
     srv.noAdaptive = true;
     open("mentor-petr");
-    await act(async () => fireEvent.click(await screen.findByRole("button", { name: /Сравнить планы/ })));
     expect(await screen.findByText("Сравнение планов пока недоступно на сервере.")).toBeTruthy();
   });
 });
