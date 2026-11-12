@@ -64,5 +64,7 @@
 | C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
 | C1.2 | Чекпоинт 1, 2: предложения по уровню | Codex | codex/skill-suggestions | на ревью | [#68](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/68) | Ревью 1–6: optional SQL, безопасный реестр, dismissed при ручной смене; 932 passed / 98,04%, покрытие не снизилось |
 
+| C1.4 | Чекпоинт 1, 4: единые уведомления | Codex | codex/onboarding-notifications | на ревью | [#70](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/70) | Ревью 1–4: main сохранён; нейтральное понижение, один факт на тему, явный каталог; 1033 passed / 97,95% |
+
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).

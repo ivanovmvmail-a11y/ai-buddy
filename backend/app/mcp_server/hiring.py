@@ -3,7 +3,8 @@ from app.agent.users import DEMO_USERS, Role, User
 from uuid import uuid4
 
 from . import checklist, events, storage
-from ._domain import known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view, suggestion_status
+from .notifications import notify
+from ._domain import SKILL_LEVEL_LABELS, SKILL_LEVEL_ORDER, known_actor, nonempty, require_intern, skill_level, strict_bool, timestamp, item_view, suggestion_status
 from .errors import Conflict, Forbidden, NotFound
 from .models import SkillLevel, SkillProfile, SkillSuggestion, PlanItem
 from ._system import SYSTEM_ACTOR
@@ -55,6 +56,20 @@ def _set_level(data, actor, profile, topic, level, *, accepted_suggestion_id=Non
             "intern_id": intern_id, "topic": topic, "from": previous, "to": level,
             "day": data.interns[intern_id].current_day,
         })
+        target = DEMO_USERS.get(intern_id)
+        if target is not None:
+            title = _topic_title(data, topic, target.team)
+            # Один актуальный факт по теме; snooze не должен оживить старый уровень.
+            for reminder in data.reminders.values():
+                if (reminder.user_id == intern_id and reminder.kind == "skill_changed"
+                        and reminder.action is not None and reminder.action.topic == topic
+                        and reminder.status != "done"):
+                    reminder.status, reminder.snooze_until_day = "done", None
+            promotion = level != "novice" and (previous is None
+                or SKILL_LEVEL_ORDER.index(level) > SKILL_LEVEL_ORDER.index(previous))
+            text = (f"Наставник отметил: {title} — {SKILL_LEVEL_LABELS[level]}. План обновился" if promotion
+                    else f"План по теме {title} обновился. Открой актуальные пункты")
+            notify(data, intern_id, intern_id, "skill_changed", uuid4().hex, text, "plan", topic=topic)
 
 
 SUGGESTION_THRESHOLD = 2
@@ -97,6 +112,9 @@ def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None)
     events._record(data, SYSTEM_ACTOR, "skill_suggestion_created", {
         "intern_id": intern_id, "suggestion_id": suggestion.id, "topic": topic,
     })
+    notify(data, mentor.id, intern_id, "skill_suggestion", suggestion.id,
+           f"Бот предлагает поднять уровень: {target.name}, {title} ({suggestion.basis})",
+           "skill_suggestion", suggestion_id=suggestion.id)
 
 
 def _topic_title(data, topic, team):
@@ -165,6 +183,9 @@ async def decide_suggestion(actor: User, suggestion_id: str, accept: bool) -> Sk
                        accepted_suggestion_id=suggestion.id)
         suggestion.status = "accepted" if accept else "dismissed"
         suggestion.decided_day = data.interns[suggestion.intern_id].current_day
+        for reminder in data.reminders.values():
+            if reminder.suggestion_id == suggestion.id:
+                reminder.status, reminder.snooze_until_day = "done", None
         events._record(data, actor, "skill_suggestion_decided", {
             "intern_id": suggestion.intern_id, "suggestion_id": suggestion.id,
             "topic": suggestion.topic, "status": suggestion.status,

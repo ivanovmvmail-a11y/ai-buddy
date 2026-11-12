@@ -1,8 +1,10 @@
 """План, следующий шаг, лестница и фактическая сводка недели."""
 from copy import deepcopy
+from uuid import uuid4
 from app.agent.users import DEMO_USERS, Role, User
 
 from . import events, storage
+from .notifications import notify
 from ._domain import STAGES, WORK_STAGES, item_status, item_view, nonempty, owner_id, positive, require_intern, timestamp
 from ._system import SYSTEM_ACTOR
 from .errors import Conflict, Forbidden, NotFound
@@ -153,6 +155,11 @@ def _add_personal(data, actor, intern_id, entry, *, reason=None):
     events._record(data, actor, "personal_item_added", {
         "intern_id": intern_id, "item_id": item.id, "topic": entry.topic, "catalog_key": entry.key,
     })
+    # Явный каталог (#71) передаёт reason; пересборка использует причину из карты.
+    if reason is not None and actor.role == Role.MENTOR:
+        notify(data, intern_id, intern_id, "personal_item_added", uuid4().hex,
+               f"В план добавлен пункт для тебя: {item.title} ({item.reason})",
+               "plan_item", plan_item_id=item.id)
     return item
 
 

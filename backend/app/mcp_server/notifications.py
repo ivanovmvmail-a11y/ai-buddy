@@ -9,12 +9,12 @@ def notification_id(kind, user_id, key):
     return 'REM-' + uuid5(NAMESPACE_URL, f'ai-buddy:{kind}:{user_id}:{key}').hex
 
 
-def notify(data, user_id, intern_id, kind, key, text, target, *, day=None, **links):
+def notify(data, user_id, intern_id, kind, key, text, target, *, day=None, topic=None, **links):
     id = notification_id(kind, user_id, key)
     if id in data.reminders:
         return None
     reminder = Reminder(id=id, user_id=user_id, intern_id=intern_id, kind=kind,
-        text=text, action={'label': {'absence_pending': 'Напомнить', 'absence_new': 'Решить'}.get(kind, 'Открыть'), 'target': target},
+        text=text, action={'label': {'absence_pending': 'Напомнить', 'absence_new': 'Решить', 'skill_suggestion': 'Решить'}.get(kind, 'Открыть'), 'target': target, 'topic': topic},
         created_day=day if day is not None else data.interns[intern_id].current_day, **links)
     data.reminders[id] = reminder
     events._record(data, SYSTEM_ACTOR, 'reminder_created', {
