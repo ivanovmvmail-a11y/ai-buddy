@@ -32,6 +32,10 @@ def _change_status(data: OnboardingData, actor: User, item: PlanItem, status: It
                     "intern_id": item.intern_id, "reminder_id": reminder.id, "day": day,
                 })
 
+    if status == "done" and old != "done":
+        from .hiring import _maybe_suggest
+        _maybe_suggest(data, item.intern_id, item.topic, closed_item=item.id)
+
 
 def _build_plan(data: OnboardingData, actor: User, intern_id: str) -> Plan:
     items = sorted((item_view(data, item) for item in data.items.values() if item.intern_id == intern_id),

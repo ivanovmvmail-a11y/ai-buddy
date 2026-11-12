@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, PrivateAttr, model_validator
 
 from app.agent.users import Role, User
 from .absence_models import AbsenceRequest
@@ -127,6 +127,25 @@ class SkillProfile(Model):
     updated_at: AwareDatetime
 
 
+SuggestionStatus = Literal["pending", "accepted", "dismissed"]
+
+
+class SkillSuggestion(Model):
+    id: str
+    intern_id: str
+    mentor_id: str
+    intern_name: str = ""
+    topic: str
+    topic_title: str = ""
+    from_level: SkillLevel
+    to_level: SkillLevel
+    basis: str
+    evidence: list[str] = Field(default_factory=list, exclude=True)
+    created_day: int = Field(ge=1)
+    status: SuggestionStatus = "pending"
+    decided_day: int | None = Field(default=None, ge=1)
+
+
 ReminderKind = Literal["plan_item", "access_request", "skill_changed", "personal_item_added",
                        "skill_suggestion", "absence_pending", "absence_decided", "absence_today",
                        "absence_new", "absence_fact"]
@@ -185,6 +204,9 @@ class ActionDraft(Model):
 
 
 class OnboardingData(Model):
+    # Возможность конкретной SQL-транзакции, не поле публичного DTO или seed.
+    _suggestions_available: bool = PrivateAttr(default=True)
+
     interns: dict[str, InternState] = Field(default_factory=dict)
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)
@@ -193,5 +215,6 @@ class OnboardingData(Model):
     requests: dict[str, AccessRequest] = Field(default_factory=dict)
     profiles: dict[str, SkillProfile] = Field(default_factory=dict)
     reminders: dict[str, Reminder] = Field(default_factory=dict)
+    suggestions: dict[str, SkillSuggestion] = Field(default_factory=dict)
     personal_catalog: dict[str, CatalogItem] = Field(default_factory=dict)
     events: list[Event] = Field(default_factory=list)

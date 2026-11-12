@@ -7,7 +7,7 @@ from pydantic import Field, StrictBool, StringConstraints, TypeAdapter
 from app.agent.users import DEMO_USERS, Role, User, can_view_intern
 
 from .errors import NotFound
-from .models import AccessLevel, ItemStatus, OnboardingData, PlanItem, SkillLevel
+from .models import AccessLevel, ItemStatus, OnboardingData, PlanItem, SkillLevel, SuggestionStatus
 
 WORK_STAGES = ("week1", "week2")
 STAGES = (*WORK_STAGES, "month1", "month2", "after3m")
@@ -16,6 +16,7 @@ positive = TypeAdapter(Annotated[int, Field(ge=1, strict=True)])
 item_status = TypeAdapter(ItemStatus)
 access_level = TypeAdapter(AccessLevel)
 skill_level = TypeAdapter(SkillLevel)
+suggestion_status = TypeAdapter(SuggestionStatus)
 strict_bool = TypeAdapter(StrictBool)
 
 
