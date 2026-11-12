@@ -18,7 +18,7 @@ def test_absence_protocol_and_no_confirmation_tools(store):
                 if 'draft_' in name: assert tool.annotations.idempotentHint is False
             draft = data(await client.call_tool('absence_draft_request', {'day':'2026-11-12','reason':'personal'}))
             assert data(await client.call_tool('absence_get_draft', {'draft_id':draft['id']})) == draft
-            assert len(data(await client.call_tool('absence_list_requests',{}))['result']) == 1
+            assert data(await client.call_tool('absence_list_requests',{}))['result'] == []
             for name in ('absence_confirm_absence','confirm_absence','absence_confirm_decision'):
                 assert (await client.call_tool(name, {'draft_id':draft['id']})).isError
             request = await absence.confirm_absence('intern-anya', draft['id'])
