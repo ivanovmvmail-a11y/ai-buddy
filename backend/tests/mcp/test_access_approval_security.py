@@ -10,7 +10,7 @@ run = async_runner.run
 
 
 @pytest.mark.parametrize("user_id", ["intern-anya", "intern-ivan"])
-@pytest.mark.parametrize("resource_id", ["jira", "confluence"])
+@pytest.mark.parametrize("resource_id", ["jira", "confluence", "redash", "grafana"])
 @pytest.mark.parametrize("level", ["read", "edit", "admin"])
 def test_auto_resource_requires_mentor_for_every_elevated_level(
     store, edit, snapshot, user_id, resource_id, level
@@ -35,7 +35,7 @@ def test_auto_resource_requires_mentor_for_every_elevated_level(
         item = snapshot().items[request.plan_item_id]
         assert item.status == "waiting" and item.waiting_for == actor.mentor_id
     else:
-        assert request.plan_item_id is None  # У Confluence нет отдельного пункта seed.
+        assert request.plan_item_id is None  # У остальных общих ресурсов нет отдельного пункта seed.
     for other in DEMO_USERS.values():
         if other.id == actor.mentor_id:
             continue

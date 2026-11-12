@@ -9,6 +9,8 @@
   "resources": [
     {"id": "jira", "title": "Учебный Jira", "kind": "base", "team": null, "approver": "auto"},
     {"id": "confluence", "title": "Учебный Confluence", "kind": "base", "team": null, "approver": "auto"},
+    {"id": "redash", "title": "Учебный Redash", "kind": "base", "team": null, "approver": "auto"},
+    {"id": "grafana", "title": "Учебная Grafana", "kind": "base", "team": null, "approver": "auto"},
     {"id": "bitbucket-platform", "title": "Bitbucket: Платформа объявлений", "kind": "team_space", "team": "Платформа объявлений", "approver": "mentor"},
     {"id": "bitbucket-delivery", "title": "Bitbucket: Авито Доставка", "kind": "team_space", "team": "Авито Доставка", "approver": "mentor"}
   ],
