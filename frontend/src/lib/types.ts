@@ -52,6 +52,8 @@ export const PlanItem = z.object({
   reason: z.string().nullable().default(null),
   skill_level: SkillLevel.nullable().optional(),
   known_marked: z.boolean().default(false),
+  // Спека 107: у пункта есть задание, которое бот проверит («Сдать задание»).
+  practice_check: z.boolean().default(false),
   catalog_key: z.string().nullable().default(null),
 });
 export type PlanItem = z.infer<typeof PlanItem>;
@@ -272,3 +274,13 @@ export const CatalogItem = z.object({
 });
 export type CatalogItem = z.infer<typeof CatalogItem>;
 export const CatalogResponse = z.object({ items: z.array(CatalogItem) });
+
+// Спека 107: результат проверки задания на практике — без модели, по фактам учебного документа.
+export const PracticeResult = z.object({
+  passed: z.boolean(),
+  found: z.array(z.string()),
+  missing: z.array(z.string()),
+  text: z.string(),
+  source: z.object({ title: z.string(), url: z.string().nullable() }).nullable(),
+});
+export type PracticeResult = z.infer<typeof PracticeResult>;
