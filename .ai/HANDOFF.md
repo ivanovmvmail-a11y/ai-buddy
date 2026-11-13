@@ -423,3 +423,6 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 ### 2026-11-13 · от Claude → Codex («память», твой #45 доведён)
 - Ветка `claude/mentor-memory` = твой `codex/mentor-inbox` + main + интерфейс. #45 закрою ссылкой на новый PR после мержа.
 - Правки в твоей зоне: `mentor_inbox.py` — уведомление наставнику сразу при `confirm_question` (`notify`, kind `mentor_question`, `mentor_question_id`), стажёру при ответе (`mentor_answer`); `tick_questions` ставит `kind`/`action`; `publication_title()`; склейка повторных «[имя удалено]». `models.py` — два kind и target `mentor_question`; `notifications.py` — «Ответить». Миграция `20261113120000_mentor_question_kinds.sql`. В `test_mentor_inbox.py` ожидания под «уведомление сразу» и 10 пользователей.
+
+### 2026-11-13 · от Claude → Codex (переписка и черновики в PostgreSQL — сделано)
+- Пункт 3 записки 13.11 и пункт «Переписка в БД» от 11.11 закрыты в `claude/chat-persistence` (решение Миши): `app/db/history.py`, `app/db/actions.py`, `app/db/_table.py`, миграция `20261113130000_chat_and_actions.sql`, тесты `tests/mcp/test_chat_store_postgres.py`; в `tests/mcp/conftest.py` миграция добавлена в список. Делать не нужно.

@@ -77,7 +77,8 @@
 | 72 | GigaChat 106 вопросов: 99 → 105; данные (следующий шаг, заявки) и оргвопросы — ответ сервера до модели; ложное «не указан»; README — совет эксперту про ключ | Claude | claude/gigachat-1313 | готово | #96
 | 73 | Сданное практическое задание → основание предложения наставнику (что именно засчитано); правка в hiring.py записана в HANDOFF | Claude | claude/practice-to-mentor | готово | #98 | backend 813, PostgreSQL 843; проверено в браузере |
 | 74 | Railway: чтение из PostgreSQL одним запросом вместо 12 (зона Codex, HANDOFF) | Claude | claude/railway-latency | готово | #97 | PostgreSQL 1229; эффект замерить после мержа |
-| 75 | «Память» (второе УТП): Codex #45 доведён — main влит, HTTP /mentor/questions, «Отправить наставнику» в чате, блоки у стажёра и наставника, уведомления сразу, ответ «Наставник уже отвечал»; спека 108; миграция видов уведомлений | Claude | claude/mentor-memory | на ревью | #99
+| 75 | «Память» (второе УТП): Codex #45 доведён — main влит, HTTP /mentor/questions, «Отправить наставнику» в чате, блоки у стажёра и наставника, уведомления сразу, ответ «Наставник уже отвечал»; спека 108; миграция видов уведомлений | Claude | claude/mentor-memory | готово | #99
+| 76 | Переписка и черновики в PostgreSQL (SPEC §9): `chat_messages`, `agent_actions`, атомарное подтверждение, запасной режим без миграции; задача Codex из HANDOFF 11.11 — по решению Миши 13.11 сделал Claude | Claude | claude/chat-persistence | на ревью | | PostgreSQL-тесты + проверка перезапуска в Docker |
 
 | C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 | C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
