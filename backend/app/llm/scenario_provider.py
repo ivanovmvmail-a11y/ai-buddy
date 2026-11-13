@@ -20,7 +20,7 @@ from .small_talk import small_talk_reply
 DOCS_MARKER = "Контекст из документов команды"
 
 ORG_WORDS = ("отпуск", "больнич", "отгул", "заболел", "зарплат", "компенсац", "справк", "дмс", "увольн", "трудов", "командиров",
-             "аванс", "получк", "оклад")
+             "аванс", "получк", "оклад", "будут платить", "платят", "сколько плат", "стипенд")
 SALARY = re.compile(r"(?<![а-яё])(зп|з/п)(?![а-яё])")
 # SPEC 3.8: отгул на один день — не к HR, а заявление руководителю (если инструмент доступен — стажёру).
 ABSENCE_WORDS = ("отгул", "отпрос", "к врачу", "ко врачу", "не смогу прийти", "не приду", "не выйду", "пропустить день",
@@ -113,6 +113,10 @@ SYNONYMS = (
     (re.compile(r"(?<![а-яё])(эс-?ку-?эл|скуэл|скл)(?![а-яё])"), " sql "),
     (re.compile(r"митинг[а-яё]*|созвон[а-яё]*|стендап[а-яё]*"), " встречи "),
     (re.compile(r"удален[а-яё]*|удаленк[а-яё]*|на удаленк[а-яё]*"), " удаленной работы из дома "),
+    # Финальная проверка 13.11: «что такое DoD» и «где мои задачи посмотреть» давали «в документах нет».
+    (re.compile(r"(?<![a-z])dod(?![a-z])|definition\s+of\s+done"), " задача готова критерии готовности "),
+    (re.compile(r"(мои|свои|моих|своих)\s+задач[а-яё]*|задач[а-яё]*\s+(мои|свои)"),
+     " задачи в трекере описание задачи в трекере "),
 )
 STOP = {"который", "когда", "почему", "сделать", "нужно", "можно", "такой", "этого", "через", "после", "чтобы",
         "только", "какой", "какие", "какая", "мне", "меня", "есть", "надо", "подскажи", "пожалуйста", "расскажи",
@@ -345,7 +349,11 @@ def is_hr_question(q: str) -> bool:
 def hr_reply(question: str) -> str:
     return (f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
             f"вопросы не отвечает. Черновик сообщения, можно скопировать:\n\n«Здравствуйте! {_as_sentence(question)} "
-            "Подскажите, пожалуйста, как это оформить.»")
+            f"Подскажите, пожалуйста{', как это оформить' if any(w in question.lower() for w in PAPERWORK) else ''}.»")
+
+
+# Что «оформляют» (больничный, отпуск); про зарплату — просто «подскажите» (финальная проверка 13.11).
+PAPERWORK = ("отпуск", "больнич", "заболел", "справк", "дмс", "увольн", "командиров", "декрет", "отгул")
 
 
 # Вопросы, на которые отвечают инструменты, сводка плана или HR, а не абзац документа: страховку не применяем.
@@ -405,6 +413,13 @@ def docs_guard(question: str, system: str, reply: str) -> str | None:
 def _names_someone(q: str) -> str | None:
     """id стажёра, если вопрос называет его по имени («Что у Ани зависло?»)."""
     return next((i for i, forms in NAMES.items() if any(re.search(rf"\b{f}", q) for f in forms)), None)
+
+
+def names_all(q: str) -> list[str]:
+    """id всех стажёров, названных в вопросе, по порядку («как дела у Ани и Ивана?»)."""
+    q = q.lower()
+    found = [(m.start(), i) for i, forms in NAMES.items() for f in forms if (m := re.search(rf"\b{f}", q))]
+    return list(dict.fromkeys(i for _, i in sorted(found)))
 
 
 def _role(system: str) -> str:
@@ -583,17 +598,83 @@ def _resource_named(q: str) -> bool:
     return any(w in q for w in RESOURCE_WORDS)
 
 
+ROLE_INFO = {
+    Role.INTERN: ("стажёр", "стажёрка", None),
+    Role.MENTOR: ("наставник", "наставник", "задачи, доступы и всё, что блокирует работу"),
+    Role.LEAD: ("руководитель", "руководитель", "цели стажировки и отгулы"),
+    Role.HRBP: ("HR BP", "HR BP", "отпуск, больничный, документы и другие организационные вопросы"),
+    Role.CURATOR: ("куратор стажировки", "куратор стажировки", "программа стажировки и учёт прогресса"),
+}
+CONTACT = re.compile(r"(?<![а-яё])(телефон|почт[аыу]|e-?mail|емейл|контакт|номер телефона|связаться)")
+WHO_IS = re.compile(r"кто\s+(так(ой|ая|ие)|это|он|она)(?![а-яё])")
+
+
+def _person_forms(user) -> set[str]:
+    first = {user.name.split()[0].lower().replace("ё", "е")}
+    if user.forms:
+        first |= {f.split()[0].lower().replace("ё", "е") for f in user.forms}
+    return first
+
+
+def _current_user(system: str):
+    match = re.search(r"Текущий пользователь: ([^,]+),", system)
+    return next((u for u in DEMO_USERS.values() if match and u.name == match.group(1)), None)
+
+
+def people_reply(q: str, system: str) -> str | None:
+    """«Кто такая Ольга Новикова?», «какой телефон у Петра Волкова?» — ответ из справочника людей, а не из документов
+    (SPEC 3.4: контакты — из справочника). Финальная проверка 13.11: бот не знал руководителя, которого стажёр видит
+    в блоке «Моя команда», и отвечал «в документах нет»."""
+    low = q.lower().replace("ё", "е")
+    if not (WHO_IS.search(low) or CONTACT.search(low)):
+        return None
+    words = set(re.findall(r"[а-яa-z]+", low))
+    person = next((u for u in DEMO_USERS.values() if _person_forms(u) & words), None)
+    if person is None:
+        return None
+    me = _current_user(system)
+    if me is not None and person.id == me.id:
+        return f"Это ты 🙂 {person.name}, {ROLE_INFO[person.role][1 if person.female else 0]}, команда «{person.team}»."
+    title, title_f, about = ROLE_INFO[person.role]
+    title = title_f if person.female else title
+    if me is not None and person.id in (me.mentor_id, me.lead_id):
+        title = f"твой {title}"
+    team = f"команда «{person.team}»" if person.role != Role.HRBP else "отвечает за стажёров"
+    if person.role == Role.CURATOR:
+        team = "программа Avito Start"
+    text = f"{person.name} — {title}, {team}."
+    if about:
+        text += f" С чем идти: {about}."
+    if CONTACT.search(low):
+        text += (" Телефонов и почты в AI-buddy нет — я их не храню. Напиши в рабочем мессенджере (Mattermost): "
+                 "найдёшь по имени.")
+    return text
+
+
 def policy_reply(q: str, question: str, system: str, available: set[str]) -> str | None:
     """Ответы по правилам продукта, одинаковые для любой модели. Прогон GigaChat 12.11: модель отвечала туманно
     («обратитесь к системе»), а наставнику советовала «обратиться к её наставнику». Агент применяет их до модели."""
     q = q.lower()
     role = _role(system)
+    # Финальная проверка 13.11 с ключом: руководителю на «согласуй отгул Ани» модель советовала «подайте заявку
+    # сами», наставнику на «одобри заявку Ани» — «предоставьте номер заявки». Решение — кнопка человека.
+    if role == "lead" and any(w in q for w in APPROVE_WORDS) and any(w in q for w in ("отгул", "заявлен", "отсутств")):
+        return ("Согласовать отгул можно только тебе — кнопкой «Согласовать» или «Отклонить» в блоке «Заявки на "
+                "отгул» на твоём экране (новые заявки — и в колокольчике 🔔). Сам я не согласую: решает человек.")
+    if role == "mentor" and any(w in q for w in APPROVE_WORDS) and any(w in q for w in ("заявк", "доступ")):
+        return ("Одобрить заявку можно только тебе — кнопкой «Одобрить» или «Отклонить…» в блоке «Ждут твоего "
+                "одобрения» на твоём экране. Сам я заявки не одобряю: решает человек.")
+    if role == "hrbp" and any(w in q for w in HR_ONLY):  # отгул на день — по регламенту, его объясняет модель
+        return ("Порядка оформления больничного, отпуска и других кадровых вопросов в документах AI-buddy нет — это "
+                "твоя зона. Стажёров с такими вопросами я сразу направляю к тебе и даю им черновик сообщения.")
     someone = _names_someone(q)
     other = someone if someone and someone != _own_id(system) else None
     if any(w in q for w in INJECTION_WORDS):
         return ("Так не могу: правила и права задаёт сервер, в чате их не поменять, а служебные инструкции я не "
                 "показываю. Работаю от имени того, кто вошёл, и вижу только его данные. Чем помочь по стажировке? "
                 "Например: «что мне делать дальше?»")
+    if (people := people_reply(q, system)) is not None:
+        return people
     # Только если вся просьба — напоминание («оформи доступ и напомни завтра» — две просьбы, их делит агент).
     # Стажёру напоминание ставит агент (черновик → «Подтвердить», 13.11); остальным ролям — честный отказ.
     if is_reminder_request(q) and "create_reminder" not in available:
@@ -619,6 +700,11 @@ def policy_reply(q: str, question: str, system: str, available: set[str]) -> str
         return ("Одобрять заявки может только наставник в своём кабинете — я работаю от имени того, кто вошёл "
                 "(сейчас это ты, стажёр), и представиться в чате другим человеком нельзя. Посмотреть статус своих "
                 "заявок — спроси «мои заявки».")
+    # «Отметь все пункты выполненными» — пачкой не закрываем (финальная проверка 13.11: модель просила «ID пунктов»).
+    if role == "intern" and any(w in q for w in ("отметь", "закрой", "поставь")) and re.search(r"(?<![а-яё])вс[её]", q)             and any(w in q for w in ("пункт", "план", "выполн", "сделан", "готов")):
+        return ("Пачкой пункты не отмечаю: пункт закрывается кнопкой «Готово» в плане, когда он сделан на деле. "
+                "Пункты наставника и руководителя закрывают они сами, практикум — после сданного задания. "
+                "Спроси «что мне делать дальше?» — подскажу следующий шаг.")
     if role == "intern" and any(w in q for w in ADMIN_WORDS):
         mentor = re.search(r"Наставник: ([^.]+)\.", system)
         who = mentor.group(1) if mentor else "твой наставник"
@@ -680,6 +766,17 @@ def scrub_reply(text: str, tool_names: set[str], doc_titles: set[str]) -> str:
         lines.append(kept.rstrip() if kept.strip() else ("" if line.strip() else line))
     cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     return cleaned or text
+
+
+_ITEM_ID = re.compile(r"\s*\(?\bid\s+[a-z]+\.[a-z0-9.\-]+\)?|\b[a-z]+\.(?:w\d+|m\d+|p|after\d+m)\.[a-z0-9\-]+\b")
+_LINK = re.compile(r"(?:https?://|git@)[^\s)`'\"»]+")
+
+
+def scrub_invented(text: str, system: str) -> str:
+    """Финальная проверка 13.11 с ключом: модель показала служебный id пункта («(id anya.w1.access-base)») и выдумала
+    адрес репозитория в `git clone`. Ссылка, которой нет в документах и данных, заменяется заглушкой, id — убирается."""
+    text = _ITEM_ID.sub("", text)
+    return _LINK.sub(lambda m: m.group(0) if m.group(0) in system else "<адрес из README репозитория>", text)
 
 
 def named_intern_plan(question: str, system: str) -> str | None:
@@ -775,7 +872,9 @@ class ScenarioProvider:
         if asks_next(q) and "get_plan" in available:
             return call("get_plan")
         # «доступ в Redash» без глагола — тоже заявка: ресурс назван прямо (каталог #90).
-        if ("доступ" in q and (any(v in q for v in ACCESS_VERBS) or _resource_named(q))
+        # «открой мне битбакет команды» — просьба без слова «доступ» (финальная проверка 13.11).
+        opens = bool(re.match(r"\s*(открой|дай|выдай|оформи|запроси)", q)) and _resource_named(q)
+        if ((opens or "доступ" in q and (any(v in q for v in ACCESS_VERBS) or _resource_named(q)))
                 and "list_access_resources" in available):
             return call("list_access_resources")
         if "заявк" in q and any(w in q for w in REQUEST_WORDS) and "list_access_requests" in available:

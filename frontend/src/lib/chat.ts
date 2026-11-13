@@ -88,14 +88,16 @@ export const useChat = create<ChatStore>((set) => ({
 
 /** Кнопки пункта плана в чате — те же, что у пункта в плане (чекпоинт 2: «в плане есть "Объяснить", а в чате нету»).
  *  Только свой рабочий пункт; skip — что уже показано в этом сообщении. */
-export function itemActions(item: PlanItem, actor: DemoUser, skip: ItemActionKind[] = []): BotAction[] {
+export function itemActions(item: PlanItem, actor: DemoUser, skip: ItemActionKind[] = [], passed = false): BotAction[] {
   if (actor.id !== item.intern_id || !isWorking(item.stage) || item.status === "done") return [];
   const base = { itemId: item.id, internId: item.intern_id };
   const out: BotAction[] = [];
   if (canRequestAccess(actor, item)) out.push({ label: "Сделать за меня", kind: "do", ...base });
   if (item.practice_check) out.push({ label: "Сдать задание", kind: "practice", ...base });
   out.push({ label: "Объяснить", kind: "explain", ...base });
-  if (canMarkDone(actor, item)) out.push({ label: "Готово", kind: "done", ...base });
+  // У практикума «Готово» — только после сданного задания (кнопка под ответом проверки), как в плане
+  // (финальная проверка 13.11: из чата пункт закрывался без сдачи).
+  if (canMarkDone(actor, item) && (!item.practice_check || passed)) out.push({ label: "Готово", kind: "done", ...base });
   return out.filter((a) => !skip.includes(a.kind as ItemActionKind));
 }
 

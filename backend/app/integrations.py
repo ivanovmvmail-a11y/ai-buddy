@@ -13,6 +13,7 @@
 """
 import hmac
 import logging
+import urllib.parse
 
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, Field, ValidationError
@@ -81,6 +82,19 @@ def _mm_user(username: str):
     return get_user(mapping.get(username.strip(), username.strip()))
 
 
+def _form() -> dict[str, str]:
+    """Форма запроса: UTF-8, как шлёт Mattermost; иначе — Windows-1251. Финальная проверка 13.11: пример из
+    docs/INTEGRATION.md из консоли Windows слал русский текст в 1251, форма не разбиралась, и сервер отвечал
+    «Неверный токен»."""
+    raw = urllib.parse.quote_from_bytes(request.get_data(), safe=b"=&+%")
+    for encoding in ("utf-8", "cp1251"):
+        try:
+            return {k: v[0] for k, v in urllib.parse.parse_qs(raw, encoding=encoding, errors="strict").items()}
+        except UnicodeDecodeError:
+            continue
+    return {}
+
+
 @bp.post("/mattermost")
 def integration_mattermost():
     """Сообщение из Mattermost (исходящий вебхук или slash-команда) → ответ агента в канал.
@@ -89,7 +103,7 @@ def integration_mattermost():
     те же права, документы и черновики (подтверждение черновика — в AI-buddy). Ответ виден только автору."""
     if not settings.mattermost_token:
         return _off("MATTERMOST_TOKEN")
-    payload = request.get_json(silent=True) or request.form.to_dict()
+    payload = request.get_json(silent=True) or _form()
     if not _same(str(payload.get("token", "")), settings.mattermost_token):
         return jsonify(detail="Неверный токен Mattermost"), 401
     user = _mm_user(str(payload.get("user_name", "")))

@@ -11,6 +11,7 @@ from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WO
                                        REQUEST_WORDS, hr_reply, is_hr_question, says_not_found,
                                        ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule, is_reminder_request, reminder_plan,
                                        docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
+                                       scrub_invented, names_all, STUCK_WORDS,
                                        search_query, second_note, split_actions)
 from app.llm.scenario_provider import _overlap as _stem_overlap
 from app.llm.scenario_provider import _resource_named
@@ -25,7 +26,7 @@ from .levels import hint as level_hint
 from .levels import level_for
 from .levels import opening as level_opening
 from .onboarding_tools import plan_context, register_onboarding_tools
-from .prompts import SYSTEM_PROMPT, user_context
+from .prompts import ROLE_NOTES, SYSTEM_PROMPT, user_context
 from .tools import NOT_FOUND_MESSAGE, ToolExecutor, ToolRegistry, check_access, draft_title, to_tool_content
 from .users import User
 
@@ -205,7 +206,8 @@ class Agent:
         # (проверка 13.11 «глазами эксперта»: GigaChat вместо черновика писал «создай заявку в Jira, согласует
         # наставник», а без ключа на тот же вопрос был черновик с автоматической выдачей — режимы противоречили).
         low = first.lower()
-        if (user.role.value == "intern" and "доступ" in low and _resource_named(low)
+        asks_access = "доступ" in low or bool(re.match(r"\s*(открой|дай|выдай|оформи|запроси)", low))
+        if (user.role.value == "intern" and asks_access and _resource_named(low)
                 and {"list_access_resources", "create_access_request"} <= available):
             llm = ScenarioProvider()
 
@@ -229,6 +231,17 @@ class Agent:
         if levelled:
             system += level_hint(*levelled)
         messages = [Message(role="system", content=system), *history]
+        model = getattr(llm, "name", "") not in ("scenario", "echo")
+        if model and messages[-1].role == "user" and (note := ROLE_NOTES.get(user.role.value)):
+            # Финальная проверка 13.11: наставнику на «как провести первую встречу 1:1?» модель отвечала как стажёру
+            # («задай вопросы наставнику»), хотя роль была в системном сообщении. Повторяем рядом с вопросом.
+            messages[-1] = Message(role="user", content=f"{messages[-1].content}\n\n(Указание помощнику, не "
+                                   f"пересказывай его: {note})")
+        if levelled and messages[-1].role == "user" and model:
+            # Финальная проверка 13.11: указание в системном сообщении GigaChat соблюдал плохо — Кирилл (уверенно)
+            # получал те же 6 шагов, что Аня. Повторяем его рядом с вопросом; в историю чата это не попадает.
+            messages[-1] = Message(role="user", content=f"{messages[-1].content}\n\n(Указание помощнику, не "
+                                   f"пересказывай его:{level_hint(*levelled).split(':', 1)[1]})")
 
         for _ in range(MAX_TOOL_STEPS):
             reply = await llm.chat(messages, specs or None)
@@ -246,6 +259,7 @@ class Agent:
                 if getattr(llm, "name", "") != "scenario":
                     # Модель назвала внутренний инструмент или выдумала документ (прогон на Railway 12.11) — убираем.
                     text = scrub_reply(text, set(self.registry.tools), {d["title"] for d in docs})
+                    text = scrub_invented(text, system)
                     if levelled and not used and not created and not says_not_found(text):
                         text = f"{level_opening(*levelled)}\n\n{text}"
                 if second and "Вторую просьбу" not in text and f"«{second}»" not in text:
@@ -287,9 +301,12 @@ class Agent:
             if action is None:
                 return AgentResult(reply="Сервис отсутствий сейчас не ответил. Попробуй ещё раз чуть позже.",
                                    tools=[call.name])
-            text = (f"{absence_rule(system)}Подготовил черновик: {result['summary']}. Подробности вроде врача в "
-                    "заявление не пишу — только причину из списка. Проверь дату и нажми «Подтвердить»: без этого "
-                    "руководителю ничего не уйдёт.")
+            # «Подробности вроде врача» — только если стажёр сам их назвал (финальная проверка 13.11: на «кому писать
+            # про отгул?» бот упоминал врача, о котором речи не было).
+            medical = any(w in q for w in ("врач", "клиник", "больниц", "анализ", "стоматолог", "зуб", "прием", "приём"))
+            privacy = ("Подробности вроде врача в заявление не пишу — только причину из списка. " if medical else "")
+            text = (f"{absence_rule(system)}Подготовил черновик: {result['summary']}. {privacy}Проверь дату и нажми "
+                    "«Подтвердить»: без этого руководителю ничего не уйдёт.")
             return AgentResult(reply=text, actions=[action], tools=[call.name])
         # Напоминание по просьбе (13.11): дату и текст разбирает сервер — одинаково для GigaChat и без ключа.
         if "create_reminder" in available and is_reminder_request(question) and (today := _today(system)):
@@ -336,6 +353,21 @@ class Agent:
                 text = scenario._requests(result, question, system).content
             return AgentResult(reply=text, tools=[data_call])
         viewer = role in ("mentor", "lead", "curator")
+        # «Как дела у Ани и Ивана?» — по каждому названному стажёру (финальная проверка 13.11: куратор получил
+        # ответ только про Аню). Чужого стажёра не раскрываем: «нет доступа» без подробностей.
+        named = names_all(q)
+        if viewer and len(named) >= 2 and "get_plan" in available and any(w in q for w in (*STUCK_WORDS, "план")):
+            lines = []
+            for intern_id in named:
+                result = await self.executor.call(user, ToolCall(id=f"rule_plan_{intern_id}", name="get_plan",
+                                                                 arguments={"intern_id": intern_id}))
+                if result.get("error"):
+                    from .users import DEMO_USERS, name_in
+                    lines.append(f"• По {name_in(DEMO_USERS.get(intern_id), 'dat', 'этому стажёру')} у тебя нет "
+                                 "доступа — подробности не раскрываю.")
+                else:
+                    lines.append("• " + ScenarioProvider()._plan(result, own=False).content.replace("\n", " "))
+            return AgentResult(reply="\n".join(lines), tools=["get_plan"])
         if viewer and any(w in q for w in FREQUENT_WORDS) and any(w in q for w in ("спраш", "вопрос", "тем")):
             from .analytics import metrics
             try:
