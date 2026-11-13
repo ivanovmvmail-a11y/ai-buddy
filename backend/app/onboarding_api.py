@@ -417,6 +417,11 @@ class MentorQuestionBody(BaseModel):
 class MentorAnswerBody(BaseModel):
     text: str = Field(min_length=1, max_length=6000)
     publish: StrictBool = True
+    topic: str | None = Field(default=None, max_length=200)  # тема в базе знаний — по ней найдут другие стажёры
+
+
+class MentorPublishBody(BaseModel):
+    topic: str | None = Field(default=None, max_length=200)
 
 
 def _mentor_question(q) -> dict:
@@ -451,7 +456,7 @@ def mentor_answer(question_id: str):
     body = _body(MentorAnswerBody)
 
     async def run():
-        draft = await mentor_inbox.draft_answer(g.user.id, question_id, body.text, body.publish)
+        draft = await mentor_inbox.draft_answer(g.user.id, question_id, body.text, body.publish, body.topic)
         return await mentor_inbox.confirm_answer(g.user.id, draft.id)
     return _mentor_question(async_runner.run(run()))
 
@@ -459,8 +464,10 @@ def mentor_answer(question_id: str):
 @bp.post("/mentor/questions/<question_id>/publish")
 def mentor_publish(question_id: str):
     """Добавить в базу знаний уже данный ответ."""
+    body = _body(MentorPublishBody)
+
     async def run():
-        draft = await mentor_inbox.draft_publication(g.user.id, question_id)
+        draft = await mentor_inbox.draft_publication(g.user.id, question_id, body.topic)
         return await mentor_inbox.confirm_publication(g.user.id, draft.id)
     return _mentor_question(async_runner.run(run()))
 

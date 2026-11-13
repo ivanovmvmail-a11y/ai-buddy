@@ -74,10 +74,12 @@ describe("«память»: вопрос наставнику", () => {
     fireEvent.change(within(inbox).getByRole("textbox", { name: "Ответ стажёру" }), { target: { value: "У наставника в канале" } });
     await act(async () => fireEvent.click(send));
     const answered = srv.calls.find((c) => c.path === "/mentor/questions/MQ-1/answer");
-    expect(answered?.body).toEqual({ text: "У наставника в канале", publish: true });
+    expect(answered?.body).toEqual({ text: "У наставника в канале", publish: true, topic: "Где пароль?" });
 
+    const later = within(inbox).getAllByRole("textbox", { name: /Тема в базе знаний/ });
+    fireEvent.change(later[later.length - 1], { target: { value: "Как называется чат стажёров" } });
     await act(async () => fireEvent.click(within(inbox).getByRole("button", { name: "Добавить ответ в базу знаний" })));
-    expect(srv.calls.some((c) => c.path === "/mentor/questions/MQ-2/publish")).toBe(true);
+    expect(srv.calls.find((c) => c.path === "/mentor/questions/MQ-2/publish")?.body).toEqual({ topic: "Как называется чат стажёров" });
   });
 
   it("стажёр видит ответ; у лида блока нет; уведомление ведёт в блок", async () => {

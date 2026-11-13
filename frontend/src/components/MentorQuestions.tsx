@@ -59,9 +59,10 @@ function Inbox({ actor }: { actor: DemoUser }) {
 function AnswerForm({ actor, q }: { actor: DemoUser; q: MentorQuestion }) {
   const [text, setText] = useState("");
   const [publish, setPublish] = useState(true);
+  const [topic, setTopic] = useState(q.question);
   const refresh = useRefresh();
   const answer = useMutation({
-    mutationFn: () => api.answerMentor(actor.id, q.id, text.trim(), publish),
+    mutationFn: () => api.answerMentor(actor.id, q.id, text.trim(), publish, publish ? topic.trim() || undefined : undefined),
     onSuccess: refresh,
   });
   const id = `answer-${q.id}`;
@@ -86,6 +87,7 @@ function AnswerForm({ actor, q }: { actor: DemoUser; q: MentorQuestion }) {
           <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} className="mt-0.5" />
           <span>Добавить ответ в базу знаний команды — имена и контакты бот уберёт сам</span>
         </label>
+        {publish && <TopicField id={`topic-${q.id}`} value={topic} onChange={setTopic} />}
         {answer.isError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{answer.error.message}</p>}
         <button
           type="submit"
@@ -99,12 +101,31 @@ function AnswerForm({ actor, q }: { actor: DemoUser; q: MentorQuestion }) {
   );
 }
 
+/** Тема в базе знаний: по ней другие стажёры найдут ответ, даже если он написан другими словами. Наставник видит
+ *  и может переписать то, что будет опубликовано; по умолчанию — вопрос стажёра (имена и контакты сервер уберёт). */
+function TopicField({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-0.5">
+      <label htmlFor={id} className="text-xs text-black/60 dark:text-white/60">Тема в базе знаний — по ней ответ найдут другие стажёры</label>
+      <input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        maxLength={200}
+        className="w-full rounded-lg border border-black/15 bg-white px-2.5 py-1 text-sm dark:border-white/20 dark:bg-white/5"
+      />
+    </div>
+  );
+}
+
 function PublishLater({ actor, q }: { actor: DemoUser; q: MentorQuestion }) {
+  const [topic, setTopic] = useState(q.question);
   const refresh = useRefresh();
-  const publish = useMutation({ mutationFn: () => api.publishMentor(actor.id, q.id), onSuccess: refresh });
+  const publish = useMutation({ mutationFn: () => api.publishMentor(actor.id, q.id, topic.trim() || undefined), onSuccess: refresh });
   return (
     <li className="text-sm">
       <p className="text-black/70 dark:text-white/70"><b>{q.intern_name}</b>: «{q.question}» — ответ дан</p>
+      <div className="mt-1"><TopicField id={`topic-later-${q.id}`} value={topic} onChange={setTopic} /></div>
       {publish.isError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{publish.error.message}</p>}
       <button
         onClick={() => publish.mutate()}
