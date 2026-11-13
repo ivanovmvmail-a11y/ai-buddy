@@ -8,7 +8,7 @@ from flask_cors import CORS
 from pydantic import BaseModel, Field, ValidationError
 
 from app import async_runner
-from app.agent import analytics, service
+from app.agent import analytics, explain, service
 from app.agent import history as chat_history
 from app.agent.actions import Action
 from app.agent.users import get_user
@@ -158,6 +158,15 @@ def create_app() -> Flask:
         limit = min(request.args.get("limit", type=int) or chat_history.HISTORY_LIMIT, chat_history.HISTORY_LIMIT)
         items = async_runner.run(chat_history.history.list(g.user.id, limit))
         return {"messages": [e.model_dump(mode="json", exclude={"user_id"}) for e in items]}
+
+    @app.get("/documents")
+    def get_document():
+        """Текст документа из «Источник» — только общий или своей команды (как поиск); чужой — 404."""
+        title = (request.args.get("title") or "")[:200]
+        doc = explain.view_document(title, g.user) if title.strip() else None
+        if doc is None:
+            return jsonify(detail="Документ не найден или недоступен"), 404
+        return doc
 
     @app.get("/actions")
     def list_actions():

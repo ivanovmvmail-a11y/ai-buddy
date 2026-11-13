@@ -159,6 +159,10 @@ export type ChatResponse = z.infer<typeof ChatResponse>;
 
 export const DocSource = z.object({ title: z.string(), url: z.string().nullable() });
 export type DocSource = z.infer<typeof DocSource>;
+
+/** GET /documents?title= — документ из «Источник» целиком (только общий или своей команды). */
+export const DocumentView = z.object({ title: z.string(), team: z.string().nullable(), content: z.string() });
+export type DocumentView = z.infer<typeof DocumentView>;
 /** Объяснение пункта без модели: текст из раздела документа пункта (аудит S1, S7); записано в события. */
 export const ExplainedResponse = z.object({
   answer_id: z.string(), text: z.string(), source: DocSource.nullable(), chips: z.array(z.string()),

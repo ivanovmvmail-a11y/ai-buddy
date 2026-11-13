@@ -122,7 +122,8 @@ describe("экран «план + чат» на API", () => {
     await waitFor(() => expect(screen.getByText(/сценарный режим/)).toBeTruthy());
     await click(within(row).getByRole("button", { name: "Объяснить" }));
     expect(await screen.findByText(/^Из документа:/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Первые дни стажёра" }).getAttribute("href")).toBe("https://example.org/doc");
+    // Источник — кнопка: документ открывается в окне приложения, а не по внешней ссылке (проверка 12.11).
+    expect(screen.getByRole("button", { name: "Первые дни стажёра" })).toBeTruthy();
 
     await click(screen.getByRole("button", { name: "Как это сделать по шагам?" }));
     expect(await screen.findByText(`По шагам: ${title}`)).toBeTruthy();

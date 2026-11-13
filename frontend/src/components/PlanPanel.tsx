@@ -9,6 +9,7 @@ import { useSession } from "@/lib/store";
 import { InternCards } from "./InternCards";
 import { ComparePlans, SkillSuggestions } from "./MentorTools";
 import { AbsenceRequests } from "./AbsencePanel";
+import { SourceLink } from "./SourceViewer";
 import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
@@ -405,9 +406,7 @@ function PracticeForm({ actor, item, onClose }: { actor: DemoUser; item: PlanIte
           {result.source && (
             <p className="mt-1 text-xs opacity-75">
               Документ:{" "}
-              {result.source.url ? (
-                <a href={result.source.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">{result.source.title}</a>
-              ) : result.source.title}
+              <SourceLink actor={actor} title={result.source.title} />
             </p>
           )}
         </div>
