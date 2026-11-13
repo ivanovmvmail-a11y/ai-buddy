@@ -27,11 +27,14 @@ EXPLAIN_WORDS = ("объясни", "поясни", "расскажи про пу
 PRACTICE_WORDS = ("сдать задани", "сдам задани", "сдаю задани", "проверь задани", "проверь мое задани",
                   "проверь моё задани", "сдать практикум", "сдам практикум", "проверь практикум", "сдать практику",
                   "сдать домашк", "проверь домашк", "задание выполнил", "задание сделал", "выполнил задание",
-                  "сделал задание", "выполнила задание", "сделала задание", "задание выполнила", "задание сделала")
+                  "сделал задание", "выполнила задание", "сделала задание", "задание выполнила", "задание сделала",
+                  # свежий набор 14.11: «я сделала практикум по гиту, хочу отчитаться»
+                  "отчитат", "сделала практикум", "сделал практикум")
 WORKING = ("week1", "week2")
 # «Что делать по git?», «с чего начать с SQL» — просьба о шаге в теме карты навыков.
-TOPIC_ASK = ("что мне делать", "что делать по", "что делать с", "с чего начать", "что дальше по", "как начать",
-             "что мне по", "что по ")
+TOPIC_ASK = re.compile(r"что (мне )?делать|с чего (мне )?(начать|начинать)|что дальше по|как (мне )?начать|что (мне )?по |"
+                       r"за что (браться|хвата)")
+SITUATION = re.compile(r"делать,?\s+(если|когда|пока|при|после)\b|если\s|упал|красн|конфликт|ошибк")
 
 
 @dataclass
@@ -75,15 +78,17 @@ async def item_reply(question: str, user: User) -> ItemReply | None:
     explain = any(w in q for w in EXPLAIN_WORDS)
     # «Что мне делать по git?» — если в плане есть открытый пункт этой темы (практикум), объясняем его, как кнопка
     # (Миша 14.11: бот отвечал сводкой плана «следующий шаг — базовые доступы»). Пункта нет — обычный ответ по документам.
-    topic = topic_of(question) if any(w in colloquial(q) for w in TOPIC_ASK) else None
+    asks = colloquial(q)
+    # «Что делать, если пайплайн красный?» — ситуация из документа, а не «что делать по теме» (тест страховки 12.11).
+    topic = topic_of(question) if TOPIC_ASK.search(asks) and not SITUATION.search(asks) else None
     if user.role.value != "intern" or not (practice or explain or topic):
         return None
     plan = await services.get_plan(user, user.id)
     items = [i for i in plan.items if i.stage in WORKING]
     if topic and not (practice or explain):
-        # Сначала персональный пункт темы (практикум «для тебя»), потом общий.
-        open_items = sorted((i for i in items if i.topic == topic and i.status != "done"), key=lambda i: i.kind != "personal")
-        item = open_items[0] if open_items else None
+        # Только персональный пункт темы (практикум «для тебя»). Общий пункт с той же темой («Открыть пространство…»)
+        # про другое — тогда ответ по документам темы (свежий набор 14.11: Кириллу на «что делать по git» — про доступ).
+        item = next((i for i in items if i.topic == topic and i.kind == "personal" and i.status != "done"), None)
         if item is None:
             return None
         body = await explain_item(user, user.id, item.id, "explain")
