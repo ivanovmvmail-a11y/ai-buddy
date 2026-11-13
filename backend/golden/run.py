@@ -276,8 +276,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Золотой набор AI-buddy")
     parser.add_argument("--provider", default="scenario", help="scenario | gigachat | openai")
     parser.add_argument("--out", type=Path, help="куда записать отчёт markdown")
+    # Эксперимент 14.11: другой набор вопросов (свежие, которых правила не видели) и намерение по модели.
+    parser.add_argument("--cases", type=Path, help="файл вопросов вместо golden/cases.json (например golden/fresh.json)")
+    parser.add_argument("--intent-router", default="", help="model — намерение стажёра определяет модель")
     args = parser.parse_args(argv)
-    results = run_cases(args.provider)
+    settings.intent_router = args.intent_router
+    cases = json.loads(args.cases.read_text(encoding="utf-8")) if args.cases else None
+    results = run_cases(args.provider, cases)
     text = report(results, args.provider)
     if args.out:
         args.out.write_text(text, encoding="utf-8")

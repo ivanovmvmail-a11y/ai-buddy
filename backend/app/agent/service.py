@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from pydantic import ValidationError
 
+from app.config import settings
 from app.llm import Message, get_llm
 from app.llm.base import ToolCall
 from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WORDS, HR_ONLY, RANKING_WORDS, asks_next,
@@ -22,6 +23,7 @@ from app.rag import retrieve
 from .actions import Action, ActionStore, InMemoryActionStore
 from .chat_items import item_reply, one_click_allowed
 from .demo_tools import register_demo_tools
+from .intent import route
 from .levels import hint as level_hint
 from .levels import level_for
 from .levels import opening as level_opening
@@ -164,8 +166,16 @@ class Agent:
         # «Привет» посреди разговора GigaChat продолжил прошлую тему и смешал два документа).
         if (talk := small_talk_reply(question, system)) is not None:
             return AgentResult(reply=talk)
+        # Эксперимент 14.11 (app/agent/intent.py): намерение определяет модель, сервер выполняет готовыми обработчиками.
+        # command — формулировка для обработчиков; rules=False — вопрос по документам: правила действий и плана не
+        # перехватывают его (как «что мне делать по git» → сводка плана). Сбой или без ключа — прежний путь по словам.
+        command, rules = question, True
+        if (settings.intent_router == "model" and user.role.value == "intern"
+                and getattr(get_llm(), "name", "") not in ("scenario", "echo")
+                and (routed := await route(get_llm(), question)) is not None):
+            command, rules = routed.command, routed.rules
         # «Объясни пункт про песочницу», «хочу сдать задание по гиту» — как кнопки плана, но из чата (чекпоинт 2).
-        if (about := await item_reply(question, user)) is not None:
+        if rules and (about := await item_reply(command, user)) is not None:
             return AgentResult(reply=about.reply, sources=about.sources or [], item_id=about.item_id or None,
                                mode=about.mode, tools=["get_plan"], topic="study")
         # Разговорные слова («запулить», «пул реквест», «CI») дополняем словами документов — поиск их найдёт.
@@ -190,7 +200,8 @@ class Agent:
 
         # Две просьбы в одной фразе: модель выполняет первую, про вторую честно говорим сами (не теряем молча).
         first, second = split_actions(question)
-        if (ruled := await self._product_rules(first, system, available, user)) is not None:
+        rule_first = first if command == question else split_actions(command)[0]
+        if rules and (ruled := await self._product_rules(rule_first, system, available, user)) is not None:
             if second:
                 ruled.reply += second_note(second)
             ruled.sources = cited_sources(ruled.reply, docs, question, short=False)
@@ -206,9 +217,9 @@ class Agent:
         # «Как получить доступ к джире?» с названным ресурсом — заявку готовит сервер, как без ключа: каталог → черновик
         # (проверка 13.11 «глазами эксперта»: GigaChat вместо черновика писал «создай заявку в Jira, согласует
         # наставник», а без ключа на тот же вопрос был черновик с автоматической выдачей — режимы противоречили).
-        low = first.lower()
+        low = rule_first.lower()
         asks_access = "доступ" in low or bool(re.match(r"\s*(открой|дай|выдай|оформи|запроси)", low))
-        if (user.role.value == "intern" and asks_access and _resource_named(low)
+        if (rules and user.role.value == "intern" and asks_access and _resource_named(low)
                 and {"list_access_resources", "create_access_request"} <= available):
             llm = ScenarioProvider()
 
