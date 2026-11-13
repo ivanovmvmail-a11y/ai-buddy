@@ -2,8 +2,8 @@
 
 Стажёр пишет ответ на «задание на практике» пункта плана — сервер сверяет его с ключевыми фактами из учебного
 документа пункта. Без модели: одинаково с ключом и без. Это проверка задания, а не оценка человека: уровень по-прежнему
-меняет только наставник; засчитанное задание лишь подсказывает стажёру закрыть пункт («Готово»), а закрытые пункты темы
-уже ведут к предложению наставнику (спека 202).
+меняет только наставник; засчитанное задание подсказывает стажёру закрыть пункт («Готово») и становится основанием предложения
+наставнику поднять уровень (спека 202, проверка 13.11): наставник видит, что именно засчитано.
 
 Задания привязаны к тексту `practice` из seed (зона Codex): тест проверяет, что каждый ключ ниже в seed есть.
 """
@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 
 from app.agent.users import Role, User
-from app.mcp_server import checklist
+from app.mcp_server import checklist, hiring
 from app.mcp_server.errors import NotFound
 
 from .explain import load_doc
@@ -85,8 +85,11 @@ async def submit(actor: User, item_id: str, answer: str) -> dict:
     result["source"] = {"title": doc.title, "url": doc.url} if doc else None
     result["item_id"], result["topic"] = item.id, item.topic
     if result["passed"]:
+        # Засчитанное задание — основание для наставника поднять уровень (сам бот уровень не меняет).
+        await hiring.note_practice_passed(actor, item.id, result["found"])
         result["text"] = ("Задание выполнено: " + ", ".join(result["found"]) + ". "
-                          + ("Можно отметить пункт «Готово»." if item.status != "done" else ""))
+                          + ("Можно отметить пункт «Готово». " if item.status != "done" else "")
+                          + "Наставник увидит, что задание сдано, — это повод поднять уровень по теме (решает он).")
     else:
         hints = " ".join(h[:1].upper() + h[1:] for h in result["missing"])
         result["text"] = f"Почти. Подумай: {hints} Подсказка — в документе пункта."

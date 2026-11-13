@@ -75,7 +75,7 @@ def _set_level(data, actor, profile, topic, level, *, accepted_suggestion_id=Non
 SUGGESTION_THRESHOLD = 2
 
 
-def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None):
+def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None, practice_item=None, practice_basis=None):
     profile = data.profiles.get(intern_id)
     if not data._suggestions_available or profile is None or not topic:
         return
@@ -90,14 +90,15 @@ def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None)
         return
     closed = [item.id for item in data.items.values() if item.intern_id == intern_id
               and item.topic == topic and item.owner_role == "intern" and item.status == "done"]
-    if known_item is None and len(closed) < SUGGESTION_THRESHOLD:
+    if known_item is None and practice_item is None and len(closed) < SUGGESTION_THRESHOLD:
         return
-    trigger = f"known:{known_item}" if known_item else f"done:{closed_item}"
+    trigger = (f"known:{known_item}" if known_item else
+               f"practice:{practice_item}" if practice_item else f"done:{closed_item}")
     previous = [s for s in data.suggestions.values() if s.intern_id == intern_id and s.topic == topic]
     if any(trigger in s.evidence for s in previous):
         return
     evidence = [f"done:{id}" for id in sorted(closed)]
-    if known_item:
+    if known_item or practice_item:
         evidence.append(trigger)
     pending = next((s for s in previous if s.status == "pending"), None)
     if pending:
@@ -106,7 +107,8 @@ def _maybe_suggest(data, intern_id, topic, *, known_item=None, closed_item=None)
     title = _topic_title(data, topic, target.team)
     suggestion = SkillSuggestion(id=f"SUG-{uuid4().hex}", intern_id=intern_id, mentor_id=mentor.id,
         topic=topic, from_level=level, to_level="familiar" if level == "novice" else "confident",
-        basis='отмечено «это я уже знаю»' if known_item else _closed_basis(len(closed), title),
+        basis=('отмечено «это я уже знаю»' if known_item else practice_basis if practice_item
+               else _closed_basis(len(closed), title)),
         evidence=evidence, created_day=data.interns[intern_id].current_day)
     data.suggestions[suggestion.id] = suggestion
     events._record(data, SYSTEM_ACTOR, "skill_suggestion_created", {
@@ -213,3 +215,19 @@ async def mark_known(actor: User, item_id: str, known: bool = True) -> PlanItem:
             if known:
                 _maybe_suggest(data, item.intern_id, item.topic, known_item=item.id)
         return item_view(data, item)
+
+
+async def note_practice_passed(actor: User, item_id: str, found: list[str]) -> None:
+    """Стажёр сдал практическое задание пункта (спека 107, проверка 13.11): наставник видит это основанием
+    предложения поднять уровень — что именно засчитано. Уровень по-прежнему меняет только наставник."""
+    known_actor(actor)
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
+        item = data.items.get(item_id)
+        if item is None or actor.role != Role.INTERN or item.intern_id != actor.id or item.owner_role != "intern":
+            raise NotFound()
+        require_intern(data, actor, item.intern_id, private=True)
+        if not item.topic:
+            return
+        events._record(data, actor, "practice_passed", {"intern_id": item.intern_id, "item_id": item.id})
+        basis = "сдано практическое задание" + (": " + ", ".join(found) if found else "")
+        _maybe_suggest(data, item.intern_id, item.topic, practice_item=item.id, practice_basis=basis[:200])
