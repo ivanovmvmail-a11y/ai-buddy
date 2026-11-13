@@ -16,7 +16,15 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        {/* Выбранная тема — до первой отрисовки, без вспышки светлой страницы. Без хранилища — тема системы. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("ai-buddy-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <Providers>{children}</Providers>
         {process.env.NODE_ENV === "development" && <Agentation endpoint="http://localhost:4747" />}

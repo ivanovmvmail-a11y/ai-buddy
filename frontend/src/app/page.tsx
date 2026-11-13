@@ -8,6 +8,7 @@ import { HomePanel } from "@/components/HomePanel";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { SECTIONS, Sidebar, type Section } from "@/components/Sidebar";
 import { ReminderBell } from "@/components/ReminderBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
   absenceNudgeMsg, accessDraftParams, explainScripted, finishedWeek, followupsFor, greeting, itemActions, msgId, reminderMsg,
@@ -393,7 +394,8 @@ export default function Home() {
           <span className="truncate text-base font-semibold lg:text-lg">
             {actor.role === "intern" ? SECTIONS[section] : "План стажёров"}
           </span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
             <ReminderBell actor={actor} onOpen={openReminder} />
           </div>
         </header>

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Тема: по умолчанию — как в системе; кнопка в шапке ставит data-theme="light|dark" на <html> (Миша, 13.11).
+   Вариант dark: Tailwind срабатывает и от системы (если тему не выбрали руками), и от выбора. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
 /* Палитра Авито (организаторы разрешили; цвета сняты с career.avito.com): белые карточки на светло-сером, чёрный
    текст, акценты — цвета точек логотипа. Смыслы цветов: голубой — действие, зелёный — сделано, фиолетовый — «для
    тебя», красный — срок прошёл. Раскладка — по мотивам онбординга Т-Банка: колонка навигации слева (светлая, как career.avito.com). */
@@ -36,7 +49,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --background: #0b0b0b;
     --foreground: #f2f2f2;
     --surface: #171717;
@@ -47,11 +60,27 @@
     --sidebar: #141414;
   }
 }
+:root[data-theme="dark"] {
+  --background: #0b0b0b;
+  --foreground: #f2f2f2;
+  --surface: #171717;
+  --surface-2: #222222;
+  --muted: rgb(255 255 255 / 0.6);
+  --line: rgb(255 255 255 / 0.1);
+  --accent-ink: #5cc8ff;
+  --sidebar: #141414;
+}
 
 /* Полосы прокрутки (Миша, 13.11: белая полоса в тёмной теме бросалась в глаза): браузер знает тему страницы,
    полоса тонкая и в цвет интерфейса, без собственного фона. */
 :root {
   color-scheme: light dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 * {
   scrollbar-width: thin;

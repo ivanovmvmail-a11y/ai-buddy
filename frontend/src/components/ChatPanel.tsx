@@ -37,6 +37,12 @@ export async function askBot(actor: DemoUser, text: string) {
     // Ответ о заявке или о задании — во вкладку своей темы, вместе с вопросом (у стажёра; у остальных одна лента).
     if (actor.role === "intern" && res.topic !== topic) {
       chat.update(asked, { topic: res.topic });
+      // След в исходной вкладке: видно, куда ушёл вопрос (Миша, 13.11: переброс был незаметен).
+      const where = TOPICS.find((t) => t.id === res.topic)?.title ?? "";
+      chat.push({
+        id: msgId(), role: "assistant", kind: "text", scripted: true, topic, label: "переход между вкладками",
+        content: `↪ «${text.trim()}» — это про другое, перенёс во вкладку «${where}». Ответ там.`,
+      });
       chat.setTab(res.topic);
     }
     // Ответ о пункте плана — с кнопками этого пункта, как в плане (чекпоинт 2).

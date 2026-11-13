@@ -62,3 +62,17 @@ describe("«Главная» стажёра", () => {
     expect(srv.calls.length).toBeGreaterThan(0);
   });
 });
+
+describe("переключатель темы", () => {
+  it("переключает и запоминает тему", async () => {
+    open();
+    const btn = await screen.findByRole("button", { name: /тема$/ });
+    const before = btn.getAttribute("aria-label");
+    await act(async () => fireEvent.click(btn));
+    const theme = document.documentElement.dataset.theme;
+    expect(theme === "dark" || theme === "light").toBe(true);
+    expect(localStorage.getItem("ai-buddy-theme")).toBe(theme);
+    expect(screen.getByRole("button", { name: /тема$/ }).getAttribute("aria-label")).not.toBe(before);
+    delete document.documentElement.dataset.theme;
+  });
+});

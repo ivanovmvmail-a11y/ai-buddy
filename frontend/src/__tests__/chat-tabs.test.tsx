@@ -85,3 +85,16 @@ describe("вкладки чата стажёра", () => {
     expect(screen.queryByRole("tab", { name: /^Учёба/ })).toBeNull();
   });
 });
+
+describe("переброс между вкладками", () => {
+  it("в исходной вкладке остаётся след «перенёс во вкладку …»", async () => {
+    srv.chatReplies.push({ reply: "Подготовил черновик заявления.", topic: "requests" });
+    open();
+    await screen.findByText(/2-й день стажировки/);
+    await act(async () => fireEvent.click(tab("Учёба")));
+    await ask("мне завтра к врачу");
+    expect(tab("Заявки").getAttribute("aria-selected")).toBe("true");
+    await act(async () => fireEvent.click(tab("Учёба")));
+    expect(screen.getByText(/«мне завтра к врачу» — это про другое, перенёс во вкладку «Заявки»/)).toBeTruthy();
+  });
+});

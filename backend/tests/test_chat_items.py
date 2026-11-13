@@ -97,3 +97,14 @@ def test_answer_goes_to_its_chat_tab(client, use_llm, text, topic):
     from .conftest import text_reply
     use_llm(text_reply("Заявок пока нет."))  # «мои заявки» с ключом отвечает модель
     assert chat(client, text)["topic"] == topic
+
+
+@pytest.mark.parametrize(("text", "topic"), [
+    ("как выполнить задание по CI?", "study"),
+    ("что делать с пунктом про конспект встреч", "study"),
+    ("где взять рабочий ноутбук?", "assistant"),
+])
+def test_study_questions_go_to_study_tab(client, use_llm, text, topic):
+    from .conftest import text_reply
+    use_llm(text_reply("Ответ по документу."))
+    assert chat(client, text)["topic"] == topic
