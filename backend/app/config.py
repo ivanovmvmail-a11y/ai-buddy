@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.
     demo_key: str = ""
 
+    # Интеграции с системами Авито (app/integrations.py, docs/INTEGRATION.md). Пусто — вход выключен.
+    integration_token: str = ""  # ключ службы для POST /integrations/hired (система найма)
+    mattermost_token: str = ""  # токен исходящего вебхука / slash-команды Mattermost
+    mattermost_users: str = ""  # логин Mattermost=id в AI-buddy через запятую; пусто — логин совпадает с id
+
     # CORS: адреса фронтенда через запятую
     frontend_origins: str = "http://localhost:3000"
 

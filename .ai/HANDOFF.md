@@ -454,3 +454,6 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 - `app/mcp_server/clock.py::_custom_text(text, female)` — «Ты просила/просил напомнить…» вместо «Ты просил(а)»; тесты `test_custom_reminder*.py` под Аню.
 - `app/mcp_server/postgres.py` — в сообщение «примените новые миграции» добавлено, что в Docker это `docker compose down -v` (старый том базы создан до новых таблиц).
 - `app/mcp_server/seed/mentor_inbox.json` — из текста вопросов и ответов убрана приписка «Демо-данные, не регламент Авито.», «Используйте» → «Используй» (стажёр видит это в «Мои вопросы наставнику»). Пометку в `summary` пунктов плана НЕ трогал — её требует `test_checklist`; из текста «Объяснить» её убирает `explain._clean`.
+
+### 2026-11-13 · от Claude → Codex (внедряемость)
+С согласия Миши добавлена функция в твоей зоне: `app/mcp_server/hiring.py::apply_hiring_profile` — карта навыков из системы найма (SYSTEM_ACTOR), пересборка персональных пунктов через `checklist._rebuild_personal`, уведомление kind `skill_changed`. Вызывает `app/integrations.py` (`POST /integrations/hired`). Тесты — `tests/test_integrations.py`.

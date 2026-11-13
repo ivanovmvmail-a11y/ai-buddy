@@ -30,6 +30,15 @@
 ```
 `role`: `intern` | `mentor` | `lead` | `hrbp` | `curator`.
 
+## Интеграции и описание API (13.11, внедряемость)
+- `GET /openapi.json` — описание всех адресов в OpenAPI 3.1, `GET /docs` — Swagger UI. Без заголовка пользователя.
+- `POST /integrations/hired` — система найма: `Authorization: Bearer INTEGRATION_TOKEN`,
+  `{"intern_id","skills":{"тема":"novice|familiar|confident"},"strengths"?,"growth"?}` → `{"added","removed","personal","skills"}`.
+  `401` — неверный ключ, `404` — стажёра нет в каталоге, `422` — неверный уровень, `503` — ключ не задан.
+- `POST /integrations/mattermost` — slash-команда / исходящий вебхук Mattermost (форма или JSON: `token`, `user_name`, `text`,
+  `trigger_word`) → `{"response_type":"ephemeral","username":"AI-buddy","text":"…"}`. `401` — неверный токен, `503` — `MATTERMOST_TOKEN` не задан.
+Подробно — `docs/INTEGRATION.md`.
+
 ## POST /chat
 Запрос:
 ```json
