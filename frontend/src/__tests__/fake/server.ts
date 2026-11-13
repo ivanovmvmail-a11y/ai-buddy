@@ -87,7 +87,7 @@ export type FakeServer = {
   state: DemoState;
   actions: Action[];
   provider: string;
-  chatReplies: Array<{ reply: string; actions?: Action[]; answerId?: string; itemId?: string; mode?: "practice" } | "fail" | "502">;
+  chatReplies: Array<{ reply: string; actions?: Action[]; answerId?: string; itemId?: string; mode?: "practice"; topic?: "assistant" | "study" | "requests" } | "fail" | "502">;
   calls: Array<{ method: string; path: string; user: string; body: unknown }>;
   feedback: Array<{ answer_id: string; useful: boolean }>;
   explainFails?: boolean;
@@ -427,6 +427,7 @@ export function installFakeServer(): FakeServer {
       return ok({
         answer_id: next.answerId ?? "ans_1", reply: next.reply, sources: [{ title: "Первые дни", url: null }], actions: next.actions ?? [],
         item_id: next.itemId ?? null, mode: next.mode ?? null,
+        topic: next.topic ?? (next.actions?.length ? "requests" : "assistant"),
       });
     }
     return err(404, "Нет такого адреса");

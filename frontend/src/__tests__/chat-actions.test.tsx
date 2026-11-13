@@ -42,9 +42,10 @@ describe("кнопки пункта плана в чате", () => {
   });
 
   it("«хочу сдать задание» в чате → следующий ответ уходит на проверку задания", async () => {
-    srv.chatReplies.push({ reply: "Задание по пункту «Практикум: ветки и pull request»: …", itemId: "anya.p.git", mode: "practice" });
+    srv.chatReplies.push({ reply: "Задание по пункту «Практикум: ветки и pull request»: …", itemId: "anya.p.git", mode: "practice", topic: "study" });
     open();
     await ask("хочу сдать задание по гиту");
+    expect(screen.getByRole("tab", { name: "Учёба", selected: true })).toBeTruthy(); // ответ ушёл во вкладку «Учёба»
     expect(await screen.findByRole("textbox", { name: "Ответ на задание" })).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Ответ на задание" }), {
       target: { value: "создала ветку, сделала коммит, открыла PR" },

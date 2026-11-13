@@ -82,3 +82,18 @@ def test_without_quick_flag_everything_is_a_draft(client):
         "resource_id": "jira", "level": "read", "justification": "Для учебных задач стажировки"}},
         headers=as_user("intern-anya"))
     assert res.get_json()["status"] == "pending"
+
+
+@pytest.mark.parametrize(("text", "topic"), [
+    ("мне завтра к врачу", "requests"),
+    ("объясни пункт про песочницу", "study"),
+    ("хочу сдать задание по гиту", "study"),
+    ("что мне делать дальше?", "assistant"),
+    ("Привет", "assistant"),
+    ("мои заявки", "requests"),
+])
+def test_answer_goes_to_its_chat_tab(client, use_llm, text, topic):
+    """Чекпоинт 2: «разделите чаты» — сервер говорит, в какую вкладку ответ."""
+    from .conftest import text_reply
+    use_llm(text_reply("Заявок пока нет."))  # «мои заявки» с ключом отвечает модель
+    assert chat(client, text)["topic"] == topic

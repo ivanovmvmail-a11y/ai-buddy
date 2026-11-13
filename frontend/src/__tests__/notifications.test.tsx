@@ -20,6 +20,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Вкладка чата стажёра (чекпоинт 2: чаты разделены по темам). */
+async function chatTab(name: string) {
+  await act(async () => fireEvent.click(await screen.findByRole("tab", { name: new RegExp(`^${name}`) })));
+}
+
 function open(userId: string) {
   useSession.setState({ userId, internPick: null });
   render(<Providers><Home /></Providers>);
@@ -120,6 +125,7 @@ describe("колокольчик и сообщения бота (SPEC 3.6)", () 
       absence_request_id: "ABS-1", text: "Заявка на отгул ждёт решения 2 дня — напомнить руководителю?",
     }));
     open("intern-anya");
+    await chatTab("Заявки");
     const msg = (await screen.findByText(/Заявка на отгул ждёт решения 2 дня/)).closest("div")!.parentElement!;
     await act(async () => fireEvent.click(within(msg).getByRole("button", { name: "Написать руководителю" })));
     expect(await screen.findByText(/Черновик сообщения руководителю \(Ольга Новикова\)/)).toBeTruthy();

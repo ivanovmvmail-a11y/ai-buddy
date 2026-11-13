@@ -158,6 +158,7 @@ export const ChatResponse = z.object({
   // Чекпоинт 2: ответ о пункте плана — чат покажет кнопки пункта; "practice" — следующее сообщение = ответ на задание.
   item_id: z.string().nullable().optional(),
   mode: z.enum(["practice"]).nullable().optional(),
+  topic: z.enum(["assistant", "study", "requests"]).default("assistant"), // вкладка чата
 });
 export type ChatResponse = z.infer<typeof ChatResponse>;
 
