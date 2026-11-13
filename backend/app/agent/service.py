@@ -311,7 +311,7 @@ class Agent:
             return AgentResult(reply=absence_rule(system) + "Если нужен отгул — напиши, на какой день (например, "
                                "«отгул на завтра»), подготовлю черновик заявления.")
         if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
-                and not any(w in q for w in HR_ONLY) and not is_reminder_request(question) and (today := _today(system))):
+                and (not any(w in q for w in HR_ONLY) or not is_hr_question(q)) and not is_reminder_request(question) and (today := _today(system))):
             day, note = absence_plan(q, today)
             if note:
                 return AgentResult(reply=note)

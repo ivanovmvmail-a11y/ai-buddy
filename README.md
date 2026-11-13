@@ -208,6 +208,7 @@ cd backend && uv run --extra mcp python -m app.mcp_server.server --user intern-a
 - Тесты backend: `cd backend && uv run --extra mcp pytest --cov=app --cov-report=term-missing`
 - Тесты frontend с покрытием: `cd frontend && npm run test:cov` (порог — 80% строк)
 - Золотой набор (132 контрольных вопроса: основные, «живые» формулировки из проверок 12–13.11 и разговорные сообщения — опечатки, разговорные слова, чужие данные, даты отгула, попытки «взлома»; метрики качества): `cd backend && uv run python -m golden.run` — отчёты [сценарный режим](docs/golden-report.md), [GigaChat](docs/golden-report-gigachat.md)
+- Свежий набор (36 новых формулировок, которых правила не видели при настройке, 14.11): `cd backend && uv run python -m golden.run --cases golden/fresh.json` — проверка «на новых вопросах»: без ключа 36/36, GigaChat 35/36
 
 ## Облако (бонус): всё на Railway
 - **Сайт:** https://ai-buddy-site-production.up.railway.app
