@@ -14,7 +14,8 @@ import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
 const STATUS: Record<ItemStatus, { label: string; cls: string }> = {
-  not_started: { label: "не начат", cls: "bg-surface-2 text-[var(--muted)]" },
+  // Миша, 14.11: «не начат» сливался с карточкой (surface-2 почти как фон карточки) — нейтральная, но видимая плашка.
+  not_started: { label: "не начат", cls: "bg-foreground/10 text-foreground/80" },
   in_progress: { label: "в работе", cls: "bg-accent/15 text-accent-ink" },
   waiting: { label: "ждёт другого человека", cls: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
   done: { label: "сделано", cls: "bg-brand-green/20 text-emerald-800 dark:text-emerald-300" },
@@ -233,14 +234,15 @@ function PlanRow({
           {isNext && <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent-ink">Следующий шаг</div>}
           <div className={`text-[15px] font-semibold leading-snug ${done ? "text-[var(--muted)] line-through decoration-1" : ""}`}>{item.title}</div>
           {working && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+            // Подписи — не кнопки: без рамок и подчёркиваний, но крупнее и контрастнее, чем было (text-xs + muted терялись).
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px] leading-5">
               <span className={`rounded-full px-2 py-0.5 font-medium ${st.cls}`}>{st.label}</span>
               {personal ? (
                 <span className="rounded-full bg-brand-violet/15 px-2 py-0.5 font-medium text-violet-700 dark:text-violet-300">
                   {self ? "для тебя" : "персональный"}
                 </span>
               ) : (
-                <span className="text-[var(--muted)]">для всех</span>
+                <span className="text-foreground/75">для всех</span>
               )}
               {short && (
                 <span className="rounded-full bg-brand-green/20 px-2 py-0.5 text-emerald-800 dark:text-emerald-300">{self ? "ты это умеешь — коротко" : "умеет — коротко"}</span>
@@ -248,7 +250,7 @@ function PlanRow({
               {item.overdue && item.status !== "waiting" && !done && (
                 <span className="rounded-full bg-brand-red/15 px-2 py-0.5 font-medium text-red-700 dark:text-red-300">срок прошёл</span>
               )}
-              <span className="text-[var(--muted)]">
+              <span className="text-foreground/75">
                 · {OWNER[item.owner_role]}
                 {item.due_day ? ` · до дня ${item.due_day}` : ""}
                 {hint ? ` · ${hint}` : ""}
