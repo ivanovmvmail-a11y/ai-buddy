@@ -225,7 +225,7 @@ function PlanRow({
           ? "border border-dashed border-line text-[var(--muted)]"
           : isNext
             ? "card shadow-[0_0_0_2px_var(--accent)]"
-            : done ? "bg-surface/60" : "card"
+            : done ? "border border-line opacity-55 transition-opacity hover:opacity-90" : "card"
       }`}
     >
       <div className="flex items-start gap-3">
