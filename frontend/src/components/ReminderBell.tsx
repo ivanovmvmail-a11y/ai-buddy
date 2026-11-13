@@ -72,7 +72,7 @@ export function ReminderBell({ actor, onOpen }: Props) {
                   <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <button
                       onClick={() => { setOpen(false); onOpen(r); }}
-                      className="rounded-full bg-[#00aaff] px-2.5 py-1 text-white"
+                      className="rounded-full bg-accent px-3 py-1 font-semibold text-black"
                     >
                       {actionLabel(r)}
                     </button>

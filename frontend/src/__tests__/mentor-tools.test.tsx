@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 function open(userId: string) {
-  useSession.setState({ userId, internPick: null });
+  useSession.setState({ userId, internPick: null , section: "plan" });
   render(<Providers><Home /></Providers>);
 }
 

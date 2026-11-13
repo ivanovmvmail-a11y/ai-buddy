@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 function open(userId: string) {
-  useSession.setState({ userId, internPick: null });
+  useSession.setState({ userId, internPick: null, section: userId.startsWith("intern") ? "home" : "plan" }); // стажёру блоки — на «Главной»
   render(<Providers><Home /></Providers>);
 }
 

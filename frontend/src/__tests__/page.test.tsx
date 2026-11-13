@@ -10,7 +10,7 @@ let srv: FakeServer;
 
 beforeEach(() => {
   srv = installFakeServer();
-  useSession.setState({ userId: "intern-anya", internPick: null });
+  useSession.setState({ userId: "intern-anya", internPick: null , section: "plan" });
   useChat.getState().reset([]);
   // Node 24 подставляет свой пустой localStorage поверх jsdom — даём тестам честное хранилище в памяти
   const data = new Map<string, string>();
@@ -32,7 +32,7 @@ async function chatTab(name: string) {
 }
 
 function open(userId = "intern-anya") {
-  useSession.setState({ userId, internPick: null });
+  useSession.setState({ userId, internPick: null , section: "plan" });
   return render(
     <Providers>
       <Home />

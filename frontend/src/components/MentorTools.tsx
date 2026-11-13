@@ -21,7 +21,7 @@ export function SkillSuggestions({ actor }: { actor: DemoUser }) {
   if (!pending.length) return null;
 
   return (
-    <section aria-label="Предложения бота" className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3">
+    <section aria-label="Предложения бота" className="card p-4 sm:p-5 shadow-[inset_4px_0_0_var(--brand-violet),0_0_0_1px_var(--line)]">
       <h3 className="text-sm font-semibold">Бот предлагает поднять уровень</h3>
       <p className="mb-2 text-xs text-black/50 dark:text-white/50">Решаешь ты. Стажёр увидит только результат, отказ ему не показывается.</p>
       {decide.isError && <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">{decide.error.message}</p>}
@@ -36,14 +36,14 @@ export function SkillSuggestions({ actor }: { actor: DemoUser }) {
               <button
                 disabled={decide.isPending}
                 onClick={() => decide.mutate({ id: s.id, accept: true })}
-                className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white disabled:opacity-50"
+                className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50"
               >
                 Поднять уровень
               </button>
               <button
                 disabled={decide.isPending}
                 onClick={() => decide.mutate({ id: s.id, accept: false })}
-                className="rounded-lg border border-black/15 px-2.5 py-1 disabled:opacity-50 dark:border-white/20"
+                className="rounded-full border border-line px-3 py-1 disabled:opacity-50 dark:border-white/20"
               >
                 Оставить
               </button>
@@ -85,7 +85,7 @@ export function ComparePlans({ actor }: { actor: DemoUser }) {
   const personalRows = Math.max(0, ...cols.map((i) => data?.personal[i.id]?.length ?? 0));
 
   return (
-    <section aria-label="Сравнение планов" className="rounded-xl border border-black/10 p-3 text-sm dark:border-white/10">
+    <section aria-label="Сравнение планов" className="card p-4 sm:p-5 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-semibold">
           Сравнить планы: {first(interns[0].name)} и {first(interns[1].name)}

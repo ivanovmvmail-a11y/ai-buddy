@@ -4,8 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
+import { HomePanel } from "@/components/HomePanel";
 import { ProfilePanel } from "@/components/ProfilePanel";
+import { SECTIONS, Sidebar, type Section } from "@/components/Sidebar";
 import { ReminderBell } from "@/components/ReminderBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
   absenceNudgeMsg, accessDraftParams, explainScripted, finishedWeek, followupsFor, greeting, itemActions, msgId, reminderMsg,
@@ -16,7 +19,7 @@ import { doneOnOpen, kindOf, sectionFor, targetOf } from "@/lib/notifications";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { savedUserId, useSession } from "@/lib/store";
 import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
-import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
+import { findUser } from "@/lib/users";
 
 const DEMO_KEY_STORAGE = "ai-buddy-demo-key";
 const EXPLAIN_LABEL = "по документу пункта · глубина по карте навыков";
@@ -58,7 +61,11 @@ export default function Home() {
   const pickIntern = useSession((s) => s.pickIntern);
   const actor = findUser(userId)!;
   const [tab, setTab] = useState<"plan" | "chat">("plan");
-  const [view, setView] = useState<"plan" | "profile">("plan"); // левая колонка стажёра: план или «Мой профиль»
+  // Раздел в центре (редизайн 13.11): у стажёра «Главная» из карточек, «Мой план», «Мой профиль»; у остальных — план.
+  const view = useSession((s) => s.section);
+  const setView = useSession((s) => s.setSection);
+  const [menuOpen, setMenuOpen] = useState(false); // телефон: левая колонка выезжает по кнопке ☰
+  const section: Section = actor.role === "intern" ? view : "plan";
   const client = useQueryClient();
   const refresh = useRefresh();
   const health = useHealth(userId);
@@ -308,7 +315,7 @@ export default function Home() {
     const section = sectionFor(r);
     if (section) {
       setTab("plan");
-      setView("plan");
+      setView(sectionFor(r) === "Мой профиль" ? "profile" : "home");
       if (targetOf(r) === "intern" && r.intern_id) pickIntern(r.intern_id);
       setTimeout(() => document.querySelector(`[aria-label="${section}"]`)?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 50);
       return;
@@ -348,86 +355,97 @@ export default function Home() {
     }
   }
 
-  return (
-    <div className="flex h-dvh flex-col">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-black/10 px-4 py-2 sm:gap-x-4 sm:gap-y-2 sm:py-2.5 dark:border-white/10">
-        <div className="flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-full bg-[#00aaff] text-sm font-bold text-white">AI</span>
-          <h1 className="hidden text-lg font-semibold sm:block">AI-buddy</h1>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="sr-only text-black/55 sm:not-sr-only dark:text-white/55">Войти как</span>
-          <select
-            value={userId}
-            onChange={(e) => setUser(e.target.value)}
-            className="rounded-lg border border-black/15 bg-transparent px-2 py-1 dark:border-white/20"
-          >
-            {DEMO_USERS.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} — {ROLE_TITLES[u.role]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="ml-auto">
-          <ReminderBell actor={actor} onOpen={openReminder} />
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
-          <span
-            className="text-black/45 dark:text-white/45"
-            title="В демо свой календарь: «сегодня» после «Сброс» — среда 11.11.2026, «Следующий день» сдвигает его. Даты отгула и напоминаний в ответах — по этому календарю."
-          >
-            Демо<span className="hidden sm:inline">-панель · календарь с 11.11</span>
-            {scriptedMode && <span className="hidden sm:inline"> · сценарный режим (без ключа модели)</span>}
-          </span>
-          <button onClick={nextDay} className="rounded-md bg-black/5 px-2 py-1 hover:bg-black/10 dark:bg-white/10">Следующий день</button>
-          <button onClick={reset} className="rounded-md px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10">Сброс</button>
-        </div>
-        {demoError && <p role="alert" className="w-full text-xs text-red-700 dark:text-red-300">{demoError}</p>}
-      </header>
+  const mobileTabs: Array<{ id: Section | "chat"; label: string }> = [
+    ...(actor.role === "intern" ? (["home", "plan", "profile"] as Section[]) : (["plan"] as Section[]))
+      .map((id) => ({ id, label: actor.role === "intern" ? SECTIONS[id] : "План" })),
+    { id: "chat", label: "Чат" },
+  ];
 
-      <div className="flex border-b border-black/10 md:hidden dark:border-white/10" role="tablist">
-        {(["plan", "chat"] as const).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-sm font-medium ${tab === t ? "border-b-2 border-[#00aaff]" : "text-black/50 dark:text-white/50"}`}
-          >
-            {t === "plan" ? "План" : "Чат"}
-            {t === "chat" && unread && tab !== "chat" && (
-              <span aria-label="новые сообщения" className="ml-1.5 inline-block size-2 rounded-full bg-[#00aaff] align-middle" />
-            )}
-          </button>
-        ))}
+  return (
+    <div className="flex h-dvh bg-background">
+      {/* Левая колонка: на компьютере всегда, на телефоне — выезжает по ☰. Один экземпляр в DOM. */}
+      <div className={menuOpen ? "fixed inset-0 z-40 flex" : "hidden lg:flex"}>
+        <div className="w-[272px] shrink-0">
+          <Sidebar
+            actor={actor}
+            section={section}
+            onSection={(s) => { setView(s); setTab("plan"); setMenuOpen(false); }}
+            onUser={(id) => { setUser(id); setMenuOpen(false); }}
+            onNextDay={nextDay}
+            onReset={reset}
+            scriptedMode={scriptedMode}
+            demoError={demoError}
+          />
+        </div>
+        {menuOpen && <button aria-label="Закрыть меню" onClick={() => setMenuOpen(false)} className="flex-1 bg-black/40 lg:hidden" />}
       </div>
 
-      <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className={`min-h-0 overflow-y-auto overscroll-contain border-black/10 md:block md:border-r dark:border-white/10 ${tab === "plan" ? "block" : "hidden"}`}>
-          {actor.role === "intern" && (
-            <div className="flex gap-1 px-4 pt-4 sm:px-5" role="tablist" aria-label="Левая колонка">
-              {([["plan", "Мой план"], ["profile", "Мой профиль"]] as const).map(([v, label]) => (
-                <button
-                  key={v}
-                  role="tab"
-                  aria-selected={view === v}
-                  onClick={() => setView(v)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === v ? "bg-black/5 dark:bg-white/10" : "text-black/55 hover:bg-black/5 dark:text-white/55 dark:hover:bg-white/10"}`}
-                >
-                  {label}
-                </button>
-              ))}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center gap-2 px-4 py-2.5 sm:px-6">
+          <button
+            onClick={() => setMenuOpen(true)}
+            aria-label="Меню"
+            className="grid size-9 place-items-center rounded-full hover:bg-black/5 lg:hidden dark:hover:bg-white/10"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+          <span className="truncate text-base font-semibold lg:text-lg">
+            {actor.role === "intern" ? SECTIONS[section] : "План стажёров"}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
+            <ReminderBell actor={actor} onOpen={openReminder} />
+          </div>
+        </header>
+
+        <div className="flex gap-1 overflow-x-auto px-3 pb-2 md:hidden" role="tablist" aria-label="Разделы на телефоне">
+          {mobileTabs.map((t) => {
+            const selected = t.id === "chat" ? tab === "chat" : tab === "plan" && section === t.id;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => (t.id === "chat" ? setTab("chat") : (setView(t.id), setTab("plan")))}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium ${selected ? "bg-foreground text-background" : "text-[var(--muted)]"}`}
+              >
+                {t.label}
+                {t.id === "chat" && unread && tab !== "chat" && (
+                  <span aria-label="новые сообщения" className="ml-1.5 inline-block size-2 rounded-full bg-accent align-middle" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(340px,0.85fr)] xl:grid-cols-[minmax(0,1fr)_440px]">
+          <div className={`min-h-0 overflow-y-auto overscroll-contain md:block ${tab === "plan" ? "block" : "hidden"}`}>
+            {section === "home" ? (
+              <HomePanel
+                actor={actor}
+                onExplain={onExplain}
+                onDo={onDo}
+                onPractice={onPractice}
+                onDone={onMarkDone}
+                onReminder={openReminder}
+                onPlan={() => setView("plan")}
+              />
+            ) : section === "profile" ? (
+              <ProfilePanel actor={actor} />
+            ) : (
+              <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} onPractice={onPractice} />
+            )}
+          </div>
+          {/* Чат — отдельной карточкой справа: сердце продукта. */}
+          <div className={`min-h-0 p-0 md:block md:pb-4 md:pr-4 ${tab === "chat" ? "block" : "hidden"}`}>
+            <div className="h-full min-h-0 overflow-hidden md:card">
+              <ChatPanel actor={actor} onAction={onAction} />
             </div>
-          )}
-          {actor.role === "intern" && view === "profile"
-            ? <ProfilePanel actor={actor} />
-            : <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} onPractice={onPractice} />}
-        </div>
-        <div className={`min-h-0 md:block ${tab === "chat" ? "block" : "hidden"}`}>
-          <ChatPanel actor={actor} onAction={onAction} />
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

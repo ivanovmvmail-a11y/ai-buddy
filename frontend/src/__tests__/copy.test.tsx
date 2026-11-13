@@ -12,7 +12,7 @@ const writeText = vi.fn();
 beforeEach(() => {
   srv = installFakeServer();
   useChat.getState().reset([]);
-  useSession.setState({ userId: "intern-anya", internPick: null });
+  useSession.setState({ userId: "intern-anya", internPick: null , section: "plan" });
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
   writeText.mockReset();
 });

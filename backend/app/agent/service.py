@@ -59,10 +59,13 @@ class AgentResult:
         q = question.lower()
         if any(w in q for w in REQUEST_WORDS_RU):
             return "requests"
+        if (self.item_id and not self.tools) or any(w in q for w in STUDY_WORDS_RU):
+            return "study"
         return "assistant"
 
 
 REQUEST_WORDS_RU = ("заявк", "отгул", "отпрос", "напомни", "выдай доступ", "дай доступ", "нужен доступ", "оформи доступ")
+STUDY_WORDS_RU = ("пункт", "задани", "практикум", "песочниц", "объясни", "по шагам")
 REQUEST_TOOLS = {"create_access_request", "create_absence_request", "list_access_requests", "list_absence_requests",
                  "list_access_resources", "create_reminder", "decide_access_request"}
 

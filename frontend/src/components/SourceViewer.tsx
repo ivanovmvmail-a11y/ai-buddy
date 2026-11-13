@@ -14,7 +14,7 @@ export function SourceLink({ actor, title, className = "" }: { actor: DemoUser; 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`underline decoration-current/40 underline-offset-2 hover:text-[#00aaff] hover:decoration-[#00aaff] active:scale-100 ${className}`}
+        className={`underline decoration-current/40 underline-offset-2 hover:text-accent-ink hover:decoration-current active:scale-100 ${className}`}
       >
         {title}
       </button>

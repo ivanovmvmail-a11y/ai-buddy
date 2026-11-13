@@ -14,10 +14,10 @@ import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
 const STATUS: Record<ItemStatus, { label: string; cls: string }> = {
-  not_started: { label: "не начат", cls: "bg-black/5 text-black/60 dark:bg-white/10 dark:text-white/60" },
-  in_progress: { label: "в работе", cls: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
+  not_started: { label: "не начат", cls: "bg-surface-2 text-[var(--muted)]" },
+  in_progress: { label: "в работе", cls: "bg-accent/15 text-accent-ink" },
   waiting: { label: "ждёт другого человека", cls: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
-  done: { label: "сделано", cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  done: { label: "сделано", cls: "bg-brand-green/20 text-emerald-800 dark:text-emerald-300" },
 };
 const OWNER: Record<PlanItem["owner_role"], string> = { intern: "стажёр", mentor: "наставник", lead: "руководитель" };
 const STAGES: Stage[] = ["week1", "week2", "month1", "month2", "after3m"];
@@ -70,12 +70,12 @@ export function PlanPanel({ actor, onExplain, onDo, onPractice }: Props) {
       {actor.role === "mentor" && <ComparePlans actor={actor} />}
 
       {actor.role !== "intern" && <InternCards actor={actor} />}
-      {(actor.role === "lead" || actor.role === "intern") && <AbsenceRequests actor={actor} />}
-      {actor.role === "intern" && <MentorQuestions actor={actor} />}
+      {/* Стажёру «Мои вопросы наставнику» и «Мои заявки на отгул» — на «Главной» (редизайн 13.11). */}
+      {actor.role === "lead" && <AbsenceRequests actor={actor} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">{actor.id === p.intern_id ? "Мой план" : `План: ${intern?.name}`}</h2>
+          <h2 className="text-[22px] font-bold tracking-[-0.01em]">{actor.id === p.intern_id ? "Мой план" : `План: ${intern?.name}`}</h2>
           <p className="text-sm text-black/55 dark:text-white/55">
             {intern?.team} · день {p.current_day}
           </p>
@@ -135,7 +135,7 @@ function CatalogPicker({ actor, internId, name }: { actor: DemoUser; internId: s
   const free = (catalog.data ?? []).filter((c) => !c.in_plan);
   if (!free.length) return null;
   return (
-    <section aria-label="Каталог пунктов" className="rounded-xl border border-dashed border-violet-500/40 p-3 text-sm">
+    <section aria-label="Каталог пунктов" className="rounded-[20px] border border-dashed border-brand-violet/50 p-4 text-sm">
       <h3 className="font-semibold">Добавить пункт в план{name ? `: ${name}` : ""}</h3>
       <p className="mb-2 text-xs text-black/50 dark:text-white/50">Из каталога команды. Общие пункты не меняются.</p>
       {add.isError && <p role="alert" className="mb-2 text-red-700 dark:text-red-300">{add.error.message}</p>}
@@ -166,12 +166,12 @@ function Ladder({ ladder }: { ladder: StageInfo[] }) {
         <li
           key={s.title}
           aria-current={s.state === "current" ? "step" : undefined}
-          className={`rounded-lg border px-2 py-2 text-xs leading-tight ${
+          className={`rounded-2xl px-3 py-2 text-xs leading-tight ${
             s.state === "current"
-              ? "border-[#00aaff] bg-[#00aaff]/10"
+              ? "bg-accent/15 shadow-[inset_0_0_0_1.5px_var(--accent)]"
               : s.state === "passed"
-                ? "border-emerald-500/40 bg-emerald-500/10"
-                : "border-dashed border-black/20 text-black/45 dark:border-white/20 dark:text-white/45"
+                ? "bg-brand-green/20"
+                : "bg-surface-2 text-[var(--muted)]"
           }`}
         >
           <div className="font-medium">{s.title}</div>
@@ -208,54 +208,77 @@ function PlanRow({
   const canPractice = self && working && item.practice_check && item.status !== "done";
   const canKnow = self && working && item.owner_role === "intern" && !!item.topic && item.status !== "done" && lvl !== "confident";
 
+  // Иерархия (Миша, 13.11: «слишком много кнопок, главные сливаются»): одна главная кнопка-таблетка справа —
+  // то, что нужно сделать стажёру; остальное — тихими ссылками под пунктом. У закрытого пункта — ничего лишнего.
+  const primary: { label: string; run: () => void; pending?: boolean } | null =
+    canRequestAccess(actor, item) ? { label: "Сделать за меня", run: () => onDo(item) }
+      : canPractice ? { label: "Сдать задание", run: () => onPractice(item) }
+        : canMarkDone(actor, item) ? { label: "Готово", run: () => mark.mutate(), pending: mark.isPending }
+          : null;
+  const done = item.status === "done";
+  const link = "rounded-md text-sm text-[var(--muted)] underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50";
+
   return (
     <li
-      className={`rounded-xl border p-3 transition-colors ${
+      className={`rounded-[20px] p-4 ${
         !working
-          ? "border-dashed border-black/15 text-black/45 dark:border-white/15 dark:text-white/45"
+          ? "border border-dashed border-line text-[var(--muted)]"
           : isNext
-            ? "border-[#00aaff] shadow-[0_0_0_3px_rgba(0,170,255,0.12)]"
-            : "border-black/10 dark:border-white/10"
+            ? "card shadow-[0_0_0_2px_var(--accent)]"
+            : done ? "border border-line opacity-55 transition-opacity hover:opacity-90" : "card"
       }`}
     >
-      {isNext && <div className="mb-0.5 text-xs font-semibold text-[#0088cc]">Следующий шаг</div>}
-      <div className="text-[15px] font-medium leading-snug">{item.title}</div>
-      {working && (
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-          <span
-            className={`rounded-full px-2 py-0.5 ${
-              personal
-                ? "bg-violet-500/12 font-medium text-violet-700 dark:text-violet-300"
-                : "border border-black/10 text-black/50 dark:border-white/15 dark:text-white/50"
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          {isNext && <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent-ink">Следующий шаг</div>}
+          <div className={`text-[15px] font-semibold leading-snug ${done ? "text-[var(--muted)] line-through decoration-1" : ""}`}>{item.title}</div>
+          {working && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className={`rounded-full px-2 py-0.5 font-medium ${st.cls}`}>{st.label}</span>
+              {personal ? (
+                <span className="rounded-full bg-brand-violet/15 px-2 py-0.5 font-medium text-violet-700 dark:text-violet-300">
+                  {self ? "для тебя" : "персональный"}
+                </span>
+              ) : (
+                <span className="text-[var(--muted)]">для всех</span>
+              )}
+              {short && (
+                <span className="rounded-full bg-brand-green/20 px-2 py-0.5 text-emerald-800 dark:text-emerald-300">{self ? "ты это умеешь — коротко" : "умеет — коротко"}</span>
+              )}
+              {item.overdue && item.status !== "waiting" && !done && (
+                <span className="rounded-full bg-brand-red/15 px-2 py-0.5 font-medium text-red-700 dark:text-red-300">срок прошёл</span>
+              )}
+              <span className="text-[var(--muted)]">
+                · {OWNER[item.owner_role]}
+                {item.due_day ? ` · до дня ${item.due_day}` : ""}
+                {hint ? ` · ${hint}` : ""}
+              </span>
+            </div>
+          )}
+        </div>
+        {working && primary && (
+          <button
+            disabled={primary.pending}
+            onClick={primary.run}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50 ${
+              isNext ? "bg-accent text-black hover:bg-accent-hover" : "border border-foreground/25 hover:bg-surface-2"
             }`}
           >
-            {personal ? (self ? "для тебя" : "персональный") : "для всех"}
-          </span>
-          {short && (
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
-              {self ? "ты это умеешь — коротко" : "умеет — коротко"}
-            </span>
-          )}
-          <span className={`rounded-full px-2 py-0.5 ${st.cls}`}>{st.label}</span>
-          {item.overdue && item.status !== "waiting" && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-orange-800 dark:text-orange-300">срок прошёл</span>}
-          <span className="text-black/50 dark:text-white/50">
-            {OWNER[item.owner_role]}
-            {item.due_day ? ` · до дня ${item.due_day}` : ""}
-          </span>
-          {hint && <span className="text-black/50 dark:text-white/50">· {hint}</span>}
-        </div>
-      )}
-      {personal && item.reason && seesSkills && (
-        <p className="mt-1 text-xs text-black/55 dark:text-white/55">Почему: {item.reason}</p>
+            {primary.label}
+          </button>
+        )}
+      </div>
+      {personal && item.reason && seesSkills && !done && (
+        <p className="mt-1.5 text-xs text-[var(--muted)]">Почему: {item.reason}</p>
       )}
       {item.status === "waiting" && item.waiting_for && (
-        <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+        <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-300">
           Ждём: {findUser(item.waiting_for)?.name}, {waitedFor(item.waiting_days ?? 0)}
         </p>
       )}
-      {item.status_reason && <p className="mt-1 text-xs text-orange-800 dark:text-orange-300">Причина: {item.status_reason}</p>}
-      {item.known_marked && self && item.status !== "done" && (
-        <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+      {item.status_reason && <p className="mt-1.5 text-xs text-red-700 dark:text-red-300">Причина: {item.status_reason}</p>}
+      {item.known_marked && self && !done && (
+        <p className="mt-1.5 text-xs text-[var(--muted)]">
           Отмечено: это я уже знаю. Наставник решит, поднять ли уровень.{" "}
           <button disabled={know.isPending} onClick={() => know.mutate(false)} className="underline underline-offset-2 disabled:opacity-50">
             Убрать отметку
@@ -265,52 +288,19 @@ function PlanRow({
       {mark.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{mark.error.message}</p>}
       {know.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{know.error.message}</p>}
       {remove.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{remove.error.message}</p>}
-      {working && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button onClick={() => onExplain(item)} className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
-            Объяснить
-          </button>
-          {canRequestAccess(actor, item) && (
-            <button onClick={() => onDo(item)} className="rounded-lg bg-[#00aaff] px-2.5 py-1 text-sm font-medium text-white hover:bg-[#0099e6]">
-              Сделать за меня
-            </button>
-          )}
-          {actor.role === "mentor" && personal && item.status !== "done" && (
-            <button
-              disabled={remove.isPending}
-              onClick={() => remove.mutate()}
-              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:text-white/70 dark:hover:bg-white/10"
-            >
-              Убрать из плана
-            </button>
-          )}
-          {canPractice && (
-            <button
-              onClick={() => onPractice(item)}
-              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-            >
-              Сдать задание
-            </button>
-          )}
+      {working && !done && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          <button onClick={() => onExplain(item)} className={link}>Объяснить</button>
           {canKnow && !item.known_marked && (
-            <button
-              disabled={know.isPending}
-              onClick={() => know.mutate(true)}
-              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
-            >
-              Это я уже знаю
-            </button>
+            <button disabled={know.isPending} onClick={() => know.mutate(true)} className={link}>Это я уже знаю</button>
           )}
-          {canMarkDone(actor, item) && (
-            <button
-              disabled={mark.isPending}
-              onClick={() => mark.mutate()}
-              className="rounded-lg border border-emerald-600/40 px-2.5 py-1 text-sm text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-50 dark:text-emerald-300"
-            >
-              Готово
-            </button>
+          {actor.role === "mentor" && personal && (
+            <button disabled={remove.isPending} onClick={() => remove.mutate()} className={link}>Убрать из плана</button>
           )}
         </div>
+      )}
+      {working && done && (
+        <button onClick={() => onExplain(item)} className={`${link} mt-1.5`}>Объяснить</button>
       )}
     </li>
   );
@@ -333,7 +323,7 @@ function Approvals({ actor }: { actor: DemoUser }) {
   if (!pending.length) return null;
 
   return (
-    <section aria-label="Ждут одобрения" className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
+    <section aria-label="Ждут одобрения" className="card p-4 sm:p-5 shadow-[inset_4px_0_0_rgb(245_158_11),0_0_0_1px_var(--line)]">
       <h3 className="mb-2 text-sm font-semibold">Ждут твоего одобрения</h3>
       {decide.isError && <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">{decide.error.message}</p>}
       <ul className="space-y-2">
@@ -354,17 +344,17 @@ function Approvals({ actor }: { actor: DemoUser }) {
                 <button
                   disabled={!reason.trim() || decide.isPending}
                   onClick={() => decide.mutate({ id: r.id, approve: false, reason: reason.trim() })}
-                  className="rounded-lg border border-black/15 px-2.5 py-1 disabled:opacity-40 dark:border-white/20"
+                  className="rounded-full border border-line px-3 py-1 disabled:opacity-40 dark:border-white/20"
                 >
                   Отклонить
                 </button>
               </div>
             ) : (
               <div className="mt-1.5 flex gap-2">
-                <button disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, approve: true })} className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white disabled:opacity-50">
+                <button disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, approve: true })} className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50">
                   Одобрить
                 </button>
-                <button onClick={() => setRejecting(r.id)} className="rounded-lg border border-black/15 px-2.5 py-1 dark:border-white/20">Отклонить…</button>
+                <button onClick={() => setRejecting(r.id)} className="rounded-full border border-line px-3 py-1 dark:border-white/20">Отклонить…</button>
               </div>
             )}
           </li>
