@@ -46,6 +46,8 @@ class ChatResponse(BaseModel):
     reply: str
     sources: list[Source] = []
     actions: list[Action] = []
+    item_id: str | None = None  # пункт плана, о котором ответ (кнопки пункта в чате)
+    mode: str | None = None  # "practice": следующее сообщение — ответ на задание
 
 
 def _action_json(action: Action) -> dict:
@@ -151,6 +153,8 @@ def create_app() -> Flask:
             reply=result.reply,
             sources=[Source(**s) for s in result.sources],
             actions=result.actions,
+            item_id=result.item_id,
+            mode=result.mode,
         ).model_dump(mode="json")
 
     @app.get("/chat/history")

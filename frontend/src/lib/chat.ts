@@ -4,14 +4,15 @@
 import { doneOnOpen, kindOf } from "./notifications";
 import { create } from "zustand";
 import { findUser } from "./users";
-import { waitedFor } from "./plan-logic";
+import { canMarkDone, canRequestAccess, isWorking, waitedFor } from "./plan-logic";
 import type {
   AccessRequest, AccessResource, Action, DemoUser, DocSource, ExplainKind, Plan, PlanItem, Reminder, SkillLevel, SkillProfile,
   WeeklySummary,
 } from "./types";
 
+export type ItemActionKind = "do" | "explain" | "steps" | "who" | "practice" | "done";
 export type BotAction =
-  | { label: string; kind: "do" | "explain" | "steps" | "who"; itemId: string; internId: string }
+  | { label: string; kind: ItemActionKind; itemId: string; internId: string }
   | { label: string; kind: "snooze"; reminderId: string }
   | { label: string; kind: "nudge"; requestId: string; itemTitle: string }
   | { label: string; kind: "nudge-lead" };
@@ -36,10 +37,15 @@ export type Msg = {
 let n = 0;
 export const msgId = () => `m${++n}`;
 
+/** Сдача задания в чате (чекпоинт 2): следующее сообщение стажёра уходит на проверку задания пункта. */
+export type PracticeMode = { itemId: string; title: string };
+
 type ChatStore = {
   messages: Msg[];
   busy: boolean;
   seenReminders: string[];
+  practice: PracticeMode | null;
+  setPractice: (p: PracticeMode | null) => void;
   reset: (first: Msg[]) => void;
   push: (...m: Msg[]) => void;
   update: (id: string, patch: Partial<Msg>) => void;
@@ -51,12 +57,27 @@ export const useChat = create<ChatStore>((set) => ({
   messages: [],
   busy: false,
   seenReminders: [],
-  reset: (first) => set({ messages: first, busy: false, seenReminders: [] }),
+  practice: null,
+  setPractice: (practice) => set({ practice }),
+  reset: (first) => set({ messages: first, busy: false, seenReminders: [], practice: null }),
   push: (...m) => set((s) => ({ messages: [...s.messages, ...m] })),
   update: (id, patch) => set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
   setBusy: (busy) => set({ busy }),
   markSeen: (ids) => set((s) => ({ seenReminders: [...s.seenReminders, ...ids] })),
 }));
+
+/** Кнопки пункта плана в чате — те же, что у пункта в плане (чекпоинт 2: «в плане есть "Объяснить", а в чате нету»).
+ *  Только свой рабочий пункт; skip — что уже показано в этом сообщении. */
+export function itemActions(item: PlanItem, actor: DemoUser, skip: ItemActionKind[] = []): BotAction[] {
+  if (actor.id !== item.intern_id || !isWorking(item.stage) || item.status === "done") return [];
+  const base = { itemId: item.id, internId: item.intern_id };
+  const out: BotAction[] = [];
+  if (canRequestAccess(actor, item)) out.push({ label: "Сделать за меня", kind: "do", ...base });
+  if (item.practice_check) out.push({ label: "Сдать задание", kind: "practice", ...base });
+  out.push({ label: "Объяснить", kind: "explain", ...base });
+  if (canMarkDone(actor, item)) out.push({ label: "Готово", kind: "done", ...base });
+  return out.filter((a) => !skip.includes(a.kind as ItemActionKind));
+}
 
 export function actionFor(item: PlanItem): BotAction {
   return item.resource_id && item.status !== "waiting" && item.status !== "done"
@@ -81,7 +102,8 @@ export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: A
       lines.push(`Ждём ответа (${findUser(w.waiting_for)?.name ?? "согласующий"}): «${w.title}», ${waitedFor(w.waiting_days ?? 0)}.`);
     }
     if (!next && plan.next_step.waiting.length === 0) lines.push("Недели 1–2 закрыты — дальше «Месяц 1».");
-    return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined });
+    const buttons = next ? itemActions(next, actor) : [];
+    return scripted(lines.join("\n"), { actions: buttons.length ? buttons : undefined });
   }
   if (actor.role === "mentor") {
     return scripted(

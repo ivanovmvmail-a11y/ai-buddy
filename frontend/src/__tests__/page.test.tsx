@@ -81,12 +81,13 @@ describe("экран «план + чат» на API", () => {
     expect(srv.state.items.find((i) => i.id === "anya.w1.access-team")?.status).toBe("done");
   });
 
-  it("базовые доступы выдаются сразу", async () => {
+  it("базовые доступы — в один клик, без второго подтверждения (чекпоинт 2)", async () => {
     open();
     const w1 = await week1();
     await click(within(w1).getAllByRole("button", { name: "Сделать за меня" })[0]);
-    await click(await screen.findByRole("button", { name: "Подтвердить" }));
-    expect(await screen.findByText(/доступ к «Jira и Confluence» выдан/)).toBeTruthy();
+    expect(await screen.findByText(/доступ к «Jira и Confluence» на чтение выдан/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Подтвердить" })).toBeNull();
+    expect(srv.calls.some((c) => c.path.endsWith("/confirm"))).toBe(false);
   });
 
   it("повторная заявка — понятная ошибка", async () => {
@@ -94,14 +95,13 @@ describe("экран «план + чат» на API", () => {
     open();
     const w1 = await week1();
     await click(within(w1).getAllByRole("button", { name: "Сделать за меня" })[0]);
-    await click(await screen.findByRole("button", { name: "Подтвердить" }));
     expect(await screen.findByText(/Не получилось: Заявка на этот ресурс уже есть/)).toBeTruthy();
-    expect(screen.getByText("Не выполнено")).toBeTruthy();
   });
 
   it("отмена черновика ничего не создаёт", async () => {
     open();
-    await click((await screen.findAllByRole("button", { name: "Сделать за меня" }))[0]);
+    const all = within(await week1()).getAllByRole("button", { name: "Сделать за меня" });
+    await click(all[all.length - 1]); // пространство команды — через черновик
     await click(await screen.findByRole("button", { name: "Отменить" }));
     expect(await screen.findByText(/ничего не отправлено/)).toBeTruthy();
     expect(srv.state.requests).toHaveLength(2);
@@ -178,11 +178,12 @@ describe("экран «план + чат» на API", () => {
     expect(srv.calls.some((c) => c.path === "/chat")).toBe(false);
   });
 
-  it("кнопка действия в приветствии открывает черновик", async () => {
+  it("кнопки следующего шага в приветствии: сделать и объяснить (чекпоинт 2)", async () => {
     open();
     const hello = (await screen.findByText(/2-й день стажировки/)).parentElement!;
+    expect(within(hello).getByRole("button", { name: "Объяснить" })).toBeTruthy();
     await click(within(hello).getByRole("button", { name: "Сделать за меня" }));
-    expect(await screen.findByText(/Заявка на доступ · черновик/)).toBeTruthy();
+    expect((await screen.findByText(/на чтение выдан/)).textContent).toMatch(/Следующий шаг — «/);
   });
 
   it("Иван: кого ждём и напоминания при входе; «Напомнить позже»", async () => {

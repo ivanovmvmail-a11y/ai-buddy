@@ -8,7 +8,7 @@ import { ProfilePanel } from "@/components/ProfilePanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  absenceNudgeMsg, accessDraftParams, actionFor, explainScripted, finishedWeek, followupsFor, greeting, msgId, reminderMsg,
+  absenceNudgeMsg, accessDraftParams, explainScripted, finishedWeek, followupsFor, greeting, itemActions, msgId, reminderMsg,
   nudgeMsg, useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
@@ -175,7 +175,8 @@ export default function Home() {
       say(asked, {
         id: msgId(), role: "assistant", kind: "text", scripted: true, label: EXPLAIN_LABEL, content: res.text, answerId: res.answer_id,
         sources: res.source ? [res.source] : undefined, followups: followupsFor(item, res.chips),
-        actions: kind === "explain" && item.resource_id && item.status !== "done" && item.status !== "waiting" ? [actionFor(item)] : undefined,
+        // Под объяснением — остальные кнопки пункта: сделать, сдать задание, «Готово» (чекпоинт 2: всё и из чата).
+        actions: kind === "explain" && itemActions(item, actor, ["explain"]).length ? itemActions(item, actor, ["explain"]) : undefined,
       });
     } catch {
       if (kind !== "explain") {
@@ -189,12 +190,68 @@ export default function Home() {
     }
   }
 
+  /** «Сделать за меня» (чекпоинт 2): нажатие кнопки — уже согласие. Простой доступ сервер оформляет сразу;
+   *  доступ к коду команды и всё, что согласует человек, — черновик с «Подтвердить». */
   async function onDo(item: PlanItem) {
     setTab("chat");
     say({ id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}` });
     try {
-      const draft = await api.draft(actor.id, "create_access_request", accessDraftParams(item, actor));
-      say({ id: msgId(), role: "assistant", kind: "draft", content: "Подготовил черновик заявки. Проверь и подтверди — без тебя ничего не отправлю.", draft });
+      const action = await api.quickDraft(actor.id, "create_access_request", accessDraftParams(item, actor));
+      if (action.status === "pending") {
+        say({
+          id: msgId(), role: "assistant", kind: "draft", draft: action,
+          content: "Это доступ к рабочему пространству команды — такие заявки я не отправляю без тебя. Проверь черновик и подтверди.",
+        });
+        return;
+      }
+      if (action.status === "failed") {
+        say({ id: msgId(), role: "assistant", kind: "error", content: `Не получилось: ${action.error}` });
+        return;
+      }
+      const req = (action.result as { request?: AccessRequest } | null)?.request;
+      const resources = await api.resources(actor.id).then((r) => r.resources).catch(() => []);
+      const title = resources.find((r) => r.id === req?.resource_id)?.title ?? req?.resource_id ?? "ресурс";
+      await refresh();
+      await sayNext(req?.status === "granted"
+        ? `Готово: заявка ${req.id} — доступ к «${title}» на чтение выдан. Подтверждать не нужно: это учебный сервис только на чтение. Пункт плана закрыт.`
+        : `Заявка ${req?.id ?? ""} отправлена: ${findUser(req?.approver_id)?.name ?? "согласующий"} получит её на согласование. Я напомню, если затянется.`);
+    } catch (err) {
+      say({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
+    }
+  }
+
+  /** Сообщение бота + следующий шаг плана с его кнопками. */
+  async function sayNext(text: string) {
+    const plan = await loadPlan(actor.id);
+    const next = plan?.next_step.item;
+    const buttons = next ? itemActions(next, actor) : [];
+    say({
+      id: msgId(), role: "assistant", kind: "text", scripted: true, actions: buttons.length ? buttons : undefined,
+      content: text + (next ? `\n\nСледующий шаг — «${next.title}».` : ""),
+    });
+  }
+
+  /** «Сдать задание» — в чате (чекпоинт 2): бот даёт задание, следующее сообщение стажёра уходит на проверку. */
+  function onPractice(item: PlanItem) {
+    setTab("chat");
+    say(
+      { id: msgId(), role: "user", kind: "text", content: `Сдать задание: ${item.title}` },
+      {
+        id: msgId(), role: "assistant", kind: "text", scripted: true, label: "задание пункта плана",
+        content: `Задание: ${item.practice}\n\nНапиши ответ следующим сообщением: своими словами — что и как сделано. `
+          + "Я сверю его с учебным документом пункта и подскажу, чего не хватает. Уровень по-прежнему решает наставник.",
+      },
+    );
+    useChat.getState().setPractice({ itemId: item.id, title: item.title });
+  }
+
+  async function onMarkDone(item: PlanItem) {
+    setTab("chat");
+    say({ id: msgId(), role: "user", kind: "text", content: `Готово: ${item.title}` });
+    try {
+      await api.setStatus(actor.id, item.id, "done");
+      await refresh();
+      await sayNext(`Отметил «${item.title}» — сделано.`);
     } catch (err) {
       say({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
     }
@@ -221,6 +278,8 @@ export default function Home() {
     const item = plan?.items.find((i) => i.id === a.itemId);
     if (!item) return;
     if (a.kind === "do") await onDo(item);
+    else if (a.kind === "practice") onPractice(item);
+    else if (a.kind === "done") await onMarkDone(item);
     else await onExplain(item, a.kind);
   }
 
@@ -345,7 +404,7 @@ export default function Home() {
           )}
           {actor.role === "intern" && view === "profile"
             ? <ProfilePanel actor={actor} />
-            : <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} />}
+            : <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} onPractice={onPractice} />}
         </div>
         <div className={`min-h-0 md:block ${tab === "chat" ? "block" : "hidden"}`}>
           <ChatPanel actor={actor} onAction={onAction} />

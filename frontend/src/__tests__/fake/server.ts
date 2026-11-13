@@ -87,7 +87,7 @@ export type FakeServer = {
   state: DemoState;
   actions: Action[];
   provider: string;
-  chatReplies: Array<{ reply: string; actions?: Action[]; answerId?: string } | "fail" | "502">;
+  chatReplies: Array<{ reply: string; actions?: Action[]; answerId?: string; itemId?: string; mode?: "practice" } | "fail" | "502">;
   calls: Array<{ method: string; path: string; user: string; body: unknown }>;
   feedback: Array<{ answer_id: string; useful: boolean }>;
   explainFails?: boolean;
@@ -338,9 +338,11 @@ export function installFakeServer(): FakeServer {
         title: `Заявка на доступ: ${res?.title}, права — чтение`,
       };
       srv.actions.push(action);
-      return { status: 201, body: action };
-    }
-    m = p.match(/^\/actions\/(.+)\/(confirm|cancel)$/);
+      // Чекпоинт 2: кнопка «Сделать за меня» — простой доступ (учебный сервис на чтение, auto) выдаётся сразу.
+      const quick = body.quick === true && res?.kind === "base" && res.approver === "auto" && (params.level ?? "read") === "read";
+      if (!quick) return { status: 201, body: action };
+      m = [`/actions/${action.id}/confirm`, action.id, "confirm"] as unknown as RegExpMatchArray;
+    } else m = p.match(/^\/actions\/(.+)\/(confirm|cancel)$/);
     if (m) {
       const action = srv.actions.find((a) => a.id === m![1] && a.user_id === actor.id);
       if (!action) return err(404, "Действие не найдено");
@@ -424,6 +426,7 @@ export function installFakeServer(): FakeServer {
       if (next === "502") return err(502, "Помощник временно недоступен.");
       return ok({
         answer_id: next.answerId ?? "ans_1", reply: next.reply, sources: [{ title: "Первые дни", url: null }], actions: next.actions ?? [],
+        item_id: next.itemId ?? null, mode: next.mode ?? null,
       });
     }
     return err(404, "Нет такого адреса");

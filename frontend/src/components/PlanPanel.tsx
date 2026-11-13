@@ -10,7 +10,6 @@ import { InternCards } from "./InternCards";
 import { ComparePlans, SkillSuggestions } from "./MentorTools";
 import { AbsenceRequests } from "./AbsencePanel";
 import { MentorQuestions } from "./MentorQuestions";
-import { SourceLink } from "./SourceViewer";
 import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
@@ -27,6 +26,7 @@ type Props = {
   actor: DemoUser;
   onExplain: (item: PlanItem) => void;
   onDo: (item: PlanItem) => void;
+  onPractice: (item: PlanItem) => void; // «Сдать задание» — в чате (чекпоинт 2)
 };
 
 function Retry({ text, onRetry }: { text: string; onRetry: () => void }) {
@@ -38,7 +38,7 @@ function Retry({ text, onRetry }: { text: string; onRetry: () => void }) {
   );
 }
 
-export function PlanPanel({ actor, onExplain, onDo }: Props) {
+export function PlanPanel({ actor, onExplain, onDo, onPractice }: Props) {
   const internPick = useSession((s) => s.internPick);
   const pickIntern = useSession((s) => s.pickIntern);
   const interns = useInterns(actor);
@@ -116,6 +116,7 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
                   level={item.topic ? profile.data?.skills[item.topic] : undefined}
                   onExplain={onExplain}
                   onDo={onDo}
+                  onPractice={onPractice}
                 />
               ))}
             </ul>
@@ -186,8 +187,8 @@ function Ladder({ ladder }: { ladder: StageInfo[] }) {
 const HINT: Partial<Record<SkillLevel, string>> = { novice: "здесь помогу подробно" };
 
 function PlanRow({
-  item, actor, isNext, level, onExplain, onDo,
-}: { item: PlanItem; actor: DemoUser; isNext: boolean; level?: SkillLevel; onExplain: Props["onExplain"]; onDo: Props["onDo"] }) {
+  item, actor, isNext, level, onExplain, onDo, onPractice,
+}: { item: PlanItem; actor: DemoUser; isNext: boolean; level?: SkillLevel; onExplain: Props["onExplain"]; onDo: Props["onDo"]; onPractice: Props["onPractice"] }) {
   const refresh = useRefresh();
   const mark = useMutation({ mutationFn: () => api.setStatus(actor.id, item.id, "done"), onSuccess: refresh });
   // SPEC 4: «это я уже знаю» — повод для предложения наставнику; пункт не закрывается, уровень решает наставник.
@@ -205,7 +206,6 @@ function PlanRow({
   const short = seesSkills && !personal && lvl === "confident";
   // Спека 107: задание на практике, которое бот проверит по документу пункта (только сам стажёр).
   const canPractice = self && working && item.practice_check && item.status !== "done";
-  const [practiceOpen, setPracticeOpen] = useState(false);
   const canKnow = self && working && item.owner_role === "intern" && !!item.topic && item.status !== "done" && lvl !== "confident";
 
   return (
@@ -265,7 +265,6 @@ function PlanRow({
       {mark.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{mark.error.message}</p>}
       {know.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{know.error.message}</p>}
       {remove.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{remove.error.message}</p>}
-      {practiceOpen && <PracticeForm actor={actor} item={item} onClose={() => setPracticeOpen(false)} />}
       {working && (
         <div className="mt-2 flex flex-wrap gap-2">
           <button onClick={() => onExplain(item)} className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
@@ -285,9 +284,9 @@ function PlanRow({
               Убрать из плана
             </button>
           )}
-          {canPractice && !practiceOpen && (
+          {canPractice && (
             <button
-              onClick={() => setPracticeOpen(true)}
+              onClick={() => onPractice(item)}
               className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
             >
               Сдать задание
@@ -372,60 +371,5 @@ function Approvals({ actor }: { actor: DemoUser }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/** Спека 107: ответ на «задание на практике» — сервер сверяет его с фактами учебного документа, без модели.
- *  Это проверка задания, а не оценка стажёра: засчитанное задание лишь подсказывает закрыть пункт «Готово». */
-function PracticeForm({ actor, item, onClose }: { actor: DemoUser; item: PlanItem; onClose: () => void }) {
-  const [answer, setAnswer] = useState("");
-  const check = useMutation({ mutationFn: () => api.practice(actor.id, item.id, answer.trim()) });
-  const result = check.data;
-  return (
-    <form
-      aria-label={`Задание: ${item.title}`}
-      onSubmit={(e) => { e.preventDefault(); if (answer.trim()) check.mutate(); }}
-      className="mt-2 space-y-2 rounded-lg bg-black/[0.03] p-2.5 text-sm dark:bg-white/[0.04]"
-    >
-      <label className="block">
-        <span className="text-xs text-black/55 dark:text-white/55">Задание: {item.practice} Опиши своими словами, что сделал(а).</span>
-        <textarea
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          className="mt-1 block w-full resize-y rounded-lg border border-black/15 bg-transparent px-2 py-1.5 dark:border-white/20"
-        />
-      </label>
-      {check.isError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{check.error.message}</p>}
-      {result && (
-        <div
-          role="status"
-          className={`rounded-lg px-2.5 py-2 text-sm ${
-            result.passed ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200" : "bg-amber-500/10 text-amber-900 dark:text-amber-100"
-          }`}
-        >
-          <p>{result.passed ? "✓ " : ""}{result.text}</p>
-          {result.source && (
-            <p className="mt-1 text-xs opacity-75">
-              Документ:{" "}
-              <SourceLink actor={actor} title={result.source.title} />
-            </p>
-          )}
-        </div>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={!answer.trim() || check.isPending}
-          className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white hover:bg-[#0099e6] disabled:opacity-50"
-        >
-          {check.isPending ? "Проверяю…" : "Проверить"}
-        </button>
-        <button type="button" onClick={onClose} className="rounded-lg px-2.5 py-1 text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10">
-          Закрыть
-        </button>
-      </div>
-    </form>
   );
 }
