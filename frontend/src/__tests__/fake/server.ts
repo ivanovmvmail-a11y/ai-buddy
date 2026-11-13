@@ -102,6 +102,12 @@ export type FakeServer = {
   addKirill: () => void;
 };
 
+const DOCUMENTS = [
+  { title: "Учебный репозиторий — клонирование и ветки", team: null,
+    content: "# Учебный репозиторий\n\nКаждая задача делается в своей ветке.\n\n- **git pull** — обнови основную ветку\n- создай ветку" },
+  { title: "Авито Доставка — о команде", team: "Авито Доставка", content: "## Чем занимается команда\nУчебный стенд маршрутов." },
+];
+
 export function installFakeServer(): FakeServer {
   const srv: FakeServer = {
     state: initialState(), actions: [], history: {}, provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null,
@@ -290,6 +296,12 @@ export function installFakeServer(): FakeServer {
       });
     }
     if (p === "/chat/history") return ok({ messages: srv.history[actor.id] ?? [] });
+    if (p === "/documents") {
+      // Как на сервере: общий документ или своей команды, иначе 404 (не раскрываем, что документ есть).
+      const doc = DOCUMENTS.find((d) => d.title === url.searchParams.get("title"));
+      if (!doc || (doc.team !== null && doc.team !== actor.team)) return err(404, "Документ не найден или недоступен");
+      return ok(doc);
+    }
     if (p === "/actions" && method === "GET") return ok({ actions: srv.actions.filter((a) => a.user_id === actor.id) });
     if (p === "/actions" && method === "POST") {
       if (actor.role !== "intern") return err(403, "Нет прав на это действие");

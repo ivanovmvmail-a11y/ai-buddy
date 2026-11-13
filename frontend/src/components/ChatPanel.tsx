@@ -6,6 +6,7 @@ import { approverText, msgId, useChat, type BotAction, type Msg } from "@/lib/ch
 import { useRefresh, useResources } from "@/lib/queries";
 import { findUser } from "@/lib/users";
 import { dayText } from "./AbsencePanel";
+import { SourceLink } from "./SourceViewer";
 import type { AccessRequest, DemoUser } from "@/lib/types";
 
 type Props = { actor: DemoUser; onAction: (a: BotAction) => void };
@@ -102,9 +103,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
             {m.sources.map((s, i) => (
               <span key={s.title}>
                 {i > 0 && ", "}
-                {s.url ? (
-                  <a href={s.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[#00aaff]">{s.title}</a>
-                ) : s.title}
+                <SourceLink actor={actor} title={s.title} />
               </span>
             ))}{" "}
             · демо-данные, не регламент Авито

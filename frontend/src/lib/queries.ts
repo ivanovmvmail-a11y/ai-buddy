@@ -19,7 +19,18 @@ export const keys = {
   absence: (u: string) => ["absence", u] as const,
   catalog: (u: string, intern: string) => ["catalog", u, intern] as const,
   absenceFacts: (u: string, intern: string) => ["absence-facts", u, intern] as const,
+  document: (u: string, title: string) => ["document", u, title] as const,
 };
+
+/** Документ из «Источник»: грузится только когда окно открыто; текст не меняется — кэш на 10 минут. */
+export const useDocument = (actor: DemoUser, title: string | null) =>
+  useQuery({
+    queryKey: keys.document(actor.id, title ?? ""),
+    queryFn: () => api.document(actor.id, title as string),
+    enabled: title !== null,
+    staleTime: 600_000,
+    retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
+  });
 
 const PLAN_ROLES = new Set(["intern", "mentor", "lead", "curator"]);
 
