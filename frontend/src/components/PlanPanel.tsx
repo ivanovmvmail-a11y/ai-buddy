@@ -15,7 +15,7 @@ import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } fro
 
 const STATUS: Record<ItemStatus, { label: string; cls: string }> = {
   // Миша, 14.11: «не начат» сливался с карточкой (surface-2 почти как фон карточки) — нейтральная, но видимая плашка.
-  not_started: { label: "не начат", cls: "bg-foreground/10 text-foreground/80" },
+  not_started: { label: "не начат", cls: "bg-slate-500/15 text-slate-700 dark:bg-slate-400/15 dark:text-slate-300" },
   in_progress: { label: "в работе", cls: "bg-accent/15 text-accent-ink" },
   waiting: { label: "ждёт другого человека", cls: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
   done: { label: "сделано", cls: "bg-brand-green/20 text-emerald-800 dark:text-emerald-300" },
@@ -242,7 +242,8 @@ function PlanRow({
                   {self ? "для тебя" : "персональный"}
                 </span>
               ) : (
-                <span className="text-foreground/75">для всех</span>
+                // Пара к фиолетовому «для тебя»: спокойный голубой (не зелёный — тот у «сделано»), слабее главной кнопки.
+                <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 font-medium text-cyan-800 dark:text-cyan-200/85">для всех</span>
               )}
               {short && (
                 <span className="rounded-full bg-brand-green/20 px-2 py-0.5 text-emerald-800 dark:text-emerald-300">{self ? "ты это умеешь — коротко" : "умеет — коротко"}</span>
@@ -252,7 +253,12 @@ function PlanRow({
               )}
               <span className="text-foreground/75">
                 · {OWNER[item.owner_role]}
-                {item.due_day ? ` · до дня ${item.due_day}` : ""}
+                {item.due_day ? (
+                  <>
+                    {" · "}
+                    <span className="font-medium text-foreground/90">до дня {item.due_day}</span>
+                  </>
+                ) : null}
                 {hint ? ` · ${hint}` : ""}
               </span>
             </div>
