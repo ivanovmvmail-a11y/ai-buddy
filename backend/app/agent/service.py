@@ -47,6 +47,24 @@ class AgentResult:
     refused: bool = False  # хотя бы один инструмент отказал по правам
     item_id: str | None = None  # пункт плана, о котором ответ: чат покажет его кнопки (чекпоинт 2)
     mode: str | None = None  # "practice" — следующее сообщение стажёра — ответ на задание
+    topic: str | None = None  # вкладка чата: assistant | study | requests (чекпоинт 2: «разделите чаты»)
+
+    def chat_topic(self, question: str = "") -> str:
+        """Вкладка чата для ответа: заявки и отгулы — «Заявки», пункты плана и задания — «Учёба», остальное — «Помощник».
+        Модель могла ответить без инструмента («мои заявки» — текстом) — тогда по словам вопроса."""
+        if self.topic:
+            return self.topic
+        if self.actions or any(t in REQUEST_TOOLS for t in self.tools):
+            return "requests"
+        q = question.lower()
+        if any(w in q for w in REQUEST_WORDS_RU):
+            return "requests"
+        return "assistant"
+
+
+REQUEST_WORDS_RU = ("заявк", "отгул", "отпрос", "напомни", "выдай доступ", "дай доступ", "нужен доступ", "оформи доступ")
+REQUEST_TOOLS = {"create_access_request", "create_absence_request", "list_access_requests", "list_absence_requests",
+                 "list_access_resources", "create_reminder", "decide_access_request"}
 
 
 _WORD = re.compile(r"[a-zа-яё0-9]{5,}")
@@ -144,7 +162,7 @@ class Agent:
         # «Объясни пункт про песочницу», «хочу сдать задание по гиту» — как кнопки плана, но из чата (чекпоинт 2).
         if (about := await item_reply(question, user)) is not None:
             return AgentResult(reply=about.reply, sources=about.sources or [], item_id=about.item_id or None,
-                               mode=about.mode, tools=["get_plan"])
+                               mode=about.mode, tools=["get_plan"], topic="study")
         # Разговорные слова («запулить», «пул реквест», «CI») дополняем словами документов — поиск их найдёт.
         docs = await retrieve(search_query(question), user, k=RAG_TOP_K)
         if docs:

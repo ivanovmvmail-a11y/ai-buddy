@@ -10,7 +10,7 @@ import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
   absenceNudgeMsg, accessDraftParams, explainScripted, finishedWeek, followupsFor, greeting, itemActions, msgId, reminderMsg,
   nudgeMsg, useChat, weeklySummaryMsg,
-  type BotAction, type Msg,
+  guessTopic, reminderTopic, TOPICS, type BotAction, type Msg, type Topic,
 } from "@/lib/chat";
 import { doneOnOpen, kindOf, sectionFor, targetOf } from "@/lib/notifications";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
@@ -89,6 +89,13 @@ export default function Home() {
       const fresh = reminders.filter((r) => !useChat.getState().seenReminders.includes(r.id));
       useChat.getState().markSeen(fresh.map((r) => r.id));
       for (const r of fresh) say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));
+      // У стажёра напоминания лежат во вкладках своих тем — в открытой вкладке говорим, где новое.
+      const elsewhere = who.role === "intern" ? fresh.filter((r) => reminderTopic(r) !== useChat.getState().tab) : [];
+      if (elsewhere.length) {
+        const counts = TOPICS.filter((t) => elsewhere.some((r) => reminderTopic(r) === t.id))
+          .map((t) => `«${t.title}» — ${elsewhere.filter((r) => reminderTopic(r) === t.id).length}`);
+        say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: `🔔 Новые напоминания: ${counts.join(", ")}.` });
+      }
       return fresh.length;
     } catch {
       return 0;
@@ -102,14 +109,18 @@ export default function Home() {
       api.actions(who.id).then((a) => a.actions.filter((x) => x.status === "pending")).catch(() => []),
     ]);
     if (useSession.getState().userId !== who.id) return;
-    for (const m of past) {
+    // Вкладку сервер не хранит: вопрос кладём туда же, куда ответ (по словам ответа видно тему лучше).
+    for (let i = 0; i < past.length; i++) {
+      const m = past[i];
+      const answer = m.role === "user" ? past[i + 1] : m;
+      const topic: Topic = guessTopic(answer?.content ?? m.content);
       say({
-        id: msgId(), role: m.role, kind: "text", content: m.content, scripted: m.scripted || undefined,
+        id: msgId(), role: m.role, kind: "text", content: m.content, scripted: m.scripted || undefined, topic,
         sources: m.sources.length ? m.sources : undefined, answerId: m.answer_id ?? undefined,
       });
     }
     for (const draft of [...drafts].reverse()) {
-      say({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик ждёт твоего решения.", draft });
+      say({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик ждёт твоего решения.", draft, topic: "requests" });
     }
   }
 
@@ -123,6 +134,7 @@ export default function Home() {
       approvals = await api.requests(who.id).then((r) => r.requests.filter((x) => x.status === "pending_approval" && x.approver_id === who.id)).catch(() => []);
     }
     if (useSession.getState().userId !== who.id) return; // успели войти под другим пользователем
+    useChat.getState().setTab("assistant");
     if (who.role === "intern" && !plan) {
       say({ id: msgId(), role: "assistant", kind: "error", content: "Не получилось загрузить план. Проверь, что сервер запущен, и нажми «Сброс» или обнови страницу." });
       return;
@@ -165,8 +177,14 @@ export default function Home() {
     who: () => "К кому идти, если не получается?",
   };
 
-  async function onExplain(item: PlanItem, kind: ExplainKind = "explain") {
+  /** Открыть чат на нужной вкладке (чекпоинт 2: чаты разделены по темам). */
+  function openChat(topic: Topic) {
     setTab("chat");
+    useChat.getState().setTab(topic);
+  }
+
+  async function onExplain(item: PlanItem, kind: ExplainKind = "explain") {
+    openChat("study");
     const asked: Msg = { id: msgId(), role: "user", kind: "text", content: ASKED[kind](item) };
     try {
       // Ответ строит сервер по документу пункта и под уровень стажёра — и с ключом модели, и без (проверка 13.11:
@@ -193,7 +211,7 @@ export default function Home() {
   /** «Сделать за меня» (чекпоинт 2): нажатие кнопки — уже согласие. Простой доступ сервер оформляет сразу;
    *  доступ к коду команды и всё, что согласует человек, — черновик с «Подтвердить». */
   async function onDo(item: PlanItem) {
-    setTab("chat");
+    openChat("requests");
     say({ id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}` });
     try {
       const action = await api.quickDraft(actor.id, "create_access_request", accessDraftParams(item, actor));
@@ -233,7 +251,7 @@ export default function Home() {
 
   /** «Сдать задание» — в чате (чекпоинт 2): бот даёт задание, следующее сообщение стажёра уходит на проверку. */
   function onPractice(item: PlanItem) {
-    setTab("chat");
+    openChat("study");
     say(
       { id: msgId(), role: "user", kind: "text", content: `Сдать задание: ${item.title}` },
       {
@@ -246,7 +264,7 @@ export default function Home() {
   }
 
   async function onMarkDone(item: PlanItem) {
-    setTab("chat");
+    openChat("study");
     say({ id: msgId(), role: "user", kind: "text", content: `Готово: ${item.title}` });
     try {
       await api.setStatus(actor.id, item.id, "done");
@@ -259,12 +277,12 @@ export default function Home() {
 
   async function onAction(a: BotAction) {
     if (a.kind === "nudge") {
-      setTab("chat");
+      openChat("requests");
       say(nudgeMsg(a.requestId, a.itemTitle));
       return;
     }
     if (a.kind === "nudge-lead") {
-      setTab("chat");
+      openChat("requests");
       say(absenceNudgeMsg(findUser(actor.lead_id)?.name ?? ""));
       return;
     }
@@ -296,11 +314,11 @@ export default function Home() {
       return;
     }
     if (kindOf(r) === "absence_pending") {
-      setTab("chat");
+      openChat("requests");
       say(absenceNudgeMsg(findUser(actor.lead_id)?.name ?? ""));
       return;
     }
-    setTab("chat");
+    openChat(reminderTopic(r));
     const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
     say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));
   }
@@ -313,7 +331,7 @@ export default function Home() {
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
       if (plan) await showWeekly(actor, plan.current_day);
       const shown = await showReminders(actor, plan);
-      if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Новый день. Зависших пунктов нет." });
+      if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, topic: "assistant", content: "Новый день. Зависших пунктов нет." });
     } catch (err) {
       setDemoError((err as Error).message);
     }

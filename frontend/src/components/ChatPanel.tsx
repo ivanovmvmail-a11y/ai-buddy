@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api, type ChatMessage } from "@/lib/api";
-import { approverText, itemActions, msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
+import { approverText, itemActions, msgId, TOPICS, useChat, type BotAction, type Msg } from "@/lib/chat";
 import { usePlan, useRefresh, useResources } from "@/lib/queries";
 import { findUser } from "@/lib/users";
 import { dayText } from "./AbsencePanel";
@@ -21,26 +21,35 @@ const MAX_HISTORY = 20;
 export async function askBot(actor: DemoUser, text: string) {
   const chat = useChat.getState();
   if (!text.trim() || chat.busy) return;
-  chat.push({ id: msgId(), role: "user", kind: "text", content: text.trim() });
+  const asked = msgId();
+  const topic = chat.tab;
+  chat.push({ id: asked, role: "user", kind: "text", content: text.trim() });
   chat.setBusy(true);
+  // Модели — переписка только этой вкладки (чекпоинт 2): соседняя тема не уводит ответ в сторону.
   const history: ChatMessage[] = useChat
     .getState()
-    .messages.filter((m) => m.kind === "text" && !m.scripted)
+    .messages.filter((m) => m.kind === "text" && !m.scripted && (actor.role !== "intern" || m.topic === topic))
     .map((m) => ({ role: m.role, content: m.content }))
     // Модели нужна недавняя переписка; вся история после ~20 вопросов упиралась в лимит сервера (проверка 13.11).
     .slice(-MAX_HISTORY);
   try {
     const res = await api.chat(actor.id, history);
+    // Ответ о заявке или о задании — во вкладку своей темы, вместе с вопросом (у стажёра; у остальных одна лента).
+    if (actor.role === "intern" && res.topic !== topic) {
+      chat.update(asked, { topic: res.topic });
+      chat.setTab(res.topic);
+    }
     // Ответ о пункте плана — с кнопками этого пункта, как в плане (чекпоинт 2).
     const item = res.item_id ? await api.plan(actor.id).then((p) => p.items.find((i) => i.id === res.item_id)).catch(() => undefined) : undefined;
     if (res.mode === "practice" && item) chat.setPractice({ itemId: item.id, title: item.title });
     const actions = item ? itemActions(item, actor, res.mode === "practice" ? ["practice"] : []) : [];
+    const where = actor.role === "intern" ? res.topic : undefined;
     chat.push({
-      id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources,
+      id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources, topic: where,
       answerId: res.answer_id ?? undefined, actions: actions.length ? actions : undefined,
     });
     for (const action of res.actions) {
-      chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action });
+      chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action, topic: where });
     }
   } catch (err) {
     chat.push({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message, retry: text.trim() });
@@ -74,11 +83,29 @@ export async function submitPractice(actor: DemoUser, text: string, onDone?: () 
   }
 }
 
+const EMPTY: Record<string, string> = {
+  assistant: "Здесь — вопросы о стажировке и документах команды.",
+  study: "Здесь — объяснения пунктов плана и задания практикумов. Нажми «Объяснить» у пункта или напиши «объясни пункт про песочницу».",
+  requests: "Здесь — заявки на доступ, отгулы и напоминания. Нажми «Сделать за меня» у пункта или напиши «мне завтра к врачу».",
+};
+const PLACEHOLDER: Record<string, string> = {
+  assistant: "Спроси что угодно…",
+  study: "Спроси про пункт плана…",
+  requests: "Доступ, отгул, напоминание…",
+};
+
 export function ChatPanel({ actor, onAction }: Props) {
   const messages = useChat((s) => s.messages);
   const busy = useChat((s) => s.busy);
   const practice = useChat((s) => s.practice);
   const setPractice = useChat((s) => s.setPractice);
+  const tab = useChat((s) => s.tab);
+  const setTab = useChat((s) => s.setTab);
+  const unread = useChat((s) => s.unread);
+  // Вкладки — у стажёра: у него и заявки, и учёба, и вопросы. У остальных ролей лента одна.
+  const tabbed = actor.role === "intern";
+  const shown = tabbed ? messages.filter((m) => (m.topic ?? "assistant") === tab) : messages;
+  const practicing = practice && (!tabbed || tab === "study");
   const refresh = useRefresh();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -86,26 +113,49 @@ export function ChatPanel({ actor, onAction }: Props) {
   useEffect(() => {
     const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     bottomRef.current?.scrollIntoView?.({ behavior: calm ? "auto" : "smooth" });
-  }, [messages, busy]);
+  }, [messages, busy, tab]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const t = input;
     setInput("");
-    if (practice) void submitPractice(actor, t, refresh);
+    if (practicing) void submitPractice(actor, t, refresh);
     else void askBot(actor, t);
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {tabbed && (
+        <div role="tablist" aria-label="Темы чата" className="flex gap-1 border-b border-black/10 px-3 pt-2 dark:border-white/10">
+          {TOPICS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`relative -mb-px rounded-t-lg border-b-2 px-3 py-1.5 text-sm font-medium transition-colors ${
+                tab === t.id ? "border-[#00aaff]" : "border-transparent text-black/55 hover:text-black/80 dark:text-white/55 dark:hover:text-white/80"
+              }`}
+            >
+              {t.title}
+              {unread.includes(t.id) && tab !== t.id && (
+                <span aria-label="есть новое" className="ml-1.5 inline-block size-2 rounded-full bg-[#00aaff] align-middle" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" aria-live="polite">
-        {messages.map((m) => (
+        {tabbed && shown.length === 0 && (
+          <p className="text-sm text-black/50 dark:text-white/50">{EMPTY[tab]}</p>
+        )}
+        {shown.map((m) => (
           <Bubble key={m.id} m={m} actor={actor} onAction={onAction} />
         ))}
         {busy && <div className="text-sm text-black/55 dark:text-white/55">AI-buddy думает…</div>}
         <div ref={bottomRef} />
       </div>
-      {practice && (
+      {practicing && practice && (
         <div role="status" className="flex items-center gap-2 border-t border-violet-500/30 bg-violet-500/[0.06] px-3 py-1.5 text-sm">
           <span className="min-w-0 flex-1 truncate">Сдаёшь задание: «{practice.title}» — ответ следующим сообщением</span>
           <button
@@ -121,10 +171,10 @@ export function ChatPanel({ actor, onAction }: Props) {
       )}
       <form onSubmit={onSubmit} className="flex gap-2 border-t border-black/10 p-3 dark:border-white/10">
         <input
-          aria-label={practice ? "Ответ на задание" : "Сообщение"}
+          aria-label={practicing ? "Ответ на задание" : "Сообщение"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={practice ? "Что и как сделано — своими словами…" : "Спроси что угодно…"}
+          placeholder={practicing ? "Что и как сделано — своими словами…" : PLACEHOLDER[tabbed ? tab : "assistant"]}
           className="min-w-0 flex-1 rounded-xl border border-black/15 bg-transparent px-4 py-2.5 text-base outline-none focus:border-[#00aaff] dark:border-white/20"
         />
         <button type="submit" disabled={busy || !input.trim()} className="rounded-xl bg-[#00aaff] px-4 font-medium text-white disabled:opacity-40">
@@ -251,14 +301,14 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
       if (result.status === "done" && isAccess) {
         const req = (result.result as { request?: AccessRequest } | null)?.request;
         push({
-          id: msgId(), role: "assistant", kind: "text", scripted: true,
+          id: msgId(), role: "assistant", kind: "text", scripted: true, topic: m.topic,
           content: req?.status === "granted"
             ? `Готово: заявка ${req.id} — доступ к «${resource?.title ?? req.resource_id}» выдан. Пункт плана закрыт.`
             : `Заявка ${req?.id} создана и ушла на согласование: ${findUser(req?.approver_id)?.name ?? "согласующий"}. Пункт плана ждёт ответа — я напомню, если затянется.`,
         });
       } else if (result.status === "done" && isAbsence) {
         push({
-          id: msgId(), role: "assistant", kind: "text", scripted: true,
+          id: msgId(), role: "assistant", kind: "text", scripted: true, topic: m.topic,
           content: `Заявление ушло руководителю: ${findUser(actor.lead_id)?.name ?? "руководитель команды"}. Решение придёт уведомлением, а если затянется — я напомню.`,
         });
       } else if (result.status === "failed") {

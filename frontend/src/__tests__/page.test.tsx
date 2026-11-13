@@ -26,6 +26,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Вкладка чата стажёра (чекпоинт 2: чаты разделены по темам). */
+async function chatTab(name: string) {
+  await act(async () => fireEvent.click(await screen.findByRole("tab", { name: new RegExp(`^${name}`) })));
+}
+
 function open(userId = "intern-anya") {
   useSession.setState({ userId, internPick: null });
   return render(
@@ -189,6 +194,7 @@ describe("экран «план + чат» на API", () => {
   it("Иван: кого ждём и напоминания при входе; «Напомнить позже»", async () => {
     open("intern-ivan");
     expect(await screen.findByText(/Ждём ответа \(Мария Орлова\)/)).toBeTruthy();
+    await chatTab("Заявки");
     const reminder = (await screen.findByText(/ждёт. Напомнить наставнику/)).parentElement!;
     await click(within(reminder).getByRole("button", { name: "Напомнить позже" }));
     expect(await screen.findByText("Хорошо, напомню завтра.")).toBeTruthy();
@@ -197,6 +203,7 @@ describe("экран «план + чат» на API", () => {
 
   it("зависшая заявка: «Написать наставнику» — готовый текст для копирования, бот сам не отправляет", async () => {
     open("intern-ivan");
+    await chatTab("Заявки");
     const reminder = (await screen.findByText(/ждёт. Напомнить наставнику/)).parentElement!;
     await click(within(reminder).getByRole("button", { name: "Написать наставнику" }));
     expect(await screen.findByText(/получится посмотреть мою заявку REQ-\d+ \(пункт плана «/)).toBeTruthy();
@@ -243,6 +250,7 @@ describe("экран «план + чат» на API", () => {
 
   it("напоминание о просрочке ведёт к пункту", async () => {
     open("intern-ivan");
+    await chatTab("Учёба");
     const reminder = (await screen.findByText(/прошёл срок/)).parentElement!;
     await click(within(reminder).getByRole("button", { name: "Объяснить" }));
     expect(await screen.findByText(/Объясни пункт «Завести конспект/)).toBeTruthy();
@@ -303,8 +311,9 @@ describe("экран «план + чат» на API", () => {
     open();
     expect(await screen.findByText("Buddy — наставник.")).toBeTruthy();
     expect(screen.getByText("Кто такой buddy?")).toBeTruthy();
-    expect(screen.getByText("Черновик ждёт твоего решения.")).toBeTruthy();
     expect(await screen.findByText(/8-й день стажировки/)).toBeTruthy(); // приветствие — после истории, под Иваном
+    await chatTab("Заявки"); // неподтверждённый черновик — во вкладке «Заявки»
+    expect(screen.getByText("Черновик ждёт твоего решения.")).toBeTruthy();
     const order = useChat.getState().messages.map((m) => m.content);
     expect(order.indexOf("Buddy — наставник.")).toBeLessThan(order.findIndex((c) => c.startsWith("Привет, Иван")));
   });

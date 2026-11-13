@@ -17,8 +17,17 @@ export type BotAction =
   | { label: string; kind: "nudge"; requestId: string; itemTitle: string }
   | { label: string; kind: "nudge-lead" };
 
+/** Вкладки чата стажёра (чекпоинт 2: «разделите чаты, а то всё в одном месте»). */
+export type Topic = "assistant" | "study" | "requests";
+export const TOPICS: Array<{ id: Topic; title: string }> = [
+  { id: "assistant", title: "Помощник" },
+  { id: "study", title: "Учёба" },
+  { id: "requests", title: "Заявки" },
+];
+
 export type Msg = {
   id: string;
+  topic?: Topic; // вкладка; по умолчанию — та, что открыта
   role: "user" | "assistant";
   kind: "text" | "draft" | "error";
   content: string;
@@ -46,6 +55,9 @@ type ChatStore = {
   seenReminders: string[];
   practice: PracticeMode | null;
   setPractice: (p: PracticeMode | null) => void;
+  tab: Topic;
+  unread: Topic[];
+  setTab: (t: Topic) => void;
   reset: (first: Msg[]) => void;
   push: (...m: Msg[]) => void;
   update: (id: string, patch: Partial<Msg>) => void;
@@ -59,8 +71,16 @@ export const useChat = create<ChatStore>((set) => ({
   seenReminders: [],
   practice: null,
   setPractice: (practice) => set({ practice }),
-  reset: (first) => set({ messages: first, busy: false, seenReminders: [], practice: null }),
-  push: (...m) => set((s) => ({ messages: [...s.messages, ...m] })),
+  tab: "assistant",
+  unread: [],
+  setTab: (tab) => set((s) => ({ tab, unread: s.unread.filter((t) => t !== tab) })),
+  reset: (first) => set({ messages: first, busy: false, seenReminders: [], practice: null, tab: "assistant", unread: [] }),
+  // Сообщение без вкладки попадает в открытую; в другую — отмечаем её точкой «есть новое».
+  push: (...m) => set((s) => {
+    const tagged = m.map((x) => ({ ...x, topic: x.topic ?? s.tab }));
+    const unread = [...new Set([...s.unread, ...tagged.map((x) => x.topic!).filter((t) => t !== s.tab)])];
+    return { messages: [...s.messages, ...tagged], unread };
+  }),
   update: (id, patch) => set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
   setBusy: (busy) => set({ busy }),
   markSeen: (ids) => set((s) => ({ seenReminders: [...s.seenReminders, ...ids] })),
@@ -89,6 +109,8 @@ const scripted = (content: string, extra: Partial<Msg> = {}): Msg => ({
   id: msgId(), role: "assistant", kind: "text", content, scripted: true, ...extra,
 });
 
+const withTopic = (topic: Topic, content: string, extra: Partial<Msg> = {}): Msg => scripted(content, { ...extra, topic });
+
 /** Бот пишет первым (SPEC 3.3). */
 export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: AccessRequest[]): Msg {
   const name = actor.name.split(" ")[0];
@@ -103,7 +125,7 @@ export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: A
     }
     if (!next && plan.next_step.waiting.length === 0) lines.push("Недели 1–2 закрыты — дальше «Месяц 1».");
     const buttons = next ? itemActions(next, actor) : [];
-    return scripted(lines.join("\n"), { actions: buttons.length ? buttons : undefined });
+    return scripted(lines.join("\n"), { actions: buttons.length ? buttons : undefined, topic: "assistant" });
   }
   if (actor.role === "mentor") {
     return scripted(
@@ -134,12 +156,12 @@ export function weeklySummaryMsg(s: WeeklySummary, titles: Record<string, string
     "Эту же сводку видит наставник — удобно обсудить на встрече 1:1.",
   ];
   const next = s.carry_over.find((c) => c.owner_role === "intern" && c.status !== "waiting");
-  return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined });
+  return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined, topic: "assistant" });
 }
 
 /** «Написать наставнику» по зависшей заявке: бот не отправляет сообщения сам — готовит текст для копирования. */
 export function nudgeMsg(requestId: string, itemTitle: string): Msg {
-  return scripted(
+  return withTopic("requests", 
     "Черновик сообщения наставнику, можно скопировать:\n\n" +
       `«Привет! Подскажи, пожалуйста, получится посмотреть мою заявку ${requestId}` +
       (itemTitle ? ` (пункт плана «${itemTitle}»)` : "") +
@@ -149,7 +171,7 @@ export function nudgeMsg(requestId: string, itemTitle: string): Msg {
 
 /** Заявка на отгул ждёт решения (SPEC 3.8): готовый текст руководителю — бот сам не отправляет (SPEC 3.7). */
 export function absenceNudgeMsg(leadName: string): Msg {
-  return scripted(
+  return withTopic("requests", 
     `Черновик сообщения руководителю${leadName ? ` (${leadName})` : ""}, можно скопировать:
 
 ` +
@@ -158,9 +180,16 @@ export function absenceNudgeMsg(leadName: string): Msg {
   );
 }
 
+/** Вкладка напоминания: заявки и отгулы — «Заявки», пункт плана — «Учёба», остальное — «Помощник». */
+export function reminderTopic(r: Reminder): Topic {
+  if (r.request_id || kindOf(r).startsWith("absence")) return "requests";
+  return r.plan_item_id ? "study" : "assistant";
+}
+
 export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
+  const topic = reminderTopic(r);
   // Уведомление-факт («Наставник отметил…», «Отгул согласован») — без кнопок: ничего делать не нужно.
-  if (doneOnOpen(r) || kindOf(r) === "skill_suggestion" || kindOf(r) === "absence_new") return scripted(`🔔 ${r.text}`);
+  if (doneOnOpen(r) || kindOf(r) === "skill_suggestion" || kindOf(r) === "absence_new") return withTopic(topic, `🔔 ${r.text}`);
   const actions: BotAction[] = [];
   if (kindOf(r) === "absence_pending") {
     actions.push({ label: "Написать руководителю", kind: "nudge-lead" });
@@ -168,7 +197,7 @@ export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
     actions.push({ label: "Написать наставнику", kind: "nudge", requestId: r.request_id, itemTitle: item?.title ?? "" });
   } else if (item) actions.push({ ...actionFor(item), label: item.resource_id && item.status !== "waiting" ? "Сделать сейчас" : "Объяснить" });
   actions.push({ label: "Напомнить позже", kind: "snooze", reminderId: r.id });
-  return scripted(`🔔 ${r.text}`, { actions });
+  return withTopic(topic, `🔔 ${r.text}`, { actions });
 }
 
 const DEPTH: Record<SkillLevel, string> = {
@@ -202,6 +231,7 @@ export function explainScripted(item: PlanItem, profile: SkillProfile | undefine
   }
   if (item.practice) parts.push(`Задание на практике: ${item.practice}`);
   return scripted(parts.join("\n\n"), {
+    topic: "study",
     sources: item.doc_source_id ? [{ title: item.doc_source_id.replace("demo:", ""), url: null }] : undefined,
     followups: followupsFor(item, ["Как это сделать по шагам?", "К кому идти, если не получается?"]),
     actions: item.resource_id && item.status !== "done" && item.status !== "waiting" ? [actionFor(item)] : undefined,
@@ -223,4 +253,12 @@ export function approverText(resource: AccessResource | undefined, actor: DemoUs
   return resource.approver === "auto" && level === "read"
     ? "выдаётся автоматически"
     : findUser(actor.mentor_id)?.name ?? "наставник";
+}
+
+/** Восстановленная переписка (сервер вкладку не хранит): раскладываем по словам сообщения. */
+export function guessTopic(content: string): Topic {
+  const c = content.toLowerCase();
+  if (/заявк|отгул|заявлени|доступ к «|напомни/.test(c)) return "requests";
+  if (/^объясни пункт|^сдать задание|задание|практикум|по шагам|по разделу/.test(c)) return "study";
+  return "assistant";
 }
