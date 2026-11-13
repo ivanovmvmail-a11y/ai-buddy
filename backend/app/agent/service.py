@@ -12,6 +12,8 @@ from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WO
                                        ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule, is_reminder_request, reminder_plan,
                                        docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
                                        search_query, second_note, split_actions)
+from app.llm.scenario_provider import _overlap as _stem_overlap
+from app.llm.scenario_provider import _words as _stems
 from app.rag import retrieve
 
 from .actions import Action, ActionStore, InMemoryActionStore
@@ -55,8 +57,7 @@ def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict
     (ответ «в базе нет» повторяет вопрос и не должен выглядеть как ответ по документу).
     """
     titled = {d["title"] for d in docs if f"«{d['title']}»" in reply}
-    if not titled and says_not_found(reply):
-        return []  # «в документах этого нет» — ни на какой документ не опирается (проверка 12.11, В5)
+    missing = says_not_found(reply)
     if titled:
         cited: list[dict] = []
         for doc in docs:
@@ -68,15 +69,37 @@ def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict
     scores: dict[str, tuple[int, dict]] = {}
     for doc in docs:
         score = len(words & set(_WORD.findall(doc["content"].lower().replace("ё", "е"))))
-        if score >= 4 and score > scores.get(doc["title"], (0, doc))[0]:
+        # «в документах этого нет» не опирается на документ (проверка 12.11, В5) — но ответ бывает смешанный:
+        # «OKR — это цели на квартал (глоссарий)…, а твои цели в плане не указаны» (GigaChat 13.11, live-32).
+        # Тогда источник — только при сильном совпадении с документом.
+        if score >= (6 if missing else 4) and score > scores.get(doc["title"], (0, doc))[0]:
             scores[doc["title"]] = (score, doc)
     if not scores:
-        return []
+        return [] if missing else _short_answer_source(reply, docs, question)
     # Проверка 13.11: с ключом под ответом стояло 5–7 документов — половина по общим словам («наставник», «задача»).
     # Оставляем самые близкие к ответу: не больше двух и не слабее половины лучшего.
     best = max(s for s, _ in scores.values())
     ranked = sorted(scores.values(), key=lambda pair: -pair[0])
     return [{"title": d["title"], "url": d.get("url")} for s, d in ranked if s * 2 >= best][:MAX_SOURCES]
+
+
+def _short_answer_source(reply: str, docs: list[dict], question: str) -> list[dict]:
+    """Короткий ответ модели («иди к наставнику») не набирает четырёх общих слов с документом, хотя пересказывает его
+    (GigaChat 13.11, doc-05). Тогда источник — один фрагмент, который совпадает и с вопросом (≥2 основы слов), и с
+    ответом (≥2 основы, не считая слов вопроса), с учётом окончаний («наставнику» = «наставник»). Ничья — без источника:
+    лучше не показать документ, чем показать случайный."""
+    asked = _stems(question)
+    said = _stems(reply) - asked
+    if len(asked) < 2 or len(said) < 2:
+        return []
+    ranked = sorted(((_stem_overlap(asked, d["content"]), _stem_overlap(said, d["content"]), i)
+                     for i, d in enumerate(docs)), reverse=True)
+    ranked = [r for r in ranked if r[0] >= 2 and r[1] >= 2]
+    if not ranked or (len(ranked) > 1 and ranked[1][:2] == ranked[0][:2]
+                      and docs[ranked[1][2]]["title"] != docs[ranked[0][2]]["title"]):
+        return []
+    doc = docs[ranked[0][2]]
+    return [{"title": doc["title"], "url": doc.get("url")}]
 
 
 class ActionError(Exception):

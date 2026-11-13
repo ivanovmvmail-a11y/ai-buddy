@@ -267,6 +267,22 @@ def test_guard_key_term_missing_even_if_other_words_match(demo_docs, use_llm):
     assert reply.startswith("В документах, доступных тебе, этого нет") and "портал" not in reply
 
 
+def test_short_model_answer_still_gets_its_source(demo_docs, use_llm):
+    """GigaChat 13.11 (doc-05): верный, но короткий ответ без названия документа — источник всё равно показан."""
+    from app.agent.service import cited_sources
+    docs = [{"title": "Пока ждёшь доступ", "url": None,
+             "content": "Если доступа не хватает, напомни наставнику и держи его в курсе."},
+            {"title": "Оборудование", "url": None, "content": "Ноутбук выдаёт ответственный за учебную технику."}]
+    reply = "Если не хватает доступа, напомни своему наставнику."
+    assert [s["title"] for s in cited_sources(reply, docs, "К кому идти, если не хватает доступа?")] \
+        == ["Пока ждёшь доступ"]
+
+
+def test_short_answer_without_doc_words_gets_no_source(demo_docs, use_llm):
+    use_llm(text_reply("Отличный вопрос!"))
+    assert ask(demo_docs, "К кому идти, если не хватает доступа?")["sources"] == []
+
+
 def test_guard_key_term_present_keeps_answer(demo_docs, use_llm):
     """Латинский термин, который есть в документе (Git), страховку не включает."""
     answer = "По документу «Регламент учебного код-ревью»: открой PR в основную ветку."
