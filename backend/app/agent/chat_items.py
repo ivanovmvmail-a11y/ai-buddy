@@ -12,11 +12,12 @@
 import re
 from dataclasses import dataclass
 
-from app.llm.scenario_provider import _overlap, _query_words
+from app.llm.scenario_provider import _overlap, _query_words, colloquial
 from app.mcp_server.models import PlanItem
 
 from . import services
 from .explain import explain_item
+from .levels import topic_of
 from .practice import has_check
 from .users import User, by_gender
 
@@ -28,6 +29,9 @@ PRACTICE_WORDS = ("сдать задани", "сдам задани", "сдаю 
                   "сдать домашк", "проверь домашк", "задание выполнил", "задание сделал", "выполнил задание",
                   "сделал задание", "выполнила задание", "сделала задание", "задание выполнила", "задание сделала")
 WORKING = ("week1", "week2")
+# «Что делать по git?», «с чего начать с SQL» — просьба о шаге в теме карты навыков.
+TOPIC_ASK = ("что мне делать", "что делать по", "что делать с", "с чего начать", "что дальше по", "как начать",
+             "что мне по", "что по ")
 
 
 @dataclass
@@ -69,10 +73,21 @@ async def item_reply(question: str, user: User) -> ItemReply | None:
     q = _norm(question)
     practice = any(w in q for w in PRACTICE_WORDS)
     explain = any(w in q for w in EXPLAIN_WORDS)
-    if user.role.value != "intern" or not (practice or explain):
+    # «Что мне делать по git?» — если в плане есть открытый пункт этой темы (практикум), объясняем его, как кнопка
+    # (Миша 14.11: бот отвечал сводкой плана «следующий шаг — базовые доступы»). Пункта нет — обычный ответ по документам.
+    topic = topic_of(question) if any(w in colloquial(q) for w in TOPIC_ASK) else None
+    if user.role.value != "intern" or not (practice or explain or topic):
         return None
     plan = await services.get_plan(user, user.id)
     items = [i for i in plan.items if i.stage in WORKING]
+    if topic and not (practice or explain):
+        # Сначала персональный пункт темы (практикум «для тебя»), потом общий.
+        open_items = sorted((i for i in items if i.topic == topic and i.status != "done"), key=lambda i: i.kind != "personal")
+        item = open_items[0] if open_items else None
+        if item is None:
+            return None
+        body = await explain_item(user, user.id, item.id, "explain")
+        return ItemReply(body["text"], item_id=item.id, sources=[body["source"]] if body["source"] else [])
     if practice:
         open_tasks = [i for i in items if has_check(i.practice) and i.status != "done"]
         if not open_tasks:

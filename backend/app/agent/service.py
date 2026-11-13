@@ -49,6 +49,7 @@ class AgentResult:
     item_id: str | None = None  # пункт плана, о котором ответ: чат покажет его кнопки (чекпоинт 2)
     mode: str | None = None  # "practice" — следующее сообщение стажёра — ответ на задание
     topic: str | None = None  # вкладка чата: assistant | study | requests (чекпоинт 2: «разделите чаты»)
+    by_model: bool = False  # текст написала модель (GigaChat и т. п.); иначе — сервер из данных и документов
 
     def chat_topic(self, question: str = "") -> str:
         """Вкладка чата для ответа: заявки и отгулы — «Заявки», пункты плана и задания — «Учёба», остальное — «Помощник».
@@ -247,6 +248,7 @@ class Agent:
             reply = await llm.chat(messages, specs or None)
             if not reply.tool_calls:
                 text = reply.content
+                by_model = getattr(llm, "name", "") not in ("scenario", "echo")
                 # SPEC 3.8: к черновику заявления — правило из регламента с источником, даже если модель его опустила.
                 if any(a.tool == "create_absence_request" for a in created) and "Отгул на один день" not in text:
                     text = absence_rule(system) + text
@@ -256,6 +258,7 @@ class Agent:
                     log.info("docs guard replaced model reply user=%s", user.id)
                     text = fixed
                     levelled = None  # абзац документа — не ответ модели, подстраивать нечего
+                    by_model = False
                 if getattr(llm, "name", "") != "scenario":
                     # Модель назвала внутренний инструмент или выдумала документ (прогон на Railway 12.11) — убираем.
                     text = scrub_reply(text, set(self.registry.tools), {d["title"] for d in docs})
@@ -267,7 +270,8 @@ class Agent:
                 sources = cited_sources(text, docs, question, short=not used)
                 if created:  # к черновику — только документ, названный в ответе (правило отгула), не похожий по словам
                     sources = [s for s in sources if f"«{s['title']}»" in text]
-                return AgentResult(reply=text, sources=sources, actions=created, tools=used, refused=refused)
+                return AgentResult(reply=text, sources=sources, actions=created, tools=used, refused=refused,
+                                   by_model=by_model)
             messages.append(Message(role="assistant", content=reply.content, tool_calls=reply.tool_calls))
             for call in reply.tool_calls:
                 result = await self.executor.call(user, call)

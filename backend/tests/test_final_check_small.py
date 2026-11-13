@@ -27,3 +27,26 @@ def test_mentor_explain_says_whose_text(client):
 def test_swagger_page_has_offline_fallback_and_light_background(client):
     html = client.get("/docs").get_data(as_text=True)
     assert "window.SwaggerUIBundle" in html and "openapi.json" in html and "background: #fff" in html
+
+
+def test_topic_question_explains_plan_item_not_plan_summary(demo_docs):
+    """Миша 14.11: «что мне делать по git» → сводка плана «следующий шаг — базовые доступы»."""
+    body = ask(demo_docs, "что мне делать по git")
+    assert body["item_id"] == "anya.p.git" and "Практикум: Git" in body["reply"] and body["scripted"] is True
+
+
+def test_topic_question_without_plan_item_goes_to_docs(demo_docs):
+    body = ask(demo_docs, "что мне делать по git", "intern-kirill")  # у Кирилла Git уверенно — практикума нет
+    assert "Следующий шаг" not in body["reply"] and body["sources"]
+
+
+def test_plain_next_step_still_plan_summary(demo_docs):
+    assert "Следующий шаг" in ask(demo_docs, "что мне делать дальше?")["reply"]
+
+
+def test_model_answer_is_not_scripted(client, use_llm, monkeypatch):
+    from app.agent import service
+    from .conftest import text_reply
+    monkeypatch.setattr(service, "docs_guard", lambda *a: None)  # без замены страховкой — ответ модели как есть
+    use_llm(text_reply("Ответ модели."))
+    assert ask(client, "расскажи про культуру команды")["scripted"] is False

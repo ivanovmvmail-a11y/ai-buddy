@@ -41,6 +41,7 @@ export type Msg = {
   rated?: "useful" | "not_useful";
   scripted?: boolean;
   label?: string; // подпись под ответом без модели (по умолчанию — «из данных плана»)
+  server?: boolean; // ответ /chat собрал сервер, без модели: подпись «из данных плана», но в переписке для модели остаётся
 };
 
 let n = 0;
