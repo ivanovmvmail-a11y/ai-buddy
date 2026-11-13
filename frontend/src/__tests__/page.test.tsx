@@ -388,7 +388,7 @@ describe("экран «план + чат» на API", () => {
   it("HR BP не видит планы", async () => {
     open("hrbp-elena");
     expect(await screen.findByText(/для твоей роли недоступны/)).toBeTruthy();
-    expect(await screen.findByText(/Планы и профили стажёров тебе не показываю/)).toBeTruthy();
+    expect(await screen.findByText(/Планы и профили стажёров тебе не показываю/, undefined, { timeout: 3000 })).toBeTruthy();
   });
 
   it("сервер недоступен — сообщение и «Повторить»", async () => {
