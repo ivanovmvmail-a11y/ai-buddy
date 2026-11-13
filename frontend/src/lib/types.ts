@@ -23,6 +23,7 @@ export type DemoUser = {
   role: Role;
   team: string;
   mentor_id?: string | null;
+  lead_id?: string | null; // руководитель — решает заявки на отгул (SPEC 3.8)
 };
 
 export const PlanItem = z.object({
@@ -45,6 +46,15 @@ export const PlanItem = z.object({
   overdue: z.boolean(),
   waiting_for: z.string().nullable(),
   waiting_days: z.number().nullable(),
+  // SPEC 3.1, docs/API.md (11.11): общий пункт («для всех») или персональный («для тебя») с подписью «почему».
+  // Сервер может ещё не присылать эти поля — тогда пункт общий, а уровень берётся из карты навыков.
+  kind: z.enum(["common", "personal"]).default("common"),
+  reason: z.string().nullable().default(null),
+  skill_level: SkillLevel.nullable().optional(),
+  known_marked: z.boolean().default(false),
+  // Спека 107: у пункта есть задание, которое бот проверит («Сдать задание»).
+  practice_check: z.boolean().default(false),
+  catalog_key: z.string().nullable().default(null),
 });
 export type PlanItem = z.infer<typeof PlanItem>;
 
@@ -96,12 +106,27 @@ export const SkillProfile = z.object({
   skills: z.record(z.string(), SkillLevel),
   strengths: z.array(z.string()),
   growth: z.array(z.string()),
+  updated_by: z.string().nullable().optional(), // кто последним менял уровень (наставник)
 });
 export type SkillProfile = z.infer<typeof SkillProfile>;
+
+// SPEC 3.6 (11.11): единые уведомления. kind/action/ссылки — из контракта docs/API.md; у старого сервера их нет.
+export const ReminderKind = z.enum([
+  "plan_item", "access_request", "skill_changed", "personal_item_added", "skill_suggestion",
+  "absence_pending", "absence_decided", "absence_today", "absence_new", "absence_fact",
+]);
+export type ReminderKind = z.infer<typeof ReminderKind>;
+export const ReminderTarget = z.enum(["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern"]);
+export type ReminderTarget = z.infer<typeof ReminderTarget>;
 
 export const Reminder = z.object({
   id: z.string(),
   user_id: z.string(),
+  kind: ReminderKind.optional(),
+  action: z.object({ label: z.string(), target: ReminderTarget }).nullable().optional(),
+  intern_id: z.string().nullable().optional(),
+  absence_request_id: z.string().nullable().optional(),
+  suggestion_id: z.string().nullable().optional(),
   plan_item_id: z.string().nullable(),
   request_id: z.string().nullable(),
   text: z.string(),
@@ -117,7 +142,7 @@ export const Action = z.object({
   tool: z.string(),
   title: z.string(),
   params: z.record(z.string(), z.unknown()),
-  status: z.enum(["pending", "done", "failed", "cancelled"]),
+  status: z.enum(["pending", "running", "done", "failed", "cancelled"]), // running — выполняется прямо сейчас
   result: z.record(z.string(), z.unknown()).nullable(),
   error: z.string().nullable(),
 });
@@ -134,6 +159,10 @@ export type ChatResponse = z.infer<typeof ChatResponse>;
 
 export const DocSource = z.object({ title: z.string(), url: z.string().nullable() });
 export type DocSource = z.infer<typeof DocSource>;
+
+/** GET /documents?title= — документ из «Источник» целиком (только общий или своей команды). */
+export const DocumentView = z.object({ title: z.string(), team: z.string().nullable(), content: z.string() });
+export type DocumentView = z.infer<typeof DocumentView>;
 /** Объяснение пункта без модели: текст из раздела документа пункта (аудит S1, S7); записано в события. */
 export const ExplainedResponse = z.object({
   answer_id: z.string(), text: z.string(), source: DocSource.nullable(), chips: z.array(z.string()),
@@ -170,5 +199,92 @@ export const Metrics = z.object({
   feedback: z.object({ useful: z.number(), not_useful: z.number() }),
   topics: z.array(TopicCount),
   unanswered_topics: z.array(TopicCount),
+  conflict_topics: z.array(TopicCount).default([]), // документы противоречат друг другу (SPEC 3.7)
 });
 export type Metrics = z.infer<typeof Metrics>;
+
+// GET /chat/history — своя переписка, старые сверху (SPEC 9).
+export const ChatHistory = z.object({
+  messages: z.array(z.object({
+    id: z.string(),
+    role: z.enum(["user", "assistant"]),
+    content: z.string(),
+    sources: z.array(DocSource),
+    answer_id: z.string().nullable(),
+    scripted: z.boolean(),
+  })),
+});
+export const ActionsResponse = z.object({ actions: z.array(Action) });
+
+// SPEC 4 (11.11): бот предлагает поднять уровень, решает наставник. Стажёру эндпоинт отвечает 404.
+export const SkillSuggestion = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  intern_name: z.string(),
+  topic: z.string(),
+  topic_title: z.string(),
+  from_level: SkillLevel,
+  to_level: SkillLevel,
+  basis: z.string(),
+  created_day: z.number(),
+  status: z.enum(["pending", "accepted", "dismissed"]),
+  decided_day: z.number().nullable(),
+});
+export type SkillSuggestion = z.infer<typeof SkillSuggestion>;
+export const SuggestionsResponse = z.object({ suggestions: z.array(SkillSuggestion) });
+
+// SPEC 5 (11.11): два плана рядом — общие пункты совпадают, персональные различаются. Не рейтинг.
+export const PlanCompare = z.object({
+  interns: z.array(z.object({ id: z.string(), name: z.string() })),
+  common: z.array(z.object({
+    key: z.string(),
+    title: z.string(),
+    stage: Stage,
+    topic: z.string().nullable(),
+    by_intern: z.record(z.string(), z.object({ status: ItemStatus, skill_level: SkillLevel.nullable() })),
+  })),
+  personal: z.record(z.string(), z.array(PlanItem)),
+});
+export type PlanCompare = z.infer<typeof PlanCompare>;
+
+// SPEC 3.8 (11.11): отгул на один день. Причина — закрытый список, без медицинских подробностей.
+export const AbsenceRequest = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  intern_name: z.string(),
+  lead_id: z.string(),
+  day: z.string(),
+  reason: z.enum(["personal", "family", "study"]),
+  reason_title: z.string(),
+  status: z.enum(["pending", "approved", "rejected"]),
+  created_day: z.number(),
+  decided_day: z.number().nullable().optional(),
+});
+export type AbsenceRequest = z.infer<typeof AbsenceRequest>;
+export const AbsenceRequestsResponse = z.object({ requests: z.array(AbsenceRequest) });
+/** Наставнику — только факт «отсутствует <дата>», без причины и номера заявки. */
+export const AbsenceFactsResponse = z.object({ facts: z.array(z.object({ intern_id: z.string(), day: z.string() })) });
+
+// SPEC 3.1 (11.11): каталог персональных пунктов команды — наставник добавляет из него пункт стажёру.
+export const CatalogItem = z.object({
+  key: z.string(),
+  team: z.string(),
+  topic: z.string(),
+  topic_title: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  stage: Stage,
+  in_plan: z.boolean(),
+});
+export type CatalogItem = z.infer<typeof CatalogItem>;
+export const CatalogResponse = z.object({ items: z.array(CatalogItem) });
+
+// Спека 107: результат проверки задания на практике — без модели, по фактам учебного документа.
+export const PracticeResult = z.object({
+  passed: z.boolean(),
+  found: z.array(z.string()),
+  missing: z.array(z.string()),
+  text: z.string(),
+  source: z.object({ title: z.string(), url: z.string().nullable() }).nullable(),
+});
+export type PracticeResult = z.infer<typeof PracticeResult>;

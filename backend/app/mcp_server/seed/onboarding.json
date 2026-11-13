@@ -9,6 +9,8 @@
   "resources": [
     {"id": "jira", "title": "Учебный Jira", "kind": "base", "team": null, "approver": "auto"},
     {"id": "confluence", "title": "Учебный Confluence", "kind": "base", "team": null, "approver": "auto"},
+    {"id": "redash", "title": "Учебный Redash", "kind": "base", "team": null, "approver": "auto"},
+    {"id": "grafana", "title": "Учебная Grafana", "kind": "base", "team": null, "approver": "auto"},
     {"id": "bitbucket-platform", "title": "Bitbucket: Платформа объявлений", "kind": "team_space", "team": "Платформа объявлений", "approver": "mentor"},
     {"id": "bitbucket-delivery", "title": "Bitbucket: Авито Доставка", "kind": "team_space", "team": "Авито Доставка", "approver": "mentor"}
   ],
@@ -23,13 +25,13 @@
   ],
   "team_items": {
     "Платформа объявлений": [
-      {"id": "w1.team-space", "stage": "week1", "order": 3, "title": "Открыть пространство Платформы объявлений", "summary": "Запроси учебное пространство Bitbucket у своего наставника.", "owner_role": "intern", "resource_id": "bitbucket-platform", "due_day": 4, "topic": "git", "doc_source_id": "demo:05-platform-sandbox.md", "practice": "После выдачи доступа найди README учебного каталога."},
-      {"id": "w1.sandbox", "stage": "week1", "order": 8, "title": "Запустить песочницу объявлений", "summary": "Подготовь вымышленные карточки и проверь поиск по заголовку.", "owner_role": "intern", "due_day": 10, "topic": "ci", "doc_source_id": "demo:05-platform-sandbox.md", "practice": "Создай карточку бумажного змея и запиши результат smoke-теста."},
+      {"id": "w1.team-space", "stage": "week1", "order": 3, "title": "Открыть пространство Платформы объявлений", "summary": "Запроси учебное пространство Bitbucket у своего наставника.", "owner_role": "intern", "resource_id": "bitbucket-platform", "due_day": 4, "topic": "git", "doc_source_id": "demo:13-team-space-access.md", "practice": "После выдачи доступа найди README учебного каталога."},
+      {"id": "w1.sandbox", "stage": "week1", "order": 8, "title": "Запустить песочницу объявлений", "summary": "Подготовь вымышленные карточки и проверь поиск по заголовку.", "owner_role": "intern", "due_day": 10, "topic": "ci", "doc_source_id": "demo:17-platform-sandbox-setup.md", "practice": "Создай карточку бумажного змея и запиши результат smoke-теста."},
       {"id": "w2.docs", "stage": "week2", "order": 2, "title": "Разобрать документы Платформы объявлений", "summary": "Посмотри схему состояний карточки и учебный дашборд Grafana.", "owner_role": "intern", "due_day": 14, "topic": "sql", "doc_source_id": "demo:06-platform-lifecycle.md", "practice": "Сформулируй вопрос о переходе карточки в архив."}
     ],
     "Авито Доставка": [
-      {"id": "w1.team-space", "stage": "week1", "order": 3, "title": "Открыть пространство Авито Доставки", "summary": "Запроси учебное пространство Bitbucket у своего наставника.", "owner_role": "intern", "resource_id": "bitbucket-delivery", "due_day": 4, "topic": "git", "doc_source_id": "demo:08-delivery-sandbox.md", "practice": "После выдачи доступа найди README учебного маршрута."},
-      {"id": "w1.sandbox", "stage": "week1", "order": 8, "title": "Подготовить песочницу доставки", "summary": "Собери вымышленное отправление между учебными пунктами.", "owner_role": "intern", "due_day": 10, "topic": "ci", "doc_source_id": "demo:08-delivery-sandbox.md", "practice": "Проверь путь бумажной посылки до приёма в учебном пункте."},
+      {"id": "w1.team-space", "stage": "week1", "order": 3, "title": "Открыть пространство Авито Доставки", "summary": "Запроси учебное пространство Bitbucket у своего наставника.", "owner_role": "intern", "resource_id": "bitbucket-delivery", "due_day": 4, "topic": "git", "doc_source_id": "demo:13-team-space-access.md", "practice": "После выдачи доступа найди README учебного маршрута."},
+      {"id": "w1.sandbox", "stage": "week1", "order": 8, "title": "Подготовить песочницу доставки", "summary": "Собери вымышленное отправление между учебными пунктами.", "owner_role": "intern", "due_day": 10, "topic": "ci", "doc_source_id": "demo:20-delivery-sandbox-setup.md", "practice": "Проверь путь бумажной посылки до приёма в учебном пункте."},
       {"id": "w2.docs", "stage": "week2", "order": 2, "title": "Разобрать документы Авито Доставки", "summary": "Сравни цепочку статусов и пример учебного отчёта в Redash.", "owner_role": "intern", "due_day": 14, "topic": "sql", "doc_source_id": "demo:09-delivery-statuses.md", "practice": "Опиши, почему нельзя сразу выдать зарегистрированную посылку."}
     ]
   },
@@ -42,12 +44,120 @@
     {"id": "after3m.next", "stage": "after3m", "order": 2, "title": "Обсудить дальнейший план", "summary": "Контур будущего этапа, действий пока нет.", "owner_role": "intern"}
   ],
   "interns": [
-    {"id": "intern-anya", "start_date": "2026-11-10", "current_day": 2, "done_items": ["w1.meet-team"], "skills": {"git": "novice", "sql": "confident"}, "strengths": ["Уверенно читает учебные SQL-запросы", "Записывает вопросы к встрече"], "growth": ["Разобрать рабочий цикл ветки Git", "Попробовать разбор учебного код-ревью"]},
-    {"id": "intern-ivan", "start_date": "2026-11-04", "current_day": 8, "done_items": ["w1.meet-team", "w1.access-base", "w1.channels", "w1.one-to-one", "w1.goals"], "skills": {"git": "confident", "sql": "novice"}, "strengths": ["Уверенно работает с учебными ветками Git", "Показывает шаги воспроизведения ошибки"], "growth": ["Разобрать группировку в SQL", "Составить первый учебный запрос к отчёту"]}
+    {"id": "intern-anya", "start_date": "2026-11-10", "current_day": 2, "done_items": ["w1.meet-team"], "skills": {"git": "novice", "sql": "confident", "ci": "novice"}, "strengths": ["Уверенно читает учебные SQL-запросы", "Записывает вопросы к встрече"], "growth": ["Разобрать рабочий цикл ветки Git", "Попробовать разбор учебного код-ревью"]},
+    {"id": "intern-ivan", "start_date": "2026-11-04", "current_day": 8, "done_items": ["w1.meet-team", "w1.access-base", "w1.channels", "w1.one-to-one", "w1.goals"], "skills": {"git": "confident", "sql": "novice", "ci": "novice"}, "strengths": ["Уверенно работает с учебными ветками Git", "Показывает шаги воспроизведения ошибки"], "growth": ["Разобрать группировку в SQL", "Составить первый учебный запрос к отчёту"]},
+    {"id": "intern-kirill", "start_date": "2026-11-09", "current_day": 3, "done_items": ["w1.meet-team"], "skills": {"git": "confident", "sql": "novice", "ci": "familiar"}, "strengths": ["Проверяет учебные примеры и фиксирует результат"], "growth": ["Обсудить новые темы с наставником"]},
+    {"id": "intern-liza", "start_date": "2026-11-09", "current_day": 3, "done_items": ["w1.meet-team"], "skills": {"git": "novice", "sql": "confident", "ci": "familiar"}, "strengths": ["Проверяет учебные примеры и фиксирует результат"], "growth": ["Обсудить новые темы с наставником"]}
   ],
   "requests": [
     {"id": "REQ-1001", "intern_id": "intern-ivan", "resource_id": "bitbucket-delivery", "level": "read", "justification": "Нужно изучить учебный маршрут доставки", "status": "pending_approval", "created_day": 5},
     {"id": "REQ-1002", "intern_id": "intern-ivan", "resource_id": "jira", "level": "read", "justification": "Нужен учебный трекер", "status": "granted", "created_day": 1},
     {"id": "REQ-1003", "intern_id": "intern-ivan", "resource_id": "confluence", "level": "read", "justification": "Нужна учебная база знаний", "status": "granted", "created_day": 1}
+  ],
+  "personal_catalog": [
+    {
+      "key": "platform.git",
+      "team": "Платформа объявлений",
+      "topic": "git",
+      "topic_title": "Git",
+      "level": "novice",
+      "title": "Практикум: Git",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме Git.",
+      "doc_source_id": "demo:11-git-workflow.md",
+      "practice": "Создай учебную ветку, коммит и pull request.",
+      "stage": "week1",
+      "due_offset": 7
+    },
+    {
+      "key": "platform.sql",
+      "team": "Платформа объявлений",
+      "topic": "sql",
+      "topic_title": "SQL",
+      "level": "novice",
+      "title": "Практикум: SQL",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме SQL.",
+      "doc_source_id": "demo:06-platform-lifecycle.md",
+      "practice": "Составь запрос для подсчёта объектов по состояниям на синтетических данных.",
+      "stage": "week2",
+      "due_offset": 14
+    },
+    {
+      "key": "platform.ci",
+      "team": "Платформа объявлений",
+      "topic": "ci",
+      "topic_title": "CI",
+      "level": "novice",
+      "title": "Практикум: CI",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме CI.",
+      "doc_source_id": "demo:12-red-pipeline.md",
+      "practice": "Найди упавший шаг учебного пайплайна и опиши проверку исправления.",
+      "stage": "week1",
+      "due_offset": 7
+    },
+    {
+      "key": "platform.testing",
+      "team": "Платформа объявлений",
+      "topic": "testing",
+      "topic_title": "Тестирование",
+      "level": "novice",
+      "title": "Практикум: Тестирование",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме Тестирование.",
+      "doc_source_id": "demo:17-platform-sandbox-setup.md",
+      "practice": "Выполни smoke-тест песочницы и запиши ожидаемый результат.",
+      "stage": "week2",
+      "due_offset": 14
+    },
+    {
+      "key": "delivery.git",
+      "team": "Авито Доставка",
+      "topic": "git",
+      "topic_title": "Git",
+      "level": "novice",
+      "title": "Практикум: Git",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме Git.",
+      "doc_source_id": "demo:11-git-workflow.md",
+      "practice": "Создай учебную ветку, коммит и pull request.",
+      "stage": "week1",
+      "due_offset": 7
+    },
+    {
+      "key": "delivery.sql",
+      "team": "Авито Доставка",
+      "topic": "sql",
+      "topic_title": "SQL",
+      "level": "novice",
+      "title": "Практикум: SQL",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме SQL.",
+      "doc_source_id": "demo:09-delivery-statuses.md",
+      "practice": "Составь запрос для подсчёта объектов по состояниям на синтетических данных.",
+      "stage": "week2",
+      "due_offset": 14
+    },
+    {
+      "key": "delivery.ci",
+      "team": "Авито Доставка",
+      "topic": "ci",
+      "topic_title": "CI",
+      "level": "novice",
+      "title": "Практикум: CI",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме CI.",
+      "doc_source_id": "demo:12-red-pipeline.md",
+      "practice": "Найди упавший шаг учебного пайплайна и опиши проверку исправления.",
+      "stage": "week1",
+      "due_offset": 7
+    },
+    {
+      "key": "delivery.testing",
+      "team": "Авито Доставка",
+      "topic": "testing",
+      "topic_title": "Тестирование",
+      "level": "novice",
+      "title": "Практикум: Тестирование",
+      "summary": "демо-данные, не регламент Авито. Разбери учебный пример по теме Тестирование.",
+      "doc_source_id": "demo:20-delivery-sandbox-setup.md",
+      "practice": "Выполни smoke-тест песочницы и запиши ожидаемый результат.",
+      "stage": "week2",
+      "due_offset": 14
+    }
   ]
 }

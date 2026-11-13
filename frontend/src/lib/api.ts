@@ -2,8 +2,9 @@
 import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
-  AccessRequest, Action, ChatResponse, DaysResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
-  Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile, WeeklySummary,
+  CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, DocumentView, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
+  PlanCompare, PracticeResult, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
+  SkillSuggestion, SuggestionsResponse, WeeklySummary,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -76,6 +77,9 @@ export const api = {
   reminders: (u: string) => request("/reminders", RemindersResponse, u),
   snooze: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/snooze`, Reminder, u, post({ days: 1 })),
   doneReminder: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/done`, Reminder, u, post()),
+  history: (u: string) => request("/chat/history", ChatHistory, u),
+  document: (u: string, title: string) => request(`/documents?title=${encodeURIComponent(title)}`, DocumentView, u),
+  actions: (u: string) => request("/actions", ActionsResponse, u),
   draft: (u: string, tool: string, params: Record<string, unknown>) => request("/actions", Action, u, post({ tool, params })),
   confirm: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/confirm`, Action, u, post()),
   cancel: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/cancel`, Action, u, post()),
@@ -93,6 +97,35 @@ export const api = {
     if (!res.ok) throw new ApiError(`Ошибка сервера: ${res.status}`, res.status);
   },
   metrics: (u: string, internId?: string) => request(`/metrics${q(internId)}`, Metrics, u),
+  catalog: (u: string, internId: string) => request(`/plan/catalog${q(internId)}`, CatalogResponse, u),
+  addPersonal: (u: string, internId: string, catalogKey: string) =>
+    request("/plan/items", PlanItem, u, post({ intern_id: internId, catalog_key: catalogKey })),
+  /** DELETE отвечает 204 без тела — поэтому мимо общего request(). */
+  removePersonal: async (u: string, itemId: string) => {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/plan/items/${encodeURIComponent(itemId)}`, { method: "DELETE", headers: { "X-User-Id": u } });
+    } catch {
+      throw new ApiError(OFFLINE, 0);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(detailText(body.detail, res.status), res.status);
+    }
+  },
+  practice: (u: string, itemId: string, answer: string) =>
+    request(`/plan/items/${encodeURIComponent(itemId)}/practice`, PracticeResult, u, post({ answer })),
+  markKnown: (u: string, itemId: string, known: boolean) =>
+    request(`/plan/items/${encodeURIComponent(itemId)}/known`, PlanItem, u, post({ known })),
+  suggestions: (u: string) => request("/skills/suggestions?status=pending", SuggestionsResponse, u),
+  decideSuggestion: (u: string, id: string, accept: boolean) =>
+    request(`/skills/suggestions/${encodeURIComponent(id)}/decide`, SkillSuggestion, u, post({ accept })),
+  absenceRequests: (u: string) => request("/absence/requests", AbsenceRequestsResponse, u),
+  decideAbsence: (u: string, id: string, approve: boolean) =>
+    request(`/absence/requests/${encodeURIComponent(id)}/decide`, AbsenceRequest, u, post({ approve })),
+  absenceFacts: (u: string, internId: string) => request(`/absence/facts${q(internId)}`, AbsenceFactsResponse, u),
+  compare: (u: string, a: string, b: string) =>
+    request(`/plan/compare?intern_ids=${encodeURIComponent(a)},${encodeURIComponent(b)}`, PlanCompare, u),
   nextDay: (u: string, key?: string) => request("/demo/next-day", DaysResponse, u, { ...post(), headers: demoKey(key) }),
   reset: (u: string, key?: string) => request("/demo/reset", ResetResponse, u, { ...post(), headers: demoKey(key) }),
 };

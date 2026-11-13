@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { initialState } from "./fake/mock-data";
 import { canMarkDone, canRequestAccess, pluralDays, waitedFor } from "@/lib/plan-logic";
 import { findUser, firstName } from "@/lib/users";
-import { actionFor, approverText, explainScripted, followupQuestion, followupsFor, greeting } from "@/lib/chat";
+import {
+  actionFor, approverText, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, weeklySummaryMsg,
+} from "@/lib/chat";
 import type { Plan, SkillProfile } from "@/lib/types";
 
 const u = (id: string) => findUser(id)!;
@@ -76,5 +78,35 @@ describe("сценарные ответы", () => {
     expect(actionFor(item("anya.w1.access-base")).kind).toBe("do");
     expect(approverText(undefined, u("intern-anya"))).toBe("—");
     expect(approverText({ id: "x", title: "x", kind: "team_space", team: null, approver: "mentor" }, u("intern-ivan"))).toBe("Мария Орлова");
+  });
+});
+
+describe("итоги недели (SPEC 3.2)", () => {
+  it("неделя заканчивается только при переходе на 8, 15, … день", () => {
+    expect([1, 2, 7, 8, 9, 14, 15].map(finishedWeek)).toEqual([null, null, null, 1, null, null, 2]);
+  });
+
+  it("сводка — факты с названиями ресурсов и кнопкой к следующему своему пункту", () => {
+    const notes = item("anya.w1.notes");
+    const msg = weeklySummaryMsg({
+      intern_id: "intern-anya", week: 1, closed: [], carry_over: [notes],
+      access_granted: [{ request_id: "REQ-1", resource_id: "jira", day: 2 }, { request_id: "REQ-2", resource_id: "x", day: 3 }],
+    }, { jira: "Учебный Jira" });
+    expect(msg.content).toContain("Закрыто: пока ничего");
+    expect(msg.content).toContain("Получены доступы: «Учебный Jira», «x»");
+    expect(msg.content).toContain(`Переходит на следующую неделю: «${notes.title}»`);
+    expect(msg.actions?.[0]).toMatchObject({ itemId: notes.id });
+    const empty = weeklySummaryMsg({ intern_id: "intern-anya", week: 2, closed: [], access_granted: [], carry_over: [] });
+    expect(empty.content).toContain("Получены доступы: нет");
+    expect(empty.actions).toBeUndefined();
+  });
+});
+
+describe("кто согласует заявку (аудит S4)", () => {
+  it("автоматически — только чтение; повышенные права — наставник", () => {
+    const jira = { id: "jira", title: "Учебный Jira", kind: "tool", team: null, approver: "auto" } as never;
+    expect(approverText(jira, u("intern-anya"))).toBe("выдаётся автоматически");
+    expect(approverText(jira, u("intern-anya"), "edit")).toBe("Пётр Волков");
+    expect(approverText(undefined, u("intern-anya"))).toBe("—");
   });
 });

@@ -29,6 +29,30 @@
       "autoPort": false
     },
     {
+      "name": "backend-offline",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--directory",
+        "backend",
+        "python",
+        "-c",
+        "import os,sys; os.environ.update(LLM_PROVIDER='scenario', EMBEDDINGS_PROVIDER='fake', DATABASE_URL='', GIGACHAT_CREDENTIALS='', OPENAI_API_KEY='', SUPABASE_URL='', SUPABASE_SERVICE_KEY='', DEMO_KEY=''); sys.argv=['flask','--app','app.main','run','--port','8000']; from flask.cli import main; main()"
+      ],
+      "port": 8000,
+      "autoPort": false
+    },
+    {
+      "name": "frontend-offline",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set NEXT_PUBLIC_API_URL=http://localhost:8000&& npm --prefix frontend run dev"
+      ],
+      "port": 3000,
+      "autoPort": false
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

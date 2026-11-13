@@ -20,7 +20,7 @@ log = logging.getLogger("ai_buddy.analytics")
 
 # Порядок важен: первая подходящая тема. Ключи — начала слов, регистр не важен.
 TOPICS: list[tuple[str, tuple[str, ...]]] = [
-    ("hr", ("отпуск", "больнич", "отгул", "зарплат", "компенсац", "справк", "дмс")),
+    ("hr", ("отпуск", "больнич", "отгул", "зарплат", "зп", "аванс", "оклад", "компенсац", "справк", "дмс")),
     ("access", ("доступ", "заявк", "права", "пароль")),
     ("git", ("git", "гит", "репозитор", "pull", "пулл", "ревью", "review", "ветк", "коммит", "мерж", "bitbucket")),
     ("environment", ("стенд", "песочниц", "запуст", "пайплайн", "pipeline", "ноутбук", "окружени", "vpn", "сборк")),
@@ -33,6 +33,7 @@ TOPIC_TITLES = {
     "tasks": "задачи", "plan": "план", "people": "к кому идти", "other": "другое",
 }
 NOT_FOUND = ("этого нет", "не нашёл", "не нашел", "нет информации", "нет данных")
+CONFLICT = "документы расходятся"  # SPEC 3.7: и модель, и сценарный режим пишут эту фразу при противоречии
 REFUSED = ("нет доступа", "не могу показать", "недоступ", "не раскрыва", "данные другого стажёра")
 
 
@@ -60,7 +61,7 @@ async def record_answer(user: User, *, answer_id: str, question: str, reply: str
     low = reply.lower()
     payload = {
         **_who(user), "answer_id": answer_id, "topic": topic_of(question), "with_source": sources > 0,
-        "refused": refused or any(w in low for w in REFUSED), "not_in_base": any(w in low for w in NOT_FOUND),
+        "refused": refused or any(w in low for w in REFUSED), "not_in_base": any(w in low for w in NOT_FOUND), "conflict": CONFLICT in low,
         "tools": tools, "drafts": drafts, "latency_ms": latency_ms,
     }
     try:
@@ -73,6 +74,15 @@ async def record_explained(user: User, *, answer_id: str, title: str, with_sourc
     """Сценарный режим: объяснение пункта собрано из данных плана без модели — событие как у /chat."""
     await record_answer(user, answer_id=answer_id, question=title, reply="", sources=int(with_source),
                         tools=["explain_item"], refused=False, drafts=0, latency_ms=latency_ms)
+
+
+async def record_practice(user: User, *, item_id: str, topic: str | None, passed: bool) -> None:
+    """Спека 107: задание на практике сдано — засчитано или нет. Без текста ответа."""
+    try:
+        await events.log_event(SYSTEM_ACTOR, "practice_checked",
+                               {**_who(user), "item_id": item_id, "topic": topic, "passed": passed})
+    except Exception:  # аналитика не должна ломать проверку
+        log.exception("practice_checked not recorded user=%s", user.id)
 
 
 async def record_feedback(user: User, answer_id: str, useful: bool) -> None:
@@ -90,7 +100,7 @@ def visible_interns(viewer: User) -> list[str]:
 
 def closed_without_human(p: dict) -> bool:
     """Вопрос закрыт без человека: ответ по документу или по данным сервиса, без отказа и без «нет в базе»."""
-    if p.get("refused") or p.get("not_in_base") or p.get("topic") == "hr":
+    if p.get("refused") or p.get("not_in_base") or p.get("conflict") or p.get("topic") == "hr":
         return False
     return bool(p.get("with_source") or p.get("tools"))
 
@@ -109,6 +119,7 @@ async def metrics(viewer: User, intern_id: str | None = None) -> dict:
     n = len(answers)
     topics = Counter(p["topic"] for p in answers)
     gaps = Counter(p["topic"] for p in answers if p.get("not_in_base"))
+    conflicts = Counter(p["topic"] for p in answers if p.get("conflict"))
     useful = sum(1 for p in feedback if p.get("useful"))
     return {
         "interns": scope,
@@ -121,4 +132,6 @@ async def metrics(viewer: User, intern_id: str | None = None) -> dict:
         "feedback": {"useful": useful, "not_useful": len(feedback) - useful},
         "topics": [{"topic": t, "title": TOPIC_TITLES[t], "count": c} for t, c in topics.most_common()],
         "unanswered_topics": [{"topic": t, "title": TOPIC_TITLES[t], "count": c} for t, c in gaps.most_common()],
+        # Документы противоречат друг другу (SPEC 3.7) — сигнал наставнику обновить документ.
+        "conflict_topics": [{"topic": t, "title": TOPIC_TITLES[t], "count": c} for t, c in conflicts.most_common()],
     }

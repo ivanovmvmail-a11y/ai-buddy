@@ -30,9 +30,10 @@ class User(BaseModel):
 # (свой стажёр, свой пункт, назначенный согласующий) делают имитации сервисов в app/mcp_server.
 _BASE = frozenset({"profile:read", "reminders:write"})
 ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
-    Role.INTERN: _BASE | {"plan:read", "plan:write", "access:request", "access:read", "skills:read"},
+    Role.INTERN: _BASE | {"plan:read", "plan:write", "access:request", "access:read", "skills:read",
+                          "absence:request", "absence:read"},
     Role.MENTOR: _BASE | {"interns:read", "plan:read", "plan:write", "access:read", "access:approve", "skills:read"},
-    Role.LEAD: _BASE | {"interns:read", "plan:read", "plan:write"},
+    Role.LEAD: _BASE | {"interns:read", "plan:read", "plan:write", "absence:read"},
     Role.HRBP: _BASE | {"interns:read"},
     Role.CURATOR: _BASE | {"interns:read", "plan:read"},
 }
@@ -44,6 +45,11 @@ DEMO_USERS: dict[str, User] = {
         User(id="intern-anya", name="Аня Смирнова", role=Role.INTERN, team="Платформа объявлений",
              mentor_id="mentor-petr", lead_id="lead-olga"),
         User(id="intern-ivan", name="Иван Кузнецов", role=Role.INTERN, team="Авито Доставка",
+             mentor_id="mentor-maria", lead_id="lead-sergey"),
+        # Вторые стажёры у наставников — для экрана сравнения планов (SPEC 3.1, 5; решение 11.11).
+        User(id="intern-kirill", name="Кирилл Егоров", role=Role.INTERN, team="Платформа объявлений",
+             mentor_id="mentor-petr", lead_id="lead-olga"),
+        User(id="intern-liza", name="Лиза Ковалёва", role=Role.INTERN, team="Авито Доставка",
              mentor_id="mentor-maria", lead_id="lead-sergey"),
         User(id="mentor-petr", name="Пётр Волков", role=Role.MENTOR, team="Платформа объявлений", lead_id="lead-olga"),
         User(id="mentor-maria", name="Мария Орлова", role=Role.MENTOR, team="Авито Доставка", lead_id="lead-sergey"),
@@ -58,8 +64,8 @@ DEFAULT_USER_ID = "intern-anya"
 
 
 def get_user(user_id: str | None) -> User | None:
-    """Текущий пользователь. Пустой id → стажёр по умолчанию (демо), неизвестный id → None."""
-    return DEMO_USERS.get(user_id or DEFAULT_USER_ID)
+    """Текущий пользователь по id из имитации входа. Пустой или неизвестный id → None (401, аудит D8)."""
+    return DEMO_USERS.get(user_id) if user_id else None
 
 
 def has_permission(user: User, permission: str) -> bool:

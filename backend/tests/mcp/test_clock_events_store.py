@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 import inspect
 
 import pytest
@@ -130,14 +131,18 @@ def test_store_snapshots_rollback_isolation_and_idempotent_seed(store, snapshot)
     changed = snapshot()
     run(store.initialize(load_seed()))
     assert snapshot() == changed
+    reset_at = datetime.now(timezone.utc)
     run(store.initialize(load_seed(), reset=True))
-    assert snapshot() == before
+    reset = snapshot()
+    assert reset.model_dump(exclude={"events"}) == before.model_dump(exclude={"events"})
+    assert [e.model_dump(exclude={"ts"}) for e in reset.events] == [e.model_dump(exclude={"ts"}) for e in before.events]
+    assert all(reset_at <= e.ts <= datetime.now(timezone.utc) for e in reset.events)
     empty = storage.InMemoryStore()
     run(empty.initialize(load_seed()))
     async def count():
         async with empty.transaction() as data:
             return len(data.interns)
-    assert run(count()) == 2
+    assert run(count()) == len(before.interns)
 
 
 def test_store_factory_cached_and_selects_backend_without_connecting(monkeypatch, caplog):

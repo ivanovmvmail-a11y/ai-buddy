@@ -39,3 +39,21 @@ body {
     }
   }
 }
+
+/* better-ui: окно документа из «Источник» — редкое событие, поэтому мягкий вход (один раз, без обратного хода).
+   Закрытие мгновенное. При «меньше анимаций» — только проявление. */
+@keyframes doc-fade-in {
+  from { opacity: 0; }
+}
+@keyframes doc-rise-in {
+  from { opacity: 0; translate: 0 12px; filter: blur(4px); }
+}
+.doc-backdrop,
+.doc-dialog {
+  animation: doc-fade-in 150ms ease-out both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .doc-dialog {
+    animation: doc-rise-in 300ms ease-out both;
+  }
+}

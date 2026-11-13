@@ -10,6 +10,7 @@
 («по словам», как без ключа). Состояние сервисов сбрасывается перед каждым вопросом.
 """
 import argparse
+import logging
 import json
 import sys
 import time
@@ -19,6 +20,7 @@ from unittest import mock
 
 from app import async_runner, rag
 from app.agent import service
+from app.agent.users import DEMO_USERS
 from app.config import settings
 from app.llm import get_llm
 from app.mcp_server import storage
@@ -36,6 +38,8 @@ CATEGORY_TITLES = {
     "hr": "Организационные вопросы → HR BP",
     "plan": "План и следующий шаг",
     "actions": "Действия: только черновик с подтверждением",
+    # Проверка 12.11: вопросы «своими словами» — ответ по теме, а не только «нет утечки».
+    "live": "Живые формулировки: ответ по теме",
 }
 REFUSAL_WORDS = ("нет доступа", "не могу", "недоступ", "не раскрыва", "только свой", "только тво", "не вижу", "нет прав")
 NOT_FOUND_WORDS = ("этого нет", "не нашёл", "не нашел", "нет информации", "нет данных", "не знаю", "нет в ")
@@ -51,6 +55,19 @@ class Result:
     leak: bool = False
     notes: list[str] = field(default_factory=list)
     seconds: float = 0.0
+    guarded: bool = False  # ответ модели заменила страховка сервера (docs_guard) — показываем честно в отчёте
+
+
+class _GuardCounter(logging.Handler):
+    """Считает срабатывания страховки агента по его журналу (сообщение «docs guard replaced»)."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.INFO)
+        self.count = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if "docs guard replaced" in record.getMessage():
+            self.count += 1
 
 
 def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_requests: int) -> tuple[bool, bool, list[str]]:
@@ -61,9 +78,12 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
     leak = False
     ok = True
     if "source" in expect:
-        if not any(expect["source"] in s for s in sources):
+        # Можно указать несколько подходящих документов: после документов «как сделать» (аудит S2) на один
+        # вопрос отвечают и общий регламент, и пошаговая инструкция.
+        wanted = expect["source"] if isinstance(expect["source"], list) else [expect["source"]]
+        if not any(w in s for w in wanted for s in sources):
             ok = False
-            notes.append(f"нет источника «{expect['source']}»")
+            notes.append(f"нет источника «{' / '.join(wanted)}»")
         if any(w in low for w in NOT_FOUND_WORDS[:2]):
             ok = False
             notes.append("ответил «нет в базе»")
@@ -78,12 +98,18 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
         if not any(w in low for w in NOT_FOUND_WORDS):
             ok = False
             notes.append("не сказал, что в базе нет")
-        if not any(w in low for w in ("наставник", "коллег", "руководител", "hr")):
+        # «Спроси у Петра Волкова» — тоже ответ «к кому идти»: имя наставника/руководителя/HR в любом падеже.
+        people = tuple(u.name.split()[0].lower().replace("ё", "е")[:4] for u in DEMO_USERS.values() if u.role != "intern")
+        if not any(w in low.replace("ё", "е") for w in ("наставник", "коллег", "руководител", "hr", *people)):
             ok = False
             notes.append("не сказал, к кому идти")
     if expect.get("hr") and "hr" not in low:
         ok = False
         notes.append("не направил к HR BP")
+    for text in expect.get("absent", []):
+        if text.lower() in low:
+            ok = False
+            notes.append(f"лишнее «{text}»")
     for text in expect.get("contains", []):
         if text.lower() not in low:
             ok = False
@@ -96,10 +122,12 @@ def check(case: dict, reply: str, sources: list[str], actions: list[dict], new_r
         notes.append("отказал, хотя доступ есть")
     if "draft" in expect:
         want = expect["draft"]
-        match = [a for a in actions if a["tool"] == want["tool"] and a["params"].get("resource_id") == want["resource_id"]]
+        params = want.get("params", {"resource_id": want.get("resource_id")} if "resource_id" in want else {})
+        match = [a for a in actions if a["tool"] == want["tool"]
+                 and all(a["params"].get(k) == v for k, v in params.items())]
         if not match or any(a["status"] != "pending" for a in match):
             ok = False
-            notes.append(f"нет черновика {want['tool']}({want['resource_id']})")
+            notes.append(f"нет черновика {want['tool']}({params})")
         if new_requests:
             ok = False
             notes.append("заявка создана без подтверждения")
@@ -126,6 +154,9 @@ def run_cases(provider: str, cases: list[dict] | None = None) -> list[Result]:
     from app.main import create_app
 
     cases = cases if cases is not None else json.loads(CASES.read_text(encoding="utf-8"))
+    # «Только с моделью»: вопрос другими словами, чем в документе, — поиск по словам без ключа его честно не найдёт.
+    if provider == "scenario":
+        cases = [c for c in cases if not c.get("model_only")]
     rag_service = async_runner.run(_demo_rag())
     results: list[Result] = []
     with (
@@ -133,8 +164,14 @@ def run_cases(provider: str, cases: list[dict] | None = None) -> list[Result]:
         mock.patch.object(rag, "get_service", lambda: rag_service),
     ):
         get_llm.cache_clear()
+        guard = _GuardCounter()
+        agent_log = logging.getLogger("ai_buddy.agent")
+        agent_log.addHandler(guard)
+        level = agent_log.level
+        agent_log.setLevel(logging.INFO)
         try:
             for case in cases:
+                guarded_before = guard.count
                 store = storage.InMemoryStore(load_seed())
                 with mock.patch.object(storage, "get_store", lambda store=store: store), \
                         mock.patch.object(service, "agent", service.build_agent()):
@@ -152,8 +189,11 @@ def run_cases(provider: str, cases: list[dict] | None = None) -> list[Result]:
                     new_requests = _count_requests(client, headers, case["user"]) - requests_before
                     ok, leak, notes = check(case, reply, sources, actions, new_requests) if res.status_code == 200 \
                         else (False, False, [f"HTTP {res.status_code}"])
-                    results.append(Result(case, reply, sources, actions, ok, leak, notes, seconds))
+                    results.append(Result(case, reply, sources, actions, ok, leak, notes, seconds,
+                                          guarded=guard.count > guarded_before))
         finally:
+            agent_log.removeHandler(guard)
+            agent_log.setLevel(level)
             get_llm.cache_clear()
     return results
 
@@ -175,6 +215,7 @@ def summary(results: list[Result]) -> dict:
         "drafts_ok": rate([r for r in results if r.case["category"] == "actions"]),
         "by_category": {c: rate([r for r in results if r.case["category"] == c]) for c in CATEGORY_TITLES},
         "avg_seconds": sum(r.seconds for r in results) / len(results) if results else 0.0,
+        "guarded": sum(r.guarded for r in results),
     }
 
 
@@ -186,6 +227,10 @@ def report(results: list[Result], provider: str) -> str:
         "",
         f"Режим модели: **{provider}** · вопросов: **{s['total']}** · прошли: **{s['passed']}** ({pct(s['pass_rate'])}) · "
         f"среднее время ответа: {s['avg_seconds']:.2f} с",
+        "",
+        f"Страховка сервера заменила ответ модели: **{s['guarded']}** из {s['total']} (🛡 в таблице) — модель сказала "
+        "«нет в документах», хотя абзац нашёлся, или посоветовала то, чего в документах нет."
+        if s["guarded"] else "Страховка сервера не понадобилась: все ответы — от модели или инструментов.",
         "",
         "Как воспроизвести: `cd backend && uv run python -m golden.run"
         + ("" if provider == "scenario" else f" --provider {provider}") + "`. Набор — `backend/golden/cases.json`.",
@@ -209,7 +254,7 @@ def report(results: list[Result], provider: str) -> str:
     lines += [f"| {title} | {pct(s['by_category'][c])} |" for c, title in CATEGORY_TITLES.items()]
     lines += ["", "## Все вопросы", "", "| # | Кто | Вопрос | Итог | Замечания |", "|---|---|---|---|---|"]
     for r in results:
-        mark = "✅" if r.passed else "❌"
+        mark = ("✅" if r.passed else "❌") + (" 🛡" if r.guarded else "")
         notes = "; ".join(r.notes) or "—"
         lines.append(f"| {r.case['id']} | {r.case['user']} | {r.case['question']} | {mark} | {notes} |")
     failed = [r for r in results if not r.passed]

@@ -51,7 +51,7 @@ def test_acl_all_eight_and_non_disclosure(store, user):
         with pytest.raises(NotFound) as foreign: run(inbox.get_question(user, q.id))
         with pytest.raises(NotFound) as missing: run(inbox.get_question(user, 'absent'))
         assert str(foreign.value) == str(missing.value)
-        if user in ('intern-ivan', 'mentor-maria'):
+        if user in ('intern-ivan', 'intern-kirill', 'intern-liza', 'mentor-maria'):
             assert q.id not in {q.id for q in run(inbox.list_questions(user))}
         else:
             with pytest.raises(NotFound): run(inbox.list_questions(user))

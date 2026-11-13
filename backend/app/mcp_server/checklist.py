@@ -1,12 +1,20 @@
 """План, следующий шаг, лестница и фактическая сводка недели."""
 from copy import deepcopy
-from app.agent.users import Role, User
+from uuid import uuid4
+from app.agent.users import DEMO_USERS, Role, User
 
 from . import events, storage
+from .notifications import notify
 from ._domain import STAGES, WORK_STAGES, item_status, item_view, nonempty, owner_id, positive, require_intern, timestamp
 from ._system import SYSTEM_ACTOR
 from .errors import Conflict, Forbidden, NotFound
-from .models import ItemStatus, NextStep, OnboardingData, Plan, PlanItem, StageInfo
+from .models import ItemStatus, NextStep, OnboardingData, Plan, PlanItem, StageInfo, CatalogItem
+
+MANUAL_PERSONAL_REASON = "добавил наставник"
+
+
+def _personal_item_id(intern_id: str, topic: str) -> str:
+    return f"{intern_id.removeprefix('intern-')}.p.{topic}"
 
 
 def _change_status(data: OnboardingData, actor: User, item: PlanItem, status: ItemStatus,
@@ -31,6 +39,10 @@ def _change_status(data: OnboardingData, actor: User, item: PlanItem, status: It
                 events._record(data, SYSTEM_ACTOR, "reminder_completed", {
                     "intern_id": item.intern_id, "reminder_id": reminder.id, "day": day,
                 })
+
+    if status == "done" and old != "done":
+        from .hiring import _maybe_suggest
+        _maybe_suggest(data, item.intern_id, item.topic, closed_item=item.id)
 
 
 def _build_plan(data: OnboardingData, actor: User, intern_id: str) -> Plan:
@@ -112,7 +124,7 @@ async def weekly_summary(actor: User, intern_id: str, week: int) -> dict:
                 "status": event.payload["to"] if event else "not_started",
                 "status_reason": event.payload.get("reason") if event else None,
                 "waiting_for": event.payload.get("waiting_for") if event else None,
-                "updated_at": event.ts if event else timestamp(data, intern_id, 1),
+                "updated_at": timestamp(data, intern_id, event.payload["day"] if event else 1),
                 "updated_by": event.user_id if event else None,
             }, deep=True)
             if historical.status != "done":
@@ -124,3 +136,91 @@ async def weekly_summary(actor: User, intern_id: str, week: int) -> dict:
                    and start <= event.payload["day"]}
         return {"intern_id": intern_id, "week": week, "closed": closed,
                 "access_granted": list(granted.values()), "carry_over": carry}
+
+
+def _remove_personal(data, actor, item):
+    # История напоминаний сохраняется, FK на снятый пункт больше не нужен.
+    for reminder in data.reminders.values():
+        if reminder.plan_item_id == item.id:
+            reminder.plan_item_id = None
+            reminder.status, reminder.snooze_until_day = "done", None
+    del data.items[item.id]
+    events._record(data, actor, "personal_item_removed", {
+        "intern_id": item.intern_id, "item_id": item.id, "topic": item.topic,
+    })
+
+
+def _add_personal(data, actor, intern_id, entry, *, reason=None):
+    item = PlanItem(id=_personal_item_id(intern_id, entry.topic), intern_id=intern_id,
+        kind="personal", reason=reason or f"в карте навыков {entry.topic_title} — новичок",
+        catalog_key=entry.key, topic=entry.topic, title=entry.title, summary=entry.summary,
+        doc_source_id=entry.doc_source_id, practice=entry.practice, stage=entry.stage,
+        order=100, owner_role="intern", due_day=entry.due_offset,
+        updated_at=timestamp(data, intern_id), updated_by=actor.id)
+    data.items[item.id] = item
+    events._record(data, actor, "personal_item_added", {
+        "intern_id": intern_id, "item_id": item.id, "topic": entry.topic, "catalog_key": entry.key,
+    })
+    # Явный каталог (#71) передаёт reason; пересборка использует причину из карты.
+    if reason is not None and actor.role == Role.MENTOR:
+        notify(data, intern_id, intern_id, "personal_item_added", uuid4().hex,
+               f"В план добавлен пункт для тебя: {item.title} ({item.reason})",
+               "plan_item", plan_item_id=item.id)
+    return item
+
+
+def _rebuild_personal(data, actor, intern_id, *, topic=None):
+    profile = data.profiles[intern_id]
+    for item in list(data.items.values()):
+        if (item.intern_id == intern_id and item.kind == "personal" and item.status != "done"
+                and (topic is None or item.topic == topic)
+                and item.reason != MANUAL_PERSONAL_REASON
+                and profile.skills.get(item.topic) != "novice"):
+            _remove_personal(data, actor, item)
+    user = DEMO_USERS[intern_id]
+    for entry in data.personal_catalog.values():
+        if (entry.team == user.team and (topic is None or entry.topic == topic)
+                and profile.skills.get(entry.topic) == entry.level
+                and not any(item.intern_id == intern_id and item.catalog_key == entry.key for item in data.items.values())):
+            _add_personal(data, actor, intern_id, entry)
+
+
+async def list_catalog(actor: User, intern_id: str) -> list[CatalogItem]:
+    async with storage.get_store().read() as data:
+        user = require_intern(data, actor, intern_id, private=True)
+        if actor.role != Role.MENTOR:
+            raise NotFound()
+        keys = {item.catalog_key for item in data.items.values() if item.intern_id == intern_id}
+        return [entry.model_copy(update={"in_plan": entry.key in keys}, deep=True)
+                for entry in data.personal_catalog.values() if entry.team == user.team]
+
+
+async def add_personal_item(actor: User, intern_id: str, catalog_key: str) -> PlanItem:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
+        user = require_intern(data, actor, intern_id, private=True)
+        if actor.role != Role.MENTOR:
+            raise NotFound()
+        entry = data.personal_catalog.get(catalog_key)
+        if entry is None or entry.team != user.team:
+            raise NotFound()
+        id = _personal_item_id(intern_id, entry.topic)
+        if id in data.items or any(item.intern_id == intern_id and item.catalog_key == catalog_key
+                                   for item in data.items.values()):
+            raise Conflict("Пункт уже в плане")
+        item = _add_personal(data, actor, intern_id, entry, reason=MANUAL_PERSONAL_REASON)
+        return item_view(data, item)
+
+
+async def remove_personal_item(actor: User, item_id: str) -> None:
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
+        item = data.items.get(item_id)
+        if item is None:
+            raise NotFound()
+        require_intern(data, actor, item.intern_id, private=True)
+        if actor.role != Role.MENTOR:
+            raise NotFound()
+        if item.kind != "personal":
+            raise Forbidden("Общий пункт нельзя убрать")
+        if item.status == "done":
+            raise Conflict("Закрытый пункт остаётся в плане")
+        _remove_personal(data, actor, item)

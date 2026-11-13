@@ -7,6 +7,7 @@
    выполнить его может только сам пользователь кнопкой «Подтвердить» (ИИ готовит — решает человек;
    ст. 16 152-ФЗ о решениях на основе автоматизированной обработки).
 """
+import inspect
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -24,7 +25,10 @@ log = logging.getLogger("ai_buddy.tools")
 
 Handler = Callable[[User, BaseModel], Awaitable[dict[str, Any]]]
 Authorize = Callable[[User, BaseModel], bool]
-Describe = Callable[[BaseModel], str]
+Describe = Callable[..., str]  # (args) или (args, user) — заголовку черновика бывает нужен пользователь
+# Проверка данных до черновика: False — объекта для пользователя «нет» (не раскрываем ни название, ни факт).
+Precheck = Callable[[User, BaseModel], Awaitable[bool]]
+NOT_FOUND_MESSAGE = "Такого ресурса или объекта нет среди доступных тебе."
 
 
 @dataclass(frozen=True)
@@ -39,11 +43,21 @@ class Tool:
     authorize: Authorize | None = None
     # человеко-понятный заголовок черновика для write-инструментов
     describe: Describe | None = None
+    # проверка до черновика, что объект виден пользователю (аудит D4: чужой ресурс — сразу «нет»)
+    precheck: Precheck | None = None
 
     def spec(self) -> ToolSpec:
         schema = self.args_model.model_json_schema()
         schema.pop("title", None)
         return ToolSpec(name=self.name, description=self.description, parameters=simplify_schema(schema))
+
+
+def draft_title(tool: "Tool", args: BaseModel, user: User) -> str:
+    """Человеко-понятный заголовок черновика; describe может принимать пользователя вторым аргументом."""
+    if not tool.describe:
+        return tool.description
+    takes_user = len(inspect.signature(tool.describe).parameters) > 1
+    return tool.describe(args, user) if takes_user else tool.describe(args)
 
 
 def simplify_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -106,8 +120,11 @@ class ToolExecutor:
             return {"error": "forbidden", "message": FORBIDDEN_MESSAGE}
 
         if tool.kind == "write":
-            title = tool.describe(args) if tool.describe else tool.description
-            action = self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
+            if tool.precheck and not await tool.precheck(user, args):
+                log.info("draft refused, not visible user=%s tool=%s", user.id, tool.name)
+                return {"error": "not_found", "message": NOT_FOUND_MESSAGE}
+            title = draft_title(tool, args, user)
+            action = await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
             log.info("draft user=%s tool=%s action=%s", user.id, tool.name, action.id)
             return {
                 "status": "awaiting_confirmation",

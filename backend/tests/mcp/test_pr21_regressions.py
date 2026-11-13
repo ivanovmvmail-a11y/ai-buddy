@@ -73,7 +73,7 @@ def test_lazy_bootstrap_failure_keeps_one_seeded_memory_store(error, caplog):
     run(first_reads())
     assert primary.calls == primary.closed == 1
     assert isinstance(store._store, storage.InMemoryStore)
-    assert len(caplog.records) == 1
+    assert len([r for r in caplog.records if r.name == "ai_buddy.onboarding"]) == 1
     assert 'InMemoryStore' in caplog.text and 'private connection details' not in caplog.text
     if isinstance(error, psycopg.errors.UndefinedTable):
         assert 'Таблицы онбординга не найдены' in caplog.text
@@ -227,7 +227,7 @@ def test_first_http_request_bootstraps_empty_tables_or_falls_back_for_existing_v
             assert client.get('/plan?intern_id=intern-ivan', headers=headers).status_code == 404
             if has_schema:
                 with psycopg.connect(dsn) as connection:
-                    assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (2,)
+                    assert connection.execute('SELECT count(*) FROM intern_state').fetchone() == (len(load_seed().interns),)
                     assert connection.execute("SELECT status FROM plan_items WHERE id='anya.w1.notes'").fetchone() == ('done',)
                 assert isinstance(store._store, PostgresStore)
                 run(store.close())

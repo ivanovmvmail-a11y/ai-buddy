@@ -1,6 +1,7 @@
 // Данные поддельного сервера для тестов интерфейса (бывший макет T2). Настоящие данные — seed имитаций
 // сервисов на backend. Всё синтетическое.
 import { DEMO_USERS } from "@/lib/users";
+import type { AbsenceRequest, CatalogItem, Reminder, SkillSuggestion } from "@/lib/types";
 import type { AccessRequest, AccessResource, DemoUser, OwnerRole, PlanItem, SkillProfile, Stage } from "@/lib/types";
 
 export { DEMO_USERS };
@@ -51,32 +52,57 @@ const COMMON: ItemSeed[] = [
 const TEAM: Record<string, ItemSeed[]> = {
   "Платформа объявлений": [
     { key: "w1.access-team", stage: "week1", owner: "intern", due: 5, topic: "git", resource: "bitbucket-platform",
-      doc: "demo:05-platform-sandbox.md", title: "Запросить доступ в пространство команды и изучить его",
+      doc: "demo:13-team-space-access.md", title: "Запросить доступ в пространство команды и изучить его",
       summary: "Репозитории команды в Bitbucket. Доступ одобряет наставник.",
       practice: "Склонируй учебный репозиторий и найди, где описан запуск сервиса." },
-    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:05-platform-sandbox.md",
+    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:17-platform-sandbox-setup.md",
       title: "Поднять песочницу Платформы объявлений", summary: "Локальный стенд с учебными объявлениями.",
       practice: "Создай в песочнице объявление «Картонный дирижабль» и найди его поиском." },
   ],
   "Авито Доставка": [
     { key: "w1.access-team", stage: "week1", owner: "intern", due: 5, topic: "git", resource: "bitbucket-delivery",
-      doc: "demo:08-delivery-sandbox.md", title: "Запросить доступ в пространство команды и изучить его",
+      doc: "demo:13-team-space-access.md", title: "Запросить доступ в пространство команды и изучить его",
       summary: "Репозитории команды в Bitbucket. Доступ одобряет наставник.",
       practice: "Склонируй учебный репозиторий и найди, где описаны статусы отправления." },
-    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:08-delivery-sandbox.md",
+    { key: "w1.sandbox", stage: "week1", owner: "intern", due: 5, topic: "ci", doc: "demo:20-delivery-sandbox-setup.md",
       title: "Поднять учебный стенд Доставки", summary: "Стенд с вымышленными пунктами выдачи.",
       practice: "Создай отправление «Бирюзовый пакет» и проверь его статус." },
+  ],
+};
+
+// Персональные пункты из каталога (SPEC 3.1): тема в карте навыков «новичок» → учебный пункт «для тебя».
+const PERSONAL: Record<string, Array<ItemSeed & { reason: string }>> = {
+  "intern-anya": [
+    { key: "p.git", stage: "week1", owner: "intern", due: 6, topic: "git", doc: "demo:11-git-workflow.md",
+      title: "Практикум: ветки и pull request", summary: "Учебный pull request в песочнице команды.",
+      practice: "Создай учебную ветку, коммит и pull request.", reason: "в карте навыков Git — новичок" },
+  ],
+  "intern-kirill": [
+    { key: "p.sql", stage: "week2", owner: "intern", due: 10, topic: "sql", doc: "demo:06-platform-lifecycle.md",
+      title: "Практикум: запросы к учебной базе объявлений", summary: "Три запроса к вымышленным объявлениям.",
+      reason: "в карте навыков SQL — новичок" },
+  ],
+  "intern-ivan": [
+    { key: "p.sql", stage: "week2", owner: "intern", due: 10, topic: "sql", doc: "demo:09-delivery-statuses.md",
+      title: "Практикум: запросы к учебной базе доставок", summary: "Три запроса к вымышленным отправлениям.",
+      reason: "в карте навыков SQL — новичок" },
   ],
 };
 
 const STAGE_ORDER: Stage[] = ["week1", "week2", "month1", "month2", "after3m"];
 
 function buildItems(intern: DemoUser): PlanItem[] {
-  const seeds = [...COMMON, ...(TEAM[intern.team] ?? [])];
+  const personal = PERSONAL[intern.id] ?? [];
+  const seeds: Array<ItemSeed & { reason?: string }> = [...COMMON, ...(TEAM[intern.team] ?? []), ...personal];
   const short = intern.id.replace("intern-", "");
   return seeds
     .sort((a, b) => STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage))
     .map((s, i) => ({
+      kind: s.reason ? ("personal" as const) : ("common" as const),
+      reason: s.reason ?? null,
+      known_marked: false,
+      practice_check: Boolean(s.reason && s.practice),
+      catalog_key: s.reason ? `${intern.team === "Авито Доставка" ? "delivery" : "platform"}.${s.topic}` : null,
       id: `${short}.${s.key}`,
       intern_id: intern.id,
       stage: s.stage,
@@ -99,13 +125,40 @@ function buildItems(intern: DemoUser): PlanItem[] {
     }));
 }
 
+/** Каталог персональных пунктов команд (SPEC 3.1). Ключ «<команда>.<тема>»; пункт стажёра — «<имя>.p.<тема>». */
+export const CATALOG: CatalogItem[] = [
+  { key: "platform.git", team: "Платформа объявлений", topic: "git", topic_title: "Git", title: "Практикум: ветки и pull request",
+    summary: "Учебный pull request в песочнице команды.", stage: "week1", in_plan: false },
+  { key: "platform.sql", team: "Платформа объявлений", topic: "sql", topic_title: "SQL", title: "Практикум: запросы к учебной базе объявлений",
+    summary: "Три запроса к вымышленным объявлениям.", stage: "week2", in_plan: false },
+  { key: "platform.ci", team: "Платформа объявлений", topic: "ci", topic_title: "CI", title: "Практикум: красный пайплайн",
+    summary: "Найди упавший шаг учебного пайплайна.", stage: "week1", in_plan: false },
+  { key: "delivery.sql", team: "Авито Доставка", topic: "sql", topic_title: "SQL", title: "Практикум: запросы к учебной базе доставок",
+    summary: "Три запроса к вымышленным отправлениям.", stage: "week2", in_plan: false },
+];
+
 export type DemoState = {
   days: Record<string, number>;
   items: PlanItem[];
   requests: AccessRequest[];
   profiles: SkillProfile[];
   dismissedReminders: string[];
+  suggestions: SkillSuggestion[];
+  absences: AbsenceRequest[];
+  notifications: Reminder[];
 };
+
+/** Второй стажёр Петра (SPEC 3.1). В поддельном сервере подключается только в тестах сравнения (`srv.addKirill()`),
+ * чтобы старые тесты «у Петра одна Аня» не менялись. */
+export const KIRILL: DemoUser = DEMO_USERS.find((u) => u.id === "intern-kirill")!;
+export const EXTRA_INTERNS = new Set(["intern-kirill", "intern-liza"]);
+
+export function addKirill(s: DemoState) {
+  s.days[KIRILL.id] = 3;
+  s.items.push(...buildItems(KIRILL));
+  s.profiles.push({ intern_id: KIRILL.id, skills: { git: "confident", sql: "novice", ci: "familiar", monitoring: "familiar" },
+    strengths: ["Уверенно работает с Git"], growth: ["SQL"] });
+}
 
 export function initialState(): DemoState {
   const anya = DEMO_USERS[0];
@@ -137,5 +190,8 @@ export function initialState(): DemoState {
         strengths: ["Уверенно работает с Git", "Быстро поднимает окружение"], growth: ["SQL и аналитика данных"] },
     ],
     dismissedReminders: [],
+    suggestions: [],
+    absences: [],
+    notifications: [],
   };
 }

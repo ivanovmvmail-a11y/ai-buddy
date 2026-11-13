@@ -3,33 +3,40 @@ from contextlib import asynccontextmanager
 import logging
 
 from psycopg import sql
+from .absence_models import AbsenceRequest
 from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
 from .errors import Conflict
 from .mentor_models import MentorQuestion
 from .models import (AccessRequest, AccessResource, ActionDraft, Event, InternState, OnboardingData,
-                     PlanItem, Reminder, SkillProfile)
+                     PlanItem, Reminder, SkillProfile, CatalogItem, SkillSuggestion)
 
 # Порядок соответствует внешним ключам; SQL-имена определены кодом, не вводом пользователя.
 TABLES = (
     ("drafts", "service_drafts", ActionDraft, "id"),
     ("interns", "intern_state", InternState, "intern_id"),
     ("resources", "access_resources", AccessResource, "id"),
+    ("personal_catalog", "personal_catalog", CatalogItem, "key"),
     ("items", "plan_items", PlanItem, "id"),
+    ("absence_requests", "absence_requests", AbsenceRequest, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
     ("mentor_questions", "mentor_questions", MentorQuestion, "id"),
+    ("suggestions", "skill_suggestions", SkillSuggestion, "id"),
     ("reminders", "reminders", Reminder, "id"),
 )
-JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload"}
-DERIVED_FIELDS = {"overdue", "waiting_days"}
-OPTIONAL_TABLES = {"service_drafts", "mentor_questions", "absence_requests", "self_check_attempts"}
+JSON_FIELDS = {"fields", "skills", "strengths", "growth", "payload", "evidence"}
+DERIVED_FIELDS = {"overdue", "waiting_days", "skill_level", "in_plan"}
+OPTIONAL_TABLES = {"service_drafts", "mentor_questions", "absence_requests", "self_check_attempts", "skill_suggestions"}
 log = logging.getLogger("ai_buddy.onboarding")
 LOCK_ID = 101003  # Общая блокировка записи/seed/reset онбординга, включая другие процессы.
 
 
 def _dump(model):
+    if isinstance(model, SkillSuggestion):
+        return {**model.model_dump(mode="json", exclude={"intern_name", "topic_title"}),
+                "evidence": model.evidence}
     values = model.model_dump(mode="json", exclude=DERIVED_FIELDS)
     if isinstance(model, Reminder):
         values["mentor_question_id"] = model.mentor_question_id
@@ -53,6 +60,7 @@ class PostgresStore(PostgresPoolOwner):
     async def _load(self, connection, *, include_events):
         data = OnboardingData()
         available = await self._available_tables(connection)
+        data._suggestions_available = "skill_suggestions" in available
         for field, table, model, key in TABLES:
             if table in OPTIONAL_TABLES and table not in available:
                 continue
@@ -92,6 +100,8 @@ class PostgresStore(PostgresPoolOwner):
             for key in removed:
                 await connection.execute(sql.SQL("DELETE FROM {} WHERE {} = %s").format(
                     sql.Identifier("public", table), sql.Identifier(key_column)), (key,))
+        cursor = await connection.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='reminders'")
+        reminder_columns = {row["column_name"] for row in await cursor.fetchall()}
         for field, table, _, key_column in TABLES:
             if table in OPTIONAL_TABLES and table not in available:
                 if getattr(data, field) and not missing_ok:
@@ -104,6 +114,11 @@ class PostgresStore(PostgresPoolOwner):
                 if table == "reminders" and "mentor_questions" not in available:
                     if values.pop("mentor_question_id", None) is not None:
                         raise Conflict("Сервис пока недоступен: примените новые миграции базы данных")
+                if table == "reminders":
+                    unavailable = set(values) - reminder_columns
+                    if unavailable and record.kind not in {"plan_item", "access_request"}:
+                        raise Conflict("Уведомления пока недоступны: примените новые миграции базы данных")
+                    values = {key: value for key, value in values.items() if key in reminder_columns}
                 columns = list(values)
                 query = sql.SQL("INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}").format(
                     sql.Identifier("public", table),
@@ -113,7 +128,7 @@ class PostgresStore(PostgresPoolOwner):
                     sql.SQL(",").join(sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(name), sql.Identifier(name))
                                       for name in columns if name != key_column),
                 )
-                await connection.execute(query, tuple(Jsonb(values[name]) if name in JSON_FIELDS else values[name]
+                await connection.execute(query, tuple(Jsonb(values[name]) if (name in JSON_FIELDS or (table == "reminders" and name == "action")) and values[name] is not None else values[name]
                                                       for name in columns))
 
     @asynccontextmanager
@@ -160,7 +175,7 @@ class PostgresStore(PostgresPoolOwner):
             active_tables = [table for _, table, *_ in TABLES if table not in OPTIONAL_TABLES or table in available]
             cursor = await connection.execute(sql.SQL("SELECT EXISTS ({}) AS populated").format(
                 sql.SQL(" UNION ALL ").join(sql.SQL("SELECT 1 FROM {}").format(sql.Identifier("public", table))
-                                             for table in active_tables + ["events"])))
+                                             for table in [name for name in active_tables if name != "personal_catalog"] + ["events"])))
             populated = (await cursor.fetchone())["populated"]
             if populated and not reset:
                 return

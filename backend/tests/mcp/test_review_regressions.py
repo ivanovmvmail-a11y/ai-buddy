@@ -1,4 +1,5 @@
 """Регрессии ревью PR #17: пункты 1–5, 7–9. Пункт 6 передан T3."""
+from datetime import datetime, timezone
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
@@ -96,7 +97,8 @@ def test_r2_waiting_metadata_is_replayed_at_week_boundary(store):
     assert request.id not in {fact["request_id"] for fact in actual["access_granted"]}
 
 
-def test_r3_reminder_actions_have_intern_day_and_virtual_timestamp(store):
+def test_r3_reminder_actions_keep_virtual_day_and_real_timestamp(store):
+    before = datetime.now(timezone.utc)
     reminders = run(clock.cron_tick(SYSTEM_ACTOR))
     ivan = DEMO_USERS["intern-ivan"]
     reminder = next(reminder for reminder in reminders if reminder.request_id == "REQ-1001")
@@ -108,11 +110,12 @@ def test_r3_reminder_actions_have_intern_day_and_virtual_timestamp(store):
     assert {event.type for event in actions} == {"reminder_snoozed", "reminder_completed"}
     for event in actions:
         assert event.payload["intern_id"] == ivan.id and event.payload["day"] == 8
-        assert event.ts.isoformat() == "2026-11-11T12:00:00+00:00"
+        assert before <= event.ts <= datetime.now(timezone.utc)
         assert event.user_id == ivan.id
 
 
 def test_r3_automatic_completion_and_reactivation_are_scoped(store):
+    before = datetime.now(timezone.utc)
     reminder = next(reminder for reminder in run(clock.cron_tick(SYSTEM_ACTOR)) if reminder.request_id == "REQ-1001")
     ivan = DEMO_USERS["intern-ivan"]
     run(clock.snooze_reminder(ivan, reminder.id))
@@ -121,7 +124,8 @@ def test_r3_automatic_completion_and_reactivation_are_scoped(store):
     changes = run(events.list_events(SYSTEM_ACTOR, ivan.id))
     for kind in ("reminder_reactivated", "reminder_completed"):
         event = next(event for event in changes if event.type == kind and event.payload.get("reminder_id") == reminder.id)
-        assert event.payload["day"] == 9 and event.ts.date().isoformat() == "2026-11-12"
+        assert event.payload["day"] == 9
+        assert before <= event.ts <= datetime.now(timezone.utc)
         assert event.user_id == "system" and event.role == "system"
 
 
@@ -185,7 +189,7 @@ def test_r9_seed_passes_historical_day_without_temporarily_advancing_clock(monke
     original = checklist._change_status
     seen = []
     def checked(data, actor, item, status, *args, **kwargs):
-        assert data.interns[item.intern_id].current_day == {"intern-anya": 2, "intern-ivan": 8}[item.intern_id]
+        assert data.interns[item.intern_id].current_day == {"intern-anya": 2, "intern-ivan": 8, "intern-kirill": 3, "intern-liza": 3}[item.intern_id]
         assert kwargs["day"] == (5 if status == "waiting" else 1)
         seen.append((item.id, kwargs["day"]))
         return original(data, actor, item, status, *args, **kwargs)

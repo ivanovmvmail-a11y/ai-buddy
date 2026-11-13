@@ -1,16 +1,20 @@
 // Лента чата. Приветствие и напоминания собираются из данных сервера (план, заявки, напоминания).
 // Объяснение пункта: с настоящей моделью — вопрос в /chat; без ключа (LLM_PROVIDER=scenario или echo) —
 // сценарный ответ из тех же данных плана и профиля (SPEC, раздел 8).
+import { isInfo, kindOf } from "./notifications";
 import { create } from "zustand";
 import { findUser } from "./users";
 import { waitedFor } from "./plan-logic";
 import type {
   AccessRequest, AccessResource, Action, DemoUser, DocSource, ExplainKind, Plan, PlanItem, Reminder, SkillLevel, SkillProfile,
+  WeeklySummary,
 } from "./types";
 
 export type BotAction =
   | { label: string; kind: "do" | "explain" | "steps" | "who"; itemId: string; internId: string }
-  | { label: string; kind: "snooze"; reminderId: string };
+  | { label: string; kind: "snooze"; reminderId: string }
+  | { label: string; kind: "nudge"; requestId: string; itemTitle: string }
+  | { label: string; kind: "nudge-lead" };
 
 export type Msg = {
   id: string;
@@ -91,9 +95,55 @@ export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: A
   return scripted(`Привет, ${name}! Слева — прогресс стажёров${actor.role === "curator" ? ", только чтение" : ""}.`);
 }
 
+/** Неделя, которая только что закончилась (день 8 → неделя 1), или null, если сегодня не первый день недели. */
+export function finishedWeek(day: number): number | null {
+  return day > 7 && (day - 1) % 7 === 0 ? (day - 1) / 7 : null;
+}
+
+/** Итоги недели стажёру (SPEC 3.2): только факты из событий, без оценок. Ту же сводку видит наставник. */
+export function weeklySummaryMsg(s: WeeklySummary, titles: Record<string, string> = {}): Msg {
+  const list = (xs: string[], empty: string) => (xs.length ? xs.map((x) => `«${x}»`).join(", ") : empty);
+  const lines = [
+    `Итоги недели ${s.week} — только факты из плана:`,
+    `• Закрыто: ${list(s.closed.map((c) => c.title), "пока ничего")}`,
+    `• Получены доступы: ${list(s.access_granted.map((a) => titles[a.resource_id] ?? a.resource_id), "нет")}`,
+    `• Переходит на следующую неделю: ${list(s.carry_over.map((c) => c.title), "ничего")}`,
+    "Эту же сводку видит наставник — удобно обсудить на встрече 1:1.",
+  ];
+  const next = s.carry_over.find((c) => c.owner_role === "intern" && c.status !== "waiting");
+  return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined });
+}
+
+/** «Написать наставнику» по зависшей заявке: бот не отправляет сообщения сам — готовит текст для копирования. */
+export function nudgeMsg(requestId: string, itemTitle: string): Msg {
+  return scripted(
+    "Черновик сообщения наставнику, можно скопировать:\n\n" +
+      `«Привет! Подскажи, пожалуйста, получится посмотреть мою заявку ${requestId}` +
+      (itemTitle ? ` (пункт плана «${itemTitle}»)` : "") +
+      "? Она ждёт решения уже несколько дней, а без доступа я не могу продолжить. Спасибо!»",
+  );
+}
+
+/** Заявка на отгул ждёт решения (SPEC 3.8): готовый текст руководителю — бот сам не отправляет (SPEC 3.7). */
+export function absenceNudgeMsg(leadName: string): Msg {
+  return scripted(
+    `Черновик сообщения руководителю${leadName ? ` (${leadName})` : ""}, можно скопировать:
+
+` +
+      "«Здравствуйте! Подскажите, пожалуйста, получится посмотреть моё заявление на отгул? " +
+      "Оно ждёт решения уже несколько дней. Спасибо!»",
+  );
+}
+
 export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
+  // Уведомление-факт («Наставник отметил…», «Отгул согласован») — без кнопок: ничего делать не нужно.
+  if (isInfo(r) || kindOf(r) === "skill_suggestion" || kindOf(r) === "absence_new") return scripted(`🔔 ${r.text}`);
   const actions: BotAction[] = [];
-  if (item) actions.push({ ...actionFor(item), label: item.resource_id && item.status !== "waiting" ? "Сделать сейчас" : "Объяснить" });
+  if (kindOf(r) === "absence_pending") {
+    actions.push({ label: "Написать руководителю", kind: "nudge-lead" });
+  } else if (r.request_id) {
+    actions.push({ label: "Написать наставнику", kind: "nudge", requestId: r.request_id, itemTitle: item?.title ?? "" });
+  } else if (item) actions.push({ ...actionFor(item), label: item.resource_id && item.status !== "waiting" ? "Сделать сейчас" : "Объяснить" });
   actions.push({ label: "Напомнить позже", kind: "snooze", reminderId: r.id });
   return scripted(`🔔 ${r.text}`, { actions });
 }
@@ -101,7 +151,7 @@ export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
 const DEPTH: Record<SkillLevel, string> = {
   novice: "Разберём подробно, с примерами.",
   familiar: "Коротко по шагам:",
-  confident: "Ты в этой теме уверенно, поэтому коротко:",
+  confident: "Эту тему ты знаешь уверенно, поэтому коротко:",
 };
 
 export const explainQuestion = (item: PlanItem) =>
@@ -154,7 +204,10 @@ export function accessDraftParams(item: PlanItem, actor: DemoUser) {
   };
 }
 
-export function approverText(resource: AccessResource | undefined, actor: DemoUser): string {
+/** Кто согласует: автоматически выдаётся только чтение, повышенные права — всегда наставник (аудит S4). */
+export function approverText(resource: AccessResource | undefined, actor: DemoUser, level = "read"): string {
   if (!resource) return "—";
-  return resource.approver === "auto" ? "выдаётся автоматически" : findUser(actor.mentor_id)?.name ?? "наставник";
+  return resource.approver === "auto" && level === "read"
+    ? "выдаётся автоматически"
+    : findUser(actor.mentor_id)?.name ?? "наставник";
 }

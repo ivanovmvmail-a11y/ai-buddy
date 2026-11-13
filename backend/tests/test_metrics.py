@@ -1,5 +1,6 @@
 """События чата, оценка ответов и метрики (спека 302)."""
 import pytest
+from app.agent.users import DEMO_USERS
 from .conftest import as_user, text_reply, tool_reply
 
 from app import async_runner
@@ -55,11 +56,11 @@ def test_ac2_feedback_own_answer_only(scenario):
 
 
 @pytest.mark.parametrize("user,expected", [
-    ("mentor-petr", ["intern-anya"]), ("mentor-maria", ["intern-ivan"]),
-    ("lead-olga", ["intern-anya"]), ("curator-dmitry", ["intern-anya", "intern-ivan"]),
+    ("mentor-petr", ["intern-anya", "intern-kirill"]), ("mentor-maria", ["intern-ivan", "intern-liza"]),
+    ("lead-olga", ["intern-anya", "intern-kirill"]), ("curator-dmitry", ["intern-anya", "intern-ivan", "intern-kirill", "intern-liza"]),
 ])
 def test_ac3_metrics_scope(scenario, user, expected):
-    assert scenario.get("/metrics", headers=as_user(user)).get_json()["interns"] == expected
+    assert scenario.get("/metrics", headers=as_user(user)).get_json()["interns"] == [id for id in expected if id in DEMO_USERS]
 
 
 @pytest.mark.parametrize("user", ["intern-anya", "hrbp-elena"])
@@ -163,3 +164,17 @@ def test_ac5_mentor_explain_is_not_an_intern_question(scenario):
     assert resp.status_code == 201
     [p] = answered()
     assert "intern_id" not in p  # вопросы наставника в метрики стажёров не попадают
+
+
+def test_off_topic_questions_are_not_closed_without_human(scenario, monkeypatch):
+    """Проверка 12.11, В5: «а когда зп приходит?» и вопрос о чужой команде раньше получали абзац не по теме
+    с источником и считались «закрытыми без человека». Теперь — HR BP и «в документах нет», метрика честная."""
+    from golden.run import _demo_rag
+    from app.agent import service
+    rag = async_runner.run(_demo_rag())
+    monkeypatch.setattr(service, "retrieve", lambda query, user, k=4: rag.retrieve(query, user, k))
+    ask(scenario, "а когда зп приходит?")
+    ask(scenario, "Какие статусы проходит учебное отправление в Доставке?")
+    salary, foreign = answered()
+    assert salary["topic"] == "hr" and not analytics.closed_without_human(salary)
+    assert foreign["not_in_base"] and not foreign["with_source"] and not analytics.closed_without_human(foreign)

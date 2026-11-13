@@ -4,9 +4,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { canMarkDone, canRequestAccess, isWorking, STAGE_TITLES, waitedFor } from "@/lib/plan-logic";
-import { useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
+import { useCatalog, useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import { InternCards } from "./InternCards";
+import { ComparePlans, SkillSuggestions } from "./MentorTools";
+import { AbsenceRequests } from "./AbsencePanel";
+import { SourceLink } from "./SourceViewer";
 import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
@@ -59,9 +62,13 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
 
   return (
     <div className="space-y-5 p-4 sm:p-5">
-      {actor.role !== "intern" && <InternCards actor={actor} />}
-
+      {/* Наставнику сначала то, что ждёт решения, и сравнение планов (главная идея), потом карточки (проверка 12.11). */}
       {actor.role === "mentor" && <Approvals actor={actor} />}
+      {actor.role === "mentor" && <SkillSuggestions actor={actor} />}
+      {actor.role === "mentor" && <ComparePlans actor={actor} />}
+
+      {actor.role !== "intern" && <InternCards actor={actor} />}
+      {(actor.role === "lead" || actor.role === "intern") && <AbsenceRequests actor={actor} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
@@ -85,6 +92,8 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
       </div>
 
       <Ladder ladder={p.ladder} />
+
+      {actor.role === "mentor" && <CatalogPicker actor={actor} internId={p.intern_id} name={intern?.name.split(" ")[0] ?? ""} />}
 
       {STAGES.map((stage) => {
         const items = p.items.filter((i) => i.stage === stage);
@@ -114,6 +123,38 @@ export function PlanPanel({ actor, onExplain, onDo }: Props) {
   );
 }
 
+/** Наставник добавляет стажёру пункт из каталога команды (SPEC 3.1): только то, чего ещё нет в плане. */
+function CatalogPicker({ actor, internId, name }: { actor: DemoUser; internId: string; name: string }) {
+  const catalog = useCatalog(actor, internId);
+  const refresh = useRefresh();
+  const add = useMutation({ mutationFn: (key: string) => api.addPersonal(actor.id, internId, key), onSuccess: refresh });
+  const free = (catalog.data ?? []).filter((c) => !c.in_plan);
+  if (!free.length) return null;
+  return (
+    <section aria-label="Каталог пунктов" className="rounded-xl border border-dashed border-violet-500/40 p-3 text-sm">
+      <h3 className="font-semibold">Добавить пункт в план{name ? `: ${name}` : ""}</h3>
+      <p className="mb-2 text-xs text-black/50 dark:text-white/50">Из каталога команды. Общие пункты не меняются.</p>
+      {add.isError && <p role="alert" className="mb-2 text-red-700 dark:text-red-300">{add.error.message}</p>}
+      <ul className="flex flex-wrap gap-2">
+        {free.map((c) => (
+          <li key={c.key}>
+            <button
+              disabled={add.isPending}
+              onClick={() => add.mutate(c.key)}
+              // Имя кнопки для программ чтения с экрана — название пункта, а не подсказка (проверка 12.11)
+              aria-label={`Добавить в план: ${c.title}`}
+              title={c.summary}
+              className="rounded-lg border border-violet-500/40 px-2.5 py-1 text-violet-700 hover:bg-violet-500/10 disabled:opacity-50 dark:text-violet-300"
+            >
+              + {c.title}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Ladder({ ladder }: { ladder: StageInfo[] }) {
   return (
     <ol aria-label="Этапы стажировки" className="grid grid-cols-4 gap-1.5">
@@ -139,16 +180,30 @@ function Ladder({ ladder }: { ladder: StageInfo[] }) {
   );
 }
 
-const HINT: Partial<Record<SkillLevel, string>> = { novice: "здесь помогу подробно", confident: "ты это знаешь" };
+const HINT: Partial<Record<SkillLevel, string>> = { novice: "здесь помогу подробно" };
 
 function PlanRow({
   item, actor, isNext, level, onExplain, onDo,
 }: { item: PlanItem; actor: DemoUser; isNext: boolean; level?: SkillLevel; onExplain: Props["onExplain"]; onDo: Props["onDo"] }) {
   const refresh = useRefresh();
   const mark = useMutation({ mutationFn: () => api.setStatus(actor.id, item.id, "done"), onSuccess: refresh });
+  // SPEC 4: «это я уже знаю» — повод для предложения наставнику; пункт не закрывается, уровень решает наставник.
+  const know = useMutation({ mutationFn: (known: boolean) => api.markKnown(actor.id, item.id, known), onSuccess: refresh });
+  // SPEC 3.1: наставник убирает персональный пункт своего стажёра (общие и закрытые — нельзя).
+  const remove = useMutation({ mutationFn: () => api.removePersonal(actor.id, item.id), onSuccess: refresh });
   const working = isWorking(item.stage);
   const st = STATUS[item.status];
-  const hint = level && actor.id === item.intern_id ? HINT[level] : undefined;
+  const self = actor.id === item.intern_id;
+  // Карту навыков видят только сам стажёр и наставник (SPEC 7) — от неё зависят «почему» и «коротко».
+  const seesSkills = self || actor.role === "mentor";
+  const lvl = item.skill_level ?? level;
+  const hint = lvl && self ? HINT[lvl] : undefined;
+  const personal = item.kind === "personal";
+  const short = seesSkills && !personal && lvl === "confident";
+  // Спека 107: задание на практике, которое бот проверит по документу пункта (только сам стажёр).
+  const canPractice = self && working && item.practice_check && item.status !== "done";
+  const [practiceOpen, setPracticeOpen] = useState(false);
+  const canKnow = self && working && item.owner_role === "intern" && !!item.topic && item.status !== "done" && lvl !== "confident";
 
   return (
     <li
@@ -164,6 +219,20 @@ function PlanRow({
       <div className="text-[15px] font-medium leading-snug">{item.title}</div>
       {working && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+          <span
+            className={`rounded-full px-2 py-0.5 ${
+              personal
+                ? "bg-violet-500/12 font-medium text-violet-700 dark:text-violet-300"
+                : "border border-black/10 text-black/50 dark:border-white/15 dark:text-white/50"
+            }`}
+          >
+            {personal ? (self ? "для тебя" : "персональный") : "для всех"}
+          </span>
+          {short && (
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
+              {self ? "ты это умеешь — коротко" : "умеет — коротко"}
+            </span>
+          )}
           <span className={`rounded-full px-2 py-0.5 ${st.cls}`}>{st.label}</span>
           {item.overdue && item.status !== "waiting" && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-orange-800 dark:text-orange-300">срок прошёл</span>}
           <span className="text-black/50 dark:text-white/50">
@@ -173,13 +242,27 @@ function PlanRow({
           {hint && <span className="text-black/50 dark:text-white/50">· {hint}</span>}
         </div>
       )}
+      {personal && item.reason && seesSkills && (
+        <p className="mt-1 text-xs text-black/55 dark:text-white/55">Почему: {item.reason}</p>
+      )}
       {item.status === "waiting" && item.waiting_for && (
         <p className="mt-1 text-xs text-black/55 dark:text-white/55">
           Ждём: {findUser(item.waiting_for)?.name}, {waitedFor(item.waiting_days ?? 0)}
         </p>
       )}
       {item.status_reason && <p className="mt-1 text-xs text-orange-800 dark:text-orange-300">Причина: {item.status_reason}</p>}
+      {item.known_marked && self && item.status !== "done" && (
+        <p className="mt-1 text-xs text-black/55 dark:text-white/55">
+          Отмечено: это я уже знаю. Наставник решит, поднять ли уровень.{" "}
+          <button disabled={know.isPending} onClick={() => know.mutate(false)} className="underline underline-offset-2 disabled:opacity-50">
+            Убрать отметку
+          </button>
+        </p>
+      )}
       {mark.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{mark.error.message}</p>}
+      {know.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{know.error.message}</p>}
+      {remove.isError && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{remove.error.message}</p>}
+      {practiceOpen && <PracticeForm actor={actor} item={item} onClose={() => setPracticeOpen(false)} />}
       {working && (
         <div className="mt-2 flex flex-wrap gap-2">
           <button onClick={() => onExplain(item)} className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
@@ -188,6 +271,32 @@ function PlanRow({
           {canRequestAccess(actor, item) && (
             <button onClick={() => onDo(item)} className="rounded-lg bg-[#00aaff] px-2.5 py-1 text-sm font-medium text-white hover:bg-[#0099e6]">
               Сделать за меня
+            </button>
+          )}
+          {actor.role === "mentor" && personal && item.status !== "done" && (
+            <button
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:text-white/70 dark:hover:bg-white/10"
+            >
+              Убрать из плана
+            </button>
+          )}
+          {canPractice && !practiceOpen && (
+            <button
+              onClick={() => setPracticeOpen(true)}
+              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+            >
+              Сдать задание
+            </button>
+          )}
+          {canKnow && !item.known_marked && (
+            <button
+              disabled={know.isPending}
+              onClick={() => know.mutate(true)}
+              className="rounded-lg border border-black/15 px-2.5 py-1 text-sm hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+            >
+              Это я уже знаю
             </button>
           )}
           {canMarkDone(actor, item) && (
@@ -260,5 +369,60 @@ function Approvals({ actor }: { actor: DemoUser }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Спека 107: ответ на «задание на практике» — сервер сверяет его с фактами учебного документа, без модели.
+ *  Это проверка задания, а не оценка стажёра: засчитанное задание лишь подсказывает закрыть пункт «Готово». */
+function PracticeForm({ actor, item, onClose }: { actor: DemoUser; item: PlanItem; onClose: () => void }) {
+  const [answer, setAnswer] = useState("");
+  const check = useMutation({ mutationFn: () => api.practice(actor.id, item.id, answer.trim()) });
+  const result = check.data;
+  return (
+    <form
+      aria-label={`Задание: ${item.title}`}
+      onSubmit={(e) => { e.preventDefault(); if (answer.trim()) check.mutate(); }}
+      className="mt-2 space-y-2 rounded-lg bg-black/[0.03] p-2.5 text-sm dark:bg-white/[0.04]"
+    >
+      <label className="block">
+        <span className="text-xs text-black/55 dark:text-white/55">Задание: {item.practice} Опиши своими словами, что сделал(а).</span>
+        <textarea
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          rows={3}
+          maxLength={2000}
+          className="mt-1 block w-full resize-y rounded-lg border border-black/15 bg-transparent px-2 py-1.5 dark:border-white/20"
+        />
+      </label>
+      {check.isError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{check.error.message}</p>}
+      {result && (
+        <div
+          role="status"
+          className={`rounded-lg px-2.5 py-2 text-sm ${
+            result.passed ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200" : "bg-amber-500/10 text-amber-900 dark:text-amber-100"
+          }`}
+        >
+          <p>{result.passed ? "✓ " : ""}{result.text}</p>
+          {result.source && (
+            <p className="mt-1 text-xs opacity-75">
+              Документ:{" "}
+              <SourceLink actor={actor} title={result.source.title} />
+            </p>
+          )}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={!answer.trim() || check.isPending}
+          className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white hover:bg-[#0099e6] disabled:opacity-50"
+        >
+          {check.isPending ? "Проверяю…" : "Проверить"}
+        </button>
+        <button type="button" onClick={onClose} className="rounded-lg px-2.5 py-1 text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10">
+          Закрыть
+        </button>
+      </div>
+    </form>
   );
 }

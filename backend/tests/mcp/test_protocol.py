@@ -61,7 +61,7 @@ def test_eight_tools_roundtrip_with_separate_intern_and_mentor_servers(store):
             plan = data(await client.call_tool("get_plan", {"intern_id": ANYA}))
             assert plan["current_day"] == 2 and plan["next_step"]
             resources = data(await client.call_tool("list_resources", {}))["result"]
-            assert "bitbucket-platform" in {resource["id"] for resource in resources}
+            assert {"redash", "grafana", "bitbucket-platform"} <= {resource["id"] for resource in resources}
             assert "bitbucket-delivery" not in {resource["id"] for resource in resources}
             updated = data(await client.call_tool("set_item_status", {"item_id": "anya.w1.notes", "status": "done"}))
             assert updated["status"] == "done" and updated["updated_by"] == ANYA
@@ -209,12 +209,12 @@ def test_only_process_owner_closes_store_after_multiple_sessions(store, monkeypa
 @pytest.mark.parametrize("arguments,identity", [([], None), ([], ""), ([], "unknown"), ([], "system"),
     (["--user", "unknown"], ANYA), (["--user", ""], ANYA)])
 def test_invalid_startup_identity_exits_before_protocol(arguments, identity):
-    environment = {**os.environ, "DATABASE_URL": "", "LLM_PROVIDER": "echo"}
+    environment = {**os.environ, "DATABASE_URL": "", "LLM_PROVIDER": "echo", "PYTHONUTF8": "1"}
     environment.pop("MCP_USER_ID", None)
     if identity is not None:
         environment["MCP_USER_ID"] = identity
     result = subprocess.run([sys.executable, "-m", "app.mcp_server.server", *arguments], cwd=BACKEND,
-                            env=environment, input="", capture_output=True, text=True, timeout=15)
+                            env=environment, input="", capture_output=True, text=True, encoding="utf-8", timeout=15)
     assert result.returncode == 2 and result.stdout == ""
     assert ("Укажите пользователя" if identity in (None, "") or arguments == ["--user", ""] else "Неизвестный пользователь") in result.stderr
 

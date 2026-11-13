@@ -8,12 +8,14 @@
 Изменение уровня навыка (`set_skill_level`) намеренно НЕ инструмент: уровень меняет только
 наставник руками, ИИ человека не оценивает (SPEC, раздел 4).
 """
+from datetime import date, timedelta
 from functools import cache
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-from app.mcp_server import access, checklist, hiring
+from app.mcp_server import absence, access, checklist, clock, hiring
+from app.mcp_server.absence_models import REASONS
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
 from app.mcp_server.models import PlanItem
 from app.mcp_server.seed import load_seed
@@ -83,6 +85,7 @@ class StatusArgs(BaseModel):
     item_id: str = Field(description="id пункта плана, например anya.w1.notes")
     status: Literal["in_progress", "done"] = Field(description="новый статус")
     reason: str | None = Field(default=None, max_length=300, description="причина — обязательна, если наставник возвращает пункт")
+    title: str | None = Field(default=None, max_length=200, description="название пункта — для карточки черновика")
 
 
 async def set_plan_item_status(user: User, args: StatusArgs) -> dict:
@@ -112,6 +115,14 @@ class RequestArgs(BaseModel):
 
 
 LEVEL_TITLES = {"read": "чтение", "edit": "редактирование", "admin": "администрирование"}
+
+
+async def resource_visible(user: User, args: RequestArgs) -> bool:
+    """Ресурс есть в списке, доступном стажёру (своя команда или общий). Чужой — как несуществующий."""
+    try:
+        return any(r.id == args.resource_id for r in await access.list_resources(user))
+    except DOMAIN_ERRORS:
+        return False
 
 
 async def create_access_request(user: User, args: RequestArgs) -> dict:
@@ -154,6 +165,53 @@ async def get_skill_profile(user: User, args: PlanArgs) -> dict:
     return await _safe(run())
 
 
+# --- Отгул на один день (SPEC 3.8, сервис Codex — app/mcp_server/absence.py) ------------------------
+
+WEEKDAYS = ("пн", "вт", "ср", "чт", "пт", "сб", "вс")
+
+
+async def intern_today(user: User) -> date | None:
+    """Сегодняшняя дата по демо-часам стажёра: дата старта + день стажировки − 1."""
+    start = getattr(load_seed().interns.get(user.id), "start_date", None)
+    if user.role != Role.INTERN or start is None:
+        return None
+    try:
+        return start + timedelta(days=await clock.get_day(user, user.id) - 1)
+    except DOMAIN_ERRORS:
+        return None
+
+
+class AbsenceArgs(BaseModel):
+    day: date = Field(description="дата отгула YYYY-MM-DD: один день, не раньше сегодняшнего")
+    reason: Literal["personal", "family", "study"] = Field(
+        default="personal",
+        description="причина из закрытого списка: personal — личные дела (в т. ч. врач), family — семейные, study — учёба. "
+                    "Медицинские и другие подробности не передавай")
+
+
+def describe_absence(args: AbsenceArgs, user: User | None = None) -> str:
+    lead = DEMO_USERS.get(user.lead_id or "") if user else None
+    who = f", решает {lead.name}" if lead else ""
+    return (f"Заявление на отгул: {args.day:%d.%m} ({WEEKDAYS[args.day.weekday()]}), "
+            f"причина — {REASONS[args.reason].lower()}{who}")
+
+
+async def create_absence_request(user: User, args: AbsenceArgs) -> dict:
+    """Выполняется только после «Подтвердить»: это доверенный обратный вызов, поэтому здесь и черновик сервиса,
+    и его подтверждение (так договорились с Codex, .ai/HANDOFF.md, запись об отгуле)."""
+    async def run():
+        draft = await absence.draft_absence(user.id, args.day, args.reason)
+        request = await absence.confirm_absence(user.id, draft.id)
+        return {"status": "created", "request": request.model_dump(mode="json")}
+    return await _safe(run())
+
+
+async def list_absence_requests(user: User, args: NoArgs) -> dict:
+    async def run():
+        return {"requests": [r.model_dump(mode="json") for r in await absence.list_requests(user.id)]}
+    return await _safe(run())
+
+
 def register_onboarding_tools(registry: ToolRegistry) -> None:
     registry.register(Tool(
         name="get_plan",
@@ -165,7 +223,8 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
         description=("Отметить пункт плана: done — сделано, in_progress — вернуть в работу (наставник, с причиной). "
                      "Пункты с доступами закрываются только заявкой. Выполняется после подтверждения."),
         args_model=StatusArgs, permission="plan:write", handler=set_plan_item_status, kind="write",
-        describe=lambda a: f"Пункт плана {a.item_id}: {'сделано' if a.status == 'done' else 'вернуть в работу'}",
+        describe=lambda a: (f"{'Отметить сделанным' if a.status == 'done' else 'Вернуть в работу'}: "
+                            f"«{a.title or a.item_id}»"),
     ))
     registry.register(Tool(
         name="list_access_resources",
@@ -179,6 +238,7 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
         args_model=RequestArgs, permission="access:request", handler=create_access_request, kind="write",
         describe=lambda a: (f"Заявка на доступ: {resource_titles().get(a.resource_id, a.resource_id)}, "
                             f"права — {LEVEL_TITLES[a.level]}"),
+        precheck=resource_visible,
     ))
     registry.register(Tool(
         name="list_access_requests",
@@ -195,6 +255,19 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
         name="get_skill_profile",
         description="Карта навыков стажёра по темам (новичок / знаком / уверенно), сильные стороны и темы для роста.",
         args_model=PlanArgs, permission="skills:read", handler=get_skill_profile,
+    ))
+    registry.register(Tool(
+        name="create_absence_request",
+        description=("Заявление стажёра на отгул на ОДИН день: дата и причина из закрытого списка. Используй, когда "
+                     "стажёр хочет отпроситься («мне завтра к врачу», «как взять отгул»). Больничный и отпуск — не "
+                     "этот инструмент, это к HR BP. Уходит руководителю только после подтверждения стажёром."),
+        args_model=AbsenceArgs, permission="absence:request", handler=create_absence_request, kind="write",
+        describe=describe_absence,
+    ))
+    registry.register(Tool(
+        name="list_absence_requests",
+        description="Заявки на отгул: свои (стажёр) или стажёров своей команды (руководитель), со статусом решения.",
+        args_model=NoArgs, permission="absence:read", handler=list_absence_requests,
     ))
 
 
@@ -218,6 +291,12 @@ async def plan_context(user: User) -> str:
     mentor = DEMO_USERS.get(user.mentor_id or "")
     if mentor:
         lines.append(f"Наставник: {mentor.name}.")
+    lead = DEMO_USERS.get(user.lead_id or "")
+    if lead:
+        lines.append(f"Руководитель: {lead.name}.")
+    today = await intern_today(user)
+    if today:
+        lines.append(f"Сегодня: {today.isoformat()}.")
     if plan.next_step.item:
         lines.append(f"Следующий шаг: «{plan.next_step.item.title}» (id {plan.next_step.item.id}).")
     for w in plan.next_step.waiting:

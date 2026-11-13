@@ -49,6 +49,29 @@ def load_doc(source_id: str | None) -> Doc | None:
     return Doc(source_id, doc.title, url, tuple(_units(doc.content)))
 
 
+@cache
+def _by_title() -> dict[str, tuple[str | None, str]]:
+    """Название демо-документа → (команда или None для общих, текст без служебного заголовка)."""
+    found: dict[str, tuple[str | None, str]] = {}
+    for path in sorted(DEMO_DOCS.glob("*.md")):
+        doc = read_document(path, f"demo:{path.name}")
+        found[doc.title] = (doc.team, doc.content)
+    return found
+
+
+def view_document(title: str, user: User) -> dict | None:
+    """Документ целиком по названию из «Источник» (проверка 12.11: ссылки вели на несуществующий адрес).
+    Правило то же, что у поиска: общий документ или документ своей команды; чужой — как будто его нет.
+    При внедрении — ссылка на страницу базы знаний (Confluence) с её правами."""
+    found = _by_title().get(title.strip())
+    if found is None:
+        return None
+    team, content = found
+    if team is not None and team != user.team:
+        return None
+    return {"title": title.strip(), "team": team, "content": content}
+
+
 def _best_section(doc: Doc, text: str) -> tuple[str, list[str]]:
     """Раздел документа, ближе всего к пункту: (заголовок, абзацы раздела)."""
     by_heading: dict[str, list[str]] = {}
@@ -110,7 +133,7 @@ def _explain(item, doc, level, intern):
         heading, paragraphs = _best_section(doc, f"{item.title} {item.summary} {item.practice or ''}")
         sentences = _sentences(paragraphs)
         if level == "confident":
-            parts.append(f"Ты в этой теме уверенно, поэтому коротко. Главное из раздела «{heading}»: {sentences[0]}")
+            parts.append(f"Эту тему ты знаешь уверенно, поэтому коротко. Главное из раздела «{heading}»: {sentences[0]}")
         elif level == "familiar":
             parts.append(f"Коротко по разделу «{heading}»: " + " ".join(sentences[:2]))
         else:

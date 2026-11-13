@@ -64,10 +64,10 @@ def test_resource_create_and_list_matrix(store, actor_id):
     actor = DEMO_USERS[actor_id]
     if actor.role == "intern":
         resources = run(access.list_resources(actor))
-        own = "bitbucket-platform" if actor_id == "intern-anya" else "bitbucket-delivery"
-        assert {resource.id for resource in resources} == {"jira", "confluence", own}
-        resource = "confluence" if actor_id == "intern-anya" else "bitbucket-platform"
-        if actor_id == "intern-anya":
+        own = "bitbucket-platform" if actor.team == "Платформа объявлений" else "bitbucket-delivery"
+        assert {resource.id for resource in resources} == {"jira", "confluence", "redash", "grafana", own}
+        resource = "confluence" if actor.team == "Платформа объявлений" else "bitbucket-platform"
+        if actor.team == "Платформа объявлений":
             assert run(access.create_request(actor, resource, "read", "Учебная задача")).intern_id == actor_id
         else:
             with pytest.raises(NotFound):
