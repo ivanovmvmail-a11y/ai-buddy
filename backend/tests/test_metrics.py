@@ -102,7 +102,7 @@ def test_ac5_event_failure_does_not_break_chat(client, use_llm, monkeypatch):
     async def boom(*a, **k):
         raise RuntimeError("db down")
     monkeypatch.setattr(events, "log_event", boom)
-    res = client.post("/chat", json={"messages": [{"role": "user", "content": "привет"}]}, headers=as_user("intern-anya"))
+    res = client.post("/chat", json={"messages": [{"role": "user", "content": "как дела с моими заявками"}]}, headers=as_user("intern-anya"))
     assert res.status_code == 200 and res.get_json()["reply"] == "ok"
 
 

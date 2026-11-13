@@ -15,6 +15,7 @@ from typing import Any
 from app.agent.users import DEMO_USERS, Role
 
 from .base import LLMReply, Message, ToolCall, ToolSpec
+from .small_talk import small_talk_reply
 
 DOCS_MARKER = "Контекст из документов команды"
 
@@ -206,7 +207,12 @@ def _units(content: str) -> list[tuple[str, str]]:
             units.extend((heading, line) for line in lines)  # список — каждый пункт отдельно
         else:
             units.append((heading, " ".join(lines)))
-    return [(h, u) for h, u in units if "синтетическ" not in u.lower()]
+    # «Это вымышленные маршруты помощи для демо…» попадало стажёру в ответ «К кому идти» (проверка 13.11).
+    # Только сама пометка: «вымышленные карточки» в тексте задания — содержание, его не трогаем.
+    return [(h, u) for h, u in units if "синтетическ" not in u.lower() and not u.lower().startswith(SERVICE_NOTES)]
+
+
+SERVICE_NOTES = ("это вымышленн", "демо-данные", "это демо")
 
 
 CONFLICT_MARK = "Документы расходятся"
@@ -312,7 +318,14 @@ def _missing_text(question: str, system: str) -> str:
     return (
         "В документах, доступных тебе, этого нет — выдумывать не буду. Скорее всего "
         f"{who}. Черновик вопроса, можно скопировать:\n\n«Привет! Подскажи, пожалуйста: {_as_sentence(question)} "
-        "Я поискал в документах команды, но ответа не нашёл.»")
+        f"{_past(system, 'Я поискал', 'Я поискала')} в документах команды, но ответа {_past(system, 'не нашёл', 'не нашла')}.»")
+
+
+def _past(system: str, masc: str, fem: str) -> str:
+    """Глагол в роде пользователя: черновик вопроса пишется от его имени («Я поискала…», проверка 13.11)."""
+    match = re.search(r"Текущий пользователь: ([^,]+),", system)
+    user = next((u for u in DEMO_USERS.values() if match and u.name == match.group(1)), None)
+    return fem if user is not None and user.female else masc
 
 
 MISSING_PHRASES = ("этого нет", "не нашел", "нет информации", "информации об этом нет", "нет в документ", "не нашлось",
@@ -715,8 +728,8 @@ class ScenarioProvider:
         role = _role(system)
         someone = _names_someone(q)
         other = someone if someone and someone != _own_id(system) else None
-        if THANKS.fullmatch(q):
-            return LLMReply(content="Пожалуйста! Если появится вопрос — спрашивай. Следующий шаг всегда виден в плане слева.")
+        if (talk := small_talk_reply(question, system)) is not None:
+            return LLMReply(content=talk)
         if (text := policy_reply(q, question, system, available)) is not None:
             return LLMReply(content=text)
         if "наставник" in q and any(w in q for w in ("кто", "мой", "моего", "как зовут", "связат", "написать")):
@@ -767,11 +780,6 @@ class ScenarioProvider:
             return call("list_access_resources")
         if "заявк" in q and any(w in q for w in REQUEST_WORDS) and "list_access_requests" in available:
             return call("list_access_requests")
-        if len(q) < 25 and any(q.startswith(g) for g in GREETINGS):
-            return LLMReply(content=(
-                "Привет! Я работаю в сценарном режиме (без ключа модели). Могу подсказать следующий шаг "
-                "по плану, оформить черновик заявки на доступ, найти ответ в документах команды или помочь "
-                "сформулировать вопрос наставнику."))
         return LLMReply(content=self._from_docs(question, system))
 
     def _from_docs(self, question: str, system: str) -> str:

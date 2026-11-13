@@ -64,7 +64,7 @@ def test_full_loop_draft_confirm_bell_on_that_day(scenario):
     assert bell(scenario) == []
     next_day(scenario)
     [note] = bell(scenario)  # послезавтра наступило — пришло
-    assert note["text"] == "Ты просил(а) напомнить про 1:1 с наставником" and note["action"]["label"] == "Открыть"
+    assert note["text"] == "Ты просила напомнить про 1:1 с наставником" and note["action"]["label"] == "Открыть"
 
     # «Напомнить завтра» и «Готово» — как у остальных уведомлений
     assert scenario.post(f"/reminders/{note['id']}/snooze", headers=as_user("intern-anya")).status_code == 200
@@ -80,7 +80,7 @@ def test_today_reminder_is_active_at_once(scenario):
     [action] = ask(scenario, "напомни сегодня выложить демо")["actions"]
     scenario.post(f"/actions/{action['id']}/confirm", headers=as_user("intern-anya"))
     [note] = bell(scenario)
-    assert note["text"] == "Ты просил(а) напомнить: выложить демо"
+    assert note["text"] == "Ты просила напомнить: выложить демо"
 
 
 def test_other_roles_get_honest_answer_no_tool(scenario):
@@ -104,4 +104,4 @@ def test_service_rules(scenario):
         run(clock.add_custom_reminder(DEMO_USERS["mentor-petr"], "себе", today_date))
     later = run(clock.add_custom_reminder(anya, "что  в среду   демо", today_date + timedelta(days=5)))
     assert later.status == "snoozed" and later.snooze_until_day == current + 5
-    assert later.text == "Ты просил(а) напомнить, что в среду демо"
+    assert later.text == "Ты просила напомнить, что в среду демо"

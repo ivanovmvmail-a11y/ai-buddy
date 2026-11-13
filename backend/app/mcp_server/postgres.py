@@ -53,7 +53,7 @@ class PostgresStore(PostgresPoolOwner):
         available = {row["tablename"] for row in await cursor.fetchall()}
         missing = {table for _, table, *_ in TABLES if table in OPTIONAL_TABLES and table not in available}
         if missing - self._missing_warned:
-            log.warning("Дополнительные таблицы %s пока не созданы: примените новые миграции. Основной онбординг продолжает работать в PostgreSQL.", ", ".join(sorted(missing)))
+            log.warning("Дополнительные таблицы %s пока не созданы: примените новые миграции (в Docker: docker compose down -v — база создаётся заново со всеми таблицами). Основной онбординг продолжает работать в PostgreSQL.", ", ".join(sorted(missing)))
             self._missing_warned.update(missing)
         return available
 
@@ -112,7 +112,7 @@ class PostgresStore(PostgresPoolOwner):
         for field, table, _, key_column in TABLES:
             if table in OPTIONAL_TABLES and table not in available:
                 if getattr(data, field) and not missing_ok:
-                    raise Conflict("Сервис пока недоступен: примените новые миграции базы данных")
+                    raise Conflict("Сервис пока недоступен: примените новые миграции базы данных (база создана старой версией: в Docker — docker compose down -v и снова up)")
                 continue
             for key, record in getattr(data, field).items():
                 values = _dump(record)
@@ -120,11 +120,11 @@ class PostgresStore(PostgresPoolOwner):
                     continue
                 if table == "reminders" and "mentor_questions" not in available:
                     if values.pop("mentor_question_id", None) is not None:
-                        raise Conflict("Сервис пока недоступен: примените новые миграции базы данных")
+                        raise Conflict("Сервис пока недоступен: примените новые миграции базы данных (база создана старой версией: в Docker — docker compose down -v и снова up)")
                 if table == "reminders":
                     unavailable = set(values) - reminder_columns
                     if unavailable and record.kind not in {"plan_item", "access_request"}:
-                        raise Conflict("Уведомления пока недоступны: примените новые миграции базы данных")
+                        raise Conflict("Уведомления пока недоступны: примените новые миграции базы данных (база создана старой версией: в Docker — docker compose down -v и снова up)")
                     values = {key: value for key, value in values.items() if key in reminder_columns}
                 columns = list(values)
                 query = sql.SQL("INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}").format(

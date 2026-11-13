@@ -22,7 +22,7 @@ def test_custom_reminder_waits_for_its_day(store, snapshot):
     assert saved.id == made.id and saved.status == "snoozed" and saved.snooze_until_day == day + 1
     run(clock.advance_day(ANYA, ANYA.id))
     [saved] = custom()
-    assert saved.status == "active" and saved.text == "Ты просил(а) напомнить про 1:1 с наставником"
+    assert saved.status == "active" and saved.text == "Ты просила напомнить про 1:1 с наставником"
     assert saved.action.target == "plan" and saved.intern_id == ANYA.id
     run(clock.done_reminder(ANYA, saved.id))
     assert custom()[0].status == "done"
