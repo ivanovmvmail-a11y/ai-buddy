@@ -216,10 +216,10 @@ def ask(client, text, user="intern-anya"):
 
 def test_prompt_has_plan_context_for_intern(client, use_llm):
     llm = use_llm(text_reply("ok"))
-    ask(client, "что дальше?")
+    ask(client, "как оформить pull request")
     system = llm.calls[0][0][0].content
     assert "Следующий шаг" in system and "Уровень по темам" in system
-    ask(client, "что дальше?", "hrbp-elena")
+    ask(client, "как оформить pull request", "hrbp-elena")
     assert "Следующий шаг" not in llm.calls[1][0][0].content
 
 
@@ -236,7 +236,7 @@ def test_tools_shown_by_role(client, use_llm):
 
 def test_agent_reads_plan_through_tool(client, use_llm):
     llm = use_llm(tool_reply("get_plan"), text_reply("Твой следующий шаг…"))
-    res = ask(client, "что мне делать?")
+    res = ask(client, "покажи мой прогресс по пунктам")
     assert res.status_code == 200
     tool_msg = llm.calls[1][0][-1]
     assert tool_msg.role == "tool" and "next_step" in tool_msg.content
@@ -342,3 +342,24 @@ def test_demo_buttons_open_without_configured_key(client, monkeypatch):
 
     monkeypatch.setattr(settings, "demo_key", "")
     assert post(client, "/demo/reset").status_code == 200
+
+
+def test_next_step_comes_from_plan_not_model(client, use_llm):
+    """Прогон GigaChat 13.11: «что дальше» — сводка из плана, модель не пересказывает (и не путает факты)."""
+    llm = use_llm(text_reply("Обратись к ответственному за среду."))
+    reply = ask(client, "что мне делать дальше?").get_json()["reply"]
+    assert "Следующий шаг" in reply and "ответственному" not in reply and llm.calls == []
+
+
+def test_hr_question_goes_to_hr_for_any_model(client, use_llm):
+    llm = use_llm(text_reply("Отдохни и выздоравливай!"))
+    reply = ask(client, "я заболела").get_json()["reply"]
+    assert "HR BP" in reply and llm.calls == []
+
+
+def test_mentor_and_lead_pending_from_services(client, use_llm):
+    llm = use_llm(text_reply("Заявку подала Мария."))
+    reply = ask(client, "какие заявки ждут меня?", "mentor-maria").get_json()["reply"]
+    assert "REQ-1001" in reply and "Мария" not in reply
+    assert "ничего не ждёт" in ask(client, "какие заявки ждут моего решения?", "lead-olga").get_json()["reply"]
+    assert llm.calls == []
