@@ -18,7 +18,7 @@ afterEach(() => {
 const click = (el: HTMLElement) => act(async () => fireEvent.click(el));
 
 function open(userId: string) {
-  useSession.setState({ userId, internPick: null });
+  useSession.setState({ userId, internPick: null , section: "plan" });
   render(<Providers><Home /></Providers>);
 }
 

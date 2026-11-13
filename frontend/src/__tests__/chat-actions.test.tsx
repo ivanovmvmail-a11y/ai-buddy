@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 function open(userId = "intern-anya") {
-  useSession.setState({ userId, internPick: null });
+  useSession.setState({ userId, internPick: null , section: "plan" });
   render(<Providers><Home /></Providers>);
 }
 
@@ -34,7 +34,7 @@ describe("кнопки пункта плана в чате", () => {
     srv.chatReplies.push({ reply: "«Завести конспект встреч с наставником». Собери вопросы в одной заметке.", itemId: "anya.w1.notes" });
     open();
     await ask("объясни пункт про конспект");
-    const bubble = (await screen.findByText(/Собери вопросы в одной заметке/)).closest("[class*=rounded-2xl]") as HTMLElement;
+    const bubble = (await screen.findByText(/Собери вопросы в одной заметке/)).closest("[class*=rounded-bl-md]") as HTMLElement;
     expect(within(bubble).getByRole("button", { name: "Объяснить" })).toBeTruthy();
     await act(async () => fireEvent.click(within(bubble).getByRole("button", { name: "Готово" })));
     expect(await screen.findByText(/Отметил «Завести конспект встреч с наставником» — сделано/)).toBeTruthy();
@@ -62,7 +62,7 @@ describe("кнопки пункта плана в чате", () => {
     await screen.findByText(/Привет, Пётр/);
     fireEvent.change(screen.getByRole("textbox", { name: "Сообщение" }), { target: { value: "что у Ани" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Отправить" })));
-    const bubble = (await screen.findByText("Ответ про пункт")).closest("[class*=rounded-2xl]") as HTMLElement;
+    const bubble = (await screen.findByText("Ответ про пункт")).closest("[class*=rounded-bl-md]") as HTMLElement;
     expect(within(bubble).queryByRole("button", { name: "Готово" })).toBeNull();
   });
 });

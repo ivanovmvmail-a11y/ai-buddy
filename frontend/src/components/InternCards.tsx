@@ -51,7 +51,7 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
 
   return (
     <li
-      className={`rounded-xl border p-3 text-sm transition-colors ${selected ? "border-[#00aaff] bg-[#00aaff]/5" : "border-black/10 dark:border-white/10"}`}
+      className={`card p-4 text-sm ${selected ? "shadow-[0_0_0_2px_var(--accent)]" : ""}`}
     >
       <button onClick={onSelect} aria-pressed={selected} className="w-full text-left">
         <span className="block text-[15px] font-medium">{intern.name}</span>
@@ -72,7 +72,7 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
           <div className="mt-2">
             <div className="text-black/70 dark:text-white/70">Недели 1–2: закрыто {done} из {work.length}</div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10" aria-hidden>
-              <div className="h-full rounded-full bg-[#00aaff]" style={{ width: `${work.length ? (done / work.length) * 100 : 0}%` }} />
+              <div className="h-full rounded-full bg-brand-green" style={{ width: `${work.length ? (done / work.length) * 100 : 0}%` }} />
             </div>
           </div>
           <div className="mt-2">
@@ -111,7 +111,7 @@ function InternCard({ actor, intern, selected, onSelect }: { actor: DemoUser; in
 
       {plan.data && (
         <div className="mt-2">
-          <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="rounded-lg border border-black/15 px-2.5 py-1 dark:border-white/20">
+          <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="rounded-full border border-line px-3 py-1 dark:border-white/20">
             Итоги недели {week}
           </button>
           {open && summary.isError && <p role="alert" className="mt-1 text-red-800 dark:text-red-300">{summary.error.message}</p>}

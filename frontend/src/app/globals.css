@@ -1,35 +1,76 @@
 @import "tailwindcss";
 
+/* Палитра Авито (организаторы разрешили; цвета сняты с career.avito.com): белые карточки на светло-сером, чёрный
+   текст, акценты — цвета точек логотипа. Смыслы цветов: голубой — действие, зелёный — сделано, фиолетовый — «для
+   тебя», красный — срок прошёл. Раскладка — по мотивам онбординга Т-Банка: тёмная колонка навигации слева. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f2f1f0;
+  --foreground: #000000;
+  --surface: #ffffff;
+  --surface-2: #f2f1f0;
+  --muted: rgb(0 0 0 / 0.55);
+  --line: rgb(0 0 0 / 0.08);
+  --accent: #00aaff;
+  --accent-hover: #0099e6;
+  --accent-ink: #0077b3; /* голубой для текста: контраст 4.5:1 на белом */
+  --sidebar: #000000;
+  --sidebar-ink: #ffffff;
+  --brand-green: #04e061;
+  --brand-violet: #a169f7;
+  --brand-red: #ff4053;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Inter Variable", Arial, sans-serif;
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-sidebar: var(--sidebar);
+  --color-brand-green: var(--brand-green);
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-red: var(--brand-red);
+  --font-sans: "Onest Variable", Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b0b0b;
+    --foreground: #f2f2f2;
+    --surface: #171717;
+    --surface-2: #222222;
+    --muted: rgb(255 255 255 / 0.6);
+    --line: rgb(255 255 255 / 0.1);
+    --accent-ink: #5cc8ff;
+    --sidebar: #000000;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Inter Variable", Arial, sans-serif;
+  font-family: "Onest Variable", Arial, sans-serif;
+}
+
+/* Карточка: белая поверхность, тень вместо рамки (глубина), прозрачная рамка — для режима высокой контрастности. */
+@layer components {
+  .card {
+    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid transparent;
+    box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.04);
+  }
 }
 
 /* better-ui: нажатие кнопки — scale 0.96 за 150 мс, только если пользователь не просил меньше анимаций.
-   Вкладки «План / Чат» — частое действие, без анимации. */
+   Вкладки — частое действие, без анимации. */
 @layer base {
   button {
     -webkit-tap-highlight-color: transparent;
-    transition-property: scale, background-color, opacity;
+    transition-property: scale, background-color, color, opacity;
     transition-duration: 150ms;
     transition-timing-function: ease-out;
   }

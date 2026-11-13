@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 // Шрифт хранится в проекте (npm-пакет), а не грузится с Google Fonts:
 // сборка работает без интернета (Codex cloud) и не зависит от доступности Google.
-import "@fontsource-variable/inter";
+import "@fontsource-variable/onest";
 import "./globals.css";
 // Панель замечаний по интерфейсу для разработки (agentation): только в `npm run dev`, в сборку для экспертов не попадает.
 import { Agentation } from "agentation";

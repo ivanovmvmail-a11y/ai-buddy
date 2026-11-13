@@ -36,7 +36,7 @@ export function AbsenceRequests({ actor }: { actor: DemoUser }) {
   if (!shown.length) return null;
 
   return (
-    <section aria-label="Заявки на отгул" className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
+    <section aria-label="Заявки на отгул" className="card p-4 sm:p-5 shadow-[inset_4px_0_0_rgb(245_158_11),0_0_0_1px_var(--line)]">
       <h3 className="mb-2 text-sm font-semibold">{lead ? "Заявки на отгул ждут твоего решения" : "Мои заявки на отгул"}</h3>
       {decide.isError && <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">{decide.error.message}</p>}
       <ul className="space-y-2">
@@ -52,14 +52,14 @@ export function AbsenceRequests({ actor }: { actor: DemoUser }) {
                 <button
                   disabled={decide.isPending}
                   onClick={() => decide.mutate({ id: r.id, approve: true })}
-                  className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white disabled:opacity-50"
+                  className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50"
                 >
                   Согласовать
                 </button>
                 <button
                   disabled={decide.isPending}
                   onClick={() => decide.mutate({ id: r.id, approve: false })}
-                  className="rounded-lg border border-black/15 px-2.5 py-1 disabled:opacity-50 dark:border-white/20"
+                  className="rounded-full border border-line px-3 py-1 disabled:opacity-50 dark:border-white/20"
                 >
                   Отклонить
                 </button>

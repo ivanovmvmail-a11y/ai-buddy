@@ -19,7 +19,7 @@ function MyQuestions({ actor }: { actor: DemoUser }) {
   const questions = (useMentorQuestions(actor).data ?? []).slice(0, 3);
   if (!questions.length) return null;
   return (
-    <section aria-label={SECTION} className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
+    <section aria-label={SECTION} className="card p-4 sm:p-5">
       <h3 className="mb-2 text-sm font-semibold">Мои вопросы наставнику</h3>
       <ul className="space-y-3">
         {questions.map((q) => (
@@ -43,7 +43,7 @@ function Inbox({ actor }: { actor: DemoUser }) {
   const unpublished = all.filter((q) => q.status === "answered" && q.publication_status === "not_requested").slice(0, 3);
   if (!pending.length && !unpublished.length) return null;
   return (
-    <section aria-label={SECTION} className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
+    <section aria-label={SECTION} className="card p-4 sm:p-5">
       <h3 className="text-sm font-semibold">Вопросы стажёров</h3>
       <p className="mb-2 text-xs text-black/55 dark:text-white/55">
         Этого нет в документах. Ответь один раз — с галочкой бот запомнит ответ и следующему стажёру ответит сам.
@@ -92,7 +92,7 @@ function AnswerForm({ actor, q }: { actor: DemoUser; q: MentorQuestion }) {
         <button
           type="submit"
           disabled={!text.trim() || answer.isPending}
-          className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50"
         >
           Ответить
         </button>
@@ -130,7 +130,7 @@ function PublishLater({ actor, q }: { actor: DemoUser; q: MentorQuestion }) {
       <button
         onClick={() => publish.mutate()}
         disabled={publish.isPending}
-        className="mt-1 rounded-lg border border-black/15 px-2.5 py-1 text-xs disabled:opacity-50 dark:border-white/20"
+        className="mt-1 rounded-full border border-line px-3 py-1 text-xs disabled:opacity-50 dark:border-white/20"
       >
         Добавить ответ в базу знаний
       </button>

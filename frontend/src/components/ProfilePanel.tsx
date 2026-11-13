@@ -45,7 +45,7 @@ export function ProfilePanel({ actor }: { actor: DemoUser }) {
         {plan.data && <><dt className="text-black/55 dark:text-white/55">Стажировка</dt><dd>{plan.data.current_day}-й день</dd></>}
       </dl>
 
-      <section aria-labelledby="skills-title" className="rounded-xl border border-black/10 p-3 dark:border-white/15">
+      <section aria-labelledby="skills-title" className="card p-4 sm:p-5">
         <h3 id="skills-title" className="font-medium">Уровень по темам</h3>
         {topics.length ? (
           <ul className="mt-2 flex flex-wrap gap-2">

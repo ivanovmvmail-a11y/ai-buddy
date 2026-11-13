@@ -126,20 +126,20 @@ export function ChatPanel({ actor, onAction }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {tabbed && (
-        <div role="tablist" aria-label="Темы чата" className="flex gap-1 border-b border-black/10 px-3 pt-2 dark:border-white/10">
+        <div role="tablist" aria-label="Темы чата" className="flex gap-1 border-b border-line p-2">
           {TOPICS.map((t) => (
             <button
               key={t.id}
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`relative -mb-px rounded-t-lg border-b-2 px-3 py-1.5 text-sm font-medium transition-colors ${
-                tab === t.id ? "border-[#00aaff]" : "border-transparent text-black/55 hover:text-black/80 dark:text-white/55 dark:hover:text-white/80"
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                tab === t.id ? "bg-foreground text-background" : "text-[var(--muted)] hover:bg-surface-2 hover:text-foreground"
               }`}
             >
               {t.title}
               {unread.includes(t.id) && tab !== t.id && (
-                <span aria-label="есть новое" className="ml-1.5 inline-block size-2 rounded-full bg-[#00aaff] align-middle" />
+                <span aria-label="есть новое" className="ml-1.5 inline-block size-2 rounded-full bg-accent align-middle" />
               )}
             </button>
           ))}
@@ -169,16 +169,23 @@ export function ChatPanel({ actor, onAction }: Props) {
           </button>
         </div>
       )}
-      <form onSubmit={onSubmit} className="flex gap-2 border-t border-black/10 p-3 dark:border-white/10">
+      <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-line p-3">
         <input
           aria-label={practicing ? "Ответ на задание" : "Сообщение"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={practicing ? "Что и как сделано — своими словами…" : PLACEHOLDER[tabbed ? tab : "assistant"]}
-          className="min-w-0 flex-1 rounded-xl border border-black/15 bg-transparent px-4 py-2.5 text-base outline-none focus:border-[#00aaff] dark:border-white/20"
+          className="min-w-0 flex-1 rounded-full border border-transparent bg-surface-2 px-4 py-2.5 text-base outline-none focus:border-accent"
         />
-        <button type="submit" disabled={busy || !input.trim()} className="rounded-xl bg-[#00aaff] px-4 font-medium text-white disabled:opacity-40">
-          Отправить
+        <button
+          type="submit"
+          aria-label="Отправить"
+          disabled={busy || !input.trim()}
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-black hover:bg-accent-hover disabled:opacity-40"
+        >
+          <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
         </button>
       </form>
     </div>
@@ -204,14 +211,14 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-[#00aaff] px-4 py-2 text-[15px] text-white">{m.content}</div>
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-foreground px-4 py-2.5 text-[15px] text-background">{m.content}</div>
       </div>
     );
   }
   return (
     <div className="flex justify-start">
-      <div className={`max-w-[92%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
-        m.kind === "error" ? "bg-red-500/10 text-red-800 dark:text-red-300" : "bg-black/5 dark:bg-white/10"
+      <div className={`max-w-[92%] rounded-[20px] rounded-bl-md px-4 py-3 text-[15px] leading-relaxed ${
+        m.kind === "error" ? "bg-red-500/10 text-red-800 dark:text-red-300" : "bg-surface-2"
       }`}>
         <RichText text={m.content} />
         {m.draft && <DraftCard m={m} actor={actor} />}
@@ -234,8 +241,8 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
                 key={a.label}
                 onClick={() => onAction(a)}
                 className={i === 0 && a.kind !== "snooze"
-                  ? "rounded-lg bg-[#00aaff] px-3 py-1.5 text-sm font-medium text-white"
-                  : "rounded-lg border border-black/15 px-3 py-1.5 text-sm dark:border-white/20"}
+                  ? "rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background hover:opacity-85"
+                  : "rounded-full px-2 py-1.5 text-sm font-medium text-accent-ink underline-offset-4 hover:underline"}
               >
                 {a.label}
               </button>
@@ -345,8 +352,8 @@ function DraftCard({ m, actor }: { m: Msg; actor: DemoUser }) {
       )}
       {draft.status === "pending" ? (
         <div className="mt-3 flex gap-2">
-          <button disabled={pending} onClick={() => run("confirm")} className="rounded-lg bg-[#00aaff] px-3 py-1.5 font-medium text-white disabled:opacity-50">Подтвердить</button>
-          <button disabled={pending} onClick={() => run("cancel")} className="rounded-lg border border-black/15 px-3 py-1.5 disabled:opacity-50 dark:border-white/20">
+          <button disabled={pending} onClick={() => run("confirm")} className="rounded-full bg-accent px-4 py-1.5 font-semibold text-black hover:bg-accent-hover disabled:opacity-50">Подтвердить</button>
+          <button disabled={pending} onClick={() => run("cancel")} className="rounded-full border border-line px-3.5 py-1.5 disabled:opacity-50 dark:border-white/20">
             Отменить
           </button>
         </div>
@@ -407,14 +414,14 @@ function CopyDraft({ text, toMentor }: { text: string; toMentor: DemoUser | null
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-      <button onClick={copy} className="rounded-lg border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
+      <button onClick={copy} className="rounded-full border border-line px-3 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
         {state === "copied" ? "Скопировано" : "Скопировать вопрос"}
       </button>
       {toMentor && !send.isSuccess && (
         <button
           onClick={() => send.mutate()}
           disabled={send.isPending}
-          className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50"
         >
           Отправить наставнику
         </button>
