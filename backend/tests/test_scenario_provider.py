@@ -267,7 +267,8 @@ def test_guard_not_in_docs_but_model_invents(demo_docs, use_llm):
 ])
 def test_guard_keeps_good_or_non_doc_answers(demo_docs, use_llm, question, answer):
     use_llm(text_reply(answer))
-    assert ask(demo_docs, question)["reply"] == answer
+    # Ответ модели не заменён; вопрос про Git у Ани (новичок) получает только строку о глубине сверху (13.11).
+    assert ask(demo_docs, question)["reply"].endswith(answer)
 
 
 def test_guard_replaces_honest_missing_with_invented_advice(demo_docs, use_llm):

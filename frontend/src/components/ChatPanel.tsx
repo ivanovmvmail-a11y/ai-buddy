@@ -151,7 +151,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
         )}
         {m.answerId && <Feedback m={m} actor={actor} />}
         {m.scripted && m.kind === "text" && (
-          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">сценарный ответ · из данных плана</div>
+          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">{m.label ?? "сценарный ответ · из данных плана"}</div>
         )}
       </div>
     </div>

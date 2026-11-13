@@ -30,6 +30,7 @@ export type Msg = {
   answerId?: string; // ответ модели можно оценить (спека 302)
   rated?: "useful" | "not_useful";
   scripted?: boolean;
+  label?: string; // подпись под ответом без модели (по умолчанию — «сценарный ответ · из данных плана»)
 };
 
 let n = 0;
@@ -154,9 +155,6 @@ const DEPTH: Record<SkillLevel, string> = {
   confident: "Эту тему ты знаешь уверенно, поэтому коротко:",
 };
 
-export const explainQuestion = (item: PlanItem) =>
-  `Объясни пункт плана «${item.title}» (id ${item.id}): зачем он нужен, как его выполнить и к кому идти.`;
-
 export const FOLLOWUP_KIND: Record<string, ExplainKind> = {
   "Как это сделать по шагам?": "steps",
   "К кому идти, если не получается?": "who",
@@ -167,13 +165,6 @@ export function followupsFor(item: PlanItem, chips: string[]): BotAction[] {
   return chips
     .filter((c) => c in FOLLOWUP_KIND)
     .map((label) => ({ label, kind: FOLLOWUP_KIND[label] as "steps" | "who", itemId: item.id, internId: item.intern_id }));
-}
-
-/** Вопрос модели по подсказке — с названием пункта, чтобы поиск не потерял контекст. */
-export function followupQuestion(item: PlanItem, kind: ExplainKind): string {
-  if (kind === "steps") return `Как выполнить пункт плана «${item.title}» по шагам?`;
-  if (kind === "who") return `К кому идти, если не получается пункт плана «${item.title}»?`;
-  return explainQuestion(item);
 }
 
 /** Запасной сценарный ответ, если сервер объяснений не ответил: глубина по карте навыков (SPEC 3.4, 4). */

@@ -73,6 +73,7 @@
 - **AC-5.** Дано больничный или отпуск. Тогда к HR BP, черновика нет.
 - **AC-6.** Дано чужие роли или несуществующая заявка. Тогда 404 неотличимо.
 - **AC-7.** Дано день отгула наступил. Тогда открытые пункты сдвинуты один раз, отклонённый отгул ничего не сдвигает.
+- **AC-8 (13.11).** Когда стажёр пишет «отмени мой отгул». Тогда нового черновика нет: бот честно говорит, что отправленное из чата не отменяет, черновик отменяется кнопкой «Отменить», а отправленное решает руководитель (по имени). Одинаково для любой модели.
 
 ## 8. Метрики
 Тема `hr` в метриках чата; число черновиков отгула и доля подтверждённых.
@@ -87,6 +88,7 @@
 | AC-5 | `backend/tests/test_absence_chat.py::test_sick_leave_and_vacation_still_go_to_hr`; золотой набор `hr-03`, `live-04`, `live-05` |
 | AC-6 | `backend/tests/mcp/test_absence.py::test_all_roles_and_same_not_found_for_foreign_missing` |
 | AC-7 | `backend/tests/mcp/test_absence_reminders.py::test_absence_day_shifts_only_open_items_once_even_after_restart_tick`, `::test_rejected_absence_does_not_notify_mentor_or_shift` |
+| AC-8 | `backend/tests/test_key_mode_fixes.py::test_cancel_absence_is_honest_not_new_draft` |
 
 ## 10. Открытые вопросы
 - Нет. (Демо-отгул Ани 10.11 в первый день стажировки — убран в #87.)
