@@ -56,20 +56,27 @@ class PostgresStore(PostgresPoolOwner):
         data = OnboardingData()
         available = await self._available_tables(connection)
         data._suggestions_available = "skill_suggestions" in available
-        for field, table, model, key in TABLES:
-            if table in OPTIONAL_TABLES and table not in available:
-                continue
-            cursor = await connection.execute(sql.SQL("SELECT * FROM {} ORDER BY seq").format(
-                sql.Identifier("public", table)))
-            for row in await cursor.fetchall():
+        loaded = [(field, table, model, key) for field, table, model, key in TABLES
+                  if not (table in OPTIONAL_TABLES and table not in available)]
+        # Все таблицы — ОДНИМ запросом (проверка 13.11: на Railway ↔ Supabase каждый запрос ≈0,2 с, а по одному SELECT на
+        # таблицу чтение плана занимало 2,5 с). Один оператор SQL видит один снимок данных — согласованность та же.
+        columns = [sql.SQL("(SELECT coalesce(json_agg(t ORDER BY t.seq), '[]'::json) FROM {} t) AS {}").format(
+            sql.Identifier("public", table), sql.Identifier(table)) for _, table, _, _ in loaded]
+        if include_events:
+            columns.append(sql.SQL(
+                "(SELECT coalesce(json_agg(e ORDER BY e.id), '[]'::json) FROM "
+                "(SELECT id, ts, user_id, role, team, type, payload FROM public.events) e) AS events"))
+        cursor = await connection.execute(sql.SQL("SELECT {}").format(sql.SQL(", ").join(columns)))
+        result = await cursor.fetchone()
+        for field, table, model, key in loaded:
+            for row in result[table]:
                 row.pop("seq")  # Порядок хранения — не часть публичной модели.
                 if model is PlanItem:
                     row["waiting_days"] = 0 if row["status"] == "waiting" else None
                 record = model.model_validate(row)
                 getattr(data, field)[getattr(record, key)] = record
         if include_events:
-            cursor = await connection.execute("SELECT ts, user_id, role, team, type, payload FROM public.events ORDER BY id")
-            data.events = [Event.model_validate(row) for row in await cursor.fetchall()]
+            data.events = [Event.model_validate({k: v for k, v in row.items() if k != "id"}) for row in result["events"]]
         return data
 
     @staticmethod
@@ -147,8 +154,8 @@ class PostgresStore(PostgresPoolOwner):
     @asynccontextmanager
     async def read(self, *, include_events=False):
         async with (await self._get_pool()).connection() as connection:
-            # Несколько SELECT видят один согласованный снимок, даже при сбросе демо.
-            await connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            # Все таблицы читаются одним оператором SQL — он видит один согласованный снимок, даже при сбросе демо
+            # (раньше для этого нужен был REPEATABLE READ и отдельный запрос на каждую таблицу).
             data = await self._load(connection, include_events=include_events)
             count = len(data.events)
             yield data
