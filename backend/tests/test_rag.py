@@ -25,7 +25,7 @@ def service():
 
 @pytest.fixture
 def demo(service):
-    assert run(ingest_directory(service)) == (24, 24)
+    assert run(ingest_directory(service)) == (28, 28)
     return service
 
 
@@ -46,7 +46,7 @@ def test_delivery_intern_never_sees_platform_documents(demo):
     """Точный запрос по чужому документу не даёт доступа даже при большом k."""
     for query in ("Лиловый конструктор", "Бумажный каталог", "Картонный дирижабль"):
         hits = run(demo.retrieve(query, DEMO_USERS["intern-ivan"], k=100))
-        assert len(hits) == 17  # 10 общих + 7 своей команды
+        assert len(hits) == 21  # 14 общих + 7 своей команды
         assert all("Платформа объявлений" not in hit["title"] for hit in hits)
         assert all(query not in hit["content"] for hit in hits)
         assert any("Авито Доставка" in hit["title"] for hit in hits)
@@ -285,13 +285,43 @@ def test_overlap_starts_on_word_boundary(separator, overlap):
 
 def test_demo_metadata_and_repeat_load(demo):
     documents = [read_document(path, path.name) for path in sorted(DEMO_DOCS.glob("*.md"))]
-    assert len(documents) == 24
-    assert sum(document.team is None for document in documents) == 10
+    assert len(documents) == 28
+    assert sum(document.team is None for document in documents) == 14
     assert sum(document.team == "Авито Доставка" for document in documents) == 7
     assert sum(document.team == "Платформа объявлений" for document in documents) == 7
     assert all(not document.content.startswith("---") for document in documents)
-    assert run(ingest_directory(demo)) == (24, 24)
-    assert len(demo.store.documents) == 24
+    assert run(ingest_directory(demo)) == (28, 28)
+    assert len(demo.store.documents) == 28
+
+
+@pytest.mark.parametrize("user_id", ["intern-anya", "intern-ivan"])
+@pytest.mark.parametrize("filename,query", [
+    ("25-internship-program.md", "что такое экватор?"),
+    ("26-work-format.md", "можно я в понедельник поработаю из дома?"),
+    ("27-definition-of-done.md", "мне дали первую задачу, как понять что она сделана?"),
+    ("28-while-waiting.md", "что мне делать, пока жду ноутбук?"),
+])
+def test_gap_documents_are_shared_and_retrievable_by_both_teams(demo, filename, query, user_id):
+    document = read_document(DEMO_DOCS / filename, f"demo:{filename}")
+    assert document.team is None and document.url is None
+    assert "Синтетическая памятка для демо:" in document.content
+    hits = run(demo.retrieve(query, DEMO_USERS[user_id], k=8))
+    assert document.title in {hit["title"] for hit in hits}
+
+
+def test_gap_questions_have_correct_sources_through_chat():
+    import json
+    from golden.run import CASES, run_cases
+
+    cases = json.loads(CASES.read_text(encoding="utf-8"))
+    assert len({case["id"] for case in cases}) == len(cases)
+    selected = [case for case in cases if case["id"] in {f"doc-{i}" for i in range(20, 25)}]
+    assert len(selected) == 5
+    results = run_cases("scenario", selected)
+    assert all(result.passed and not result.leak for result in results), [
+        (result.case["id"], result.notes, result.reply) for result in results if not result.passed
+    ]
+    assert all("Документы расходятся" not in result.reply for result in results)
 
 
 @pytest.mark.parametrize("text", ["# Missing metadata", "---\ntitle: t", "---\ntitle: t\n---\nbody",
@@ -340,7 +370,7 @@ def test_cli_without_database(capsys):
 def test_cli_uses_shared_async_runner(service, monkeypatch, capsys):
     monkeypatch.setattr("app.rag.ingest.get_service", lambda: service)
     main(["--directory", str(DEMO_DOCS)])
-    assert "Loaded 24 documents, 24 chunks" in capsys.readouterr().out
+    assert "Loaded 28 documents, 28 chunks" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("stage", ["success", "metadata", "embedder", "storage"])
@@ -367,7 +397,7 @@ def test_cli_closes_store_on_same_loop_after_success_or_failure(service, monkeyp
         monkeypatch.setattr(service.store, "upsert", failed_storage)
     if stage == "success":
         main(["--directory", str(directory)])
-        assert "Loaded 24 documents" in capsys.readouterr().out
+        assert "Loaded 28 documents" in capsys.readouterr().out
     else:
         with pytest.raises(ValueError if stage == "metadata" else RuntimeError):
             main(["--directory", str(directory)])

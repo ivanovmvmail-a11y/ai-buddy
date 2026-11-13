@@ -260,6 +260,20 @@ def test_guard_not_in_docs_but_model_invents(demo_docs, use_llm):
     assert "IT" not in reply
 
 
+def test_guard_key_term_missing_even_if_other_words_match(demo_docs, use_llm):
+    """PR #105: памятка про удалёнку совпадает словами «работы», «дома», но VPN в ней нет — это не ответ."""
+    use_llm(text_reply("Поработать из дома можно: включи VPN через портал IT."))
+    reply = ask(demo_docs, "как подключить vpn, чтобы работать из дома?", "intern-ivan")["reply"]
+    assert reply.startswith("В документах, доступных тебе, этого нет") and "портал" not in reply
+
+
+def test_guard_key_term_present_keeps_answer(demo_docs, use_llm):
+    """Латинский термин, который есть в документе (Git), страховку не включает."""
+    answer = "По документу «Регламент учебного код-ревью»: открой PR в основную ветку."
+    use_llm(text_reply(answer))
+    assert ask(demo_docs, "Как оформить pull request в git?")["reply"].endswith(answer)
+
+
 @pytest.mark.parametrize("question,answer", [
     ("Привет!", "Привет! Чем помочь?"),
     ("Какой у меня уровень по Git?", "Git — новичок."),

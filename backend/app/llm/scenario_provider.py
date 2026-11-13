@@ -230,6 +230,8 @@ def _best_unit(question: str, system: str) -> tuple[tuple[int, str, str], set[st
     # Поиск без ключа всегда отдаёт top-k, поэтому порог свой: совпасть должны хотя бы 2 основы слов
     # (или единственная, если в вопросе одно значимое слово) — иначе честно «в базе нет».
     need = min(2, len(wanted)) or 1
+    if _absent_terms(question, system):  # «VPN» нет ни в одном документе — совпадение прочих слов не ответ
+        return (0, "", ""), wanted, need
     # При равном совпадении: инструкция важнее определения из глоссария («**PR** — …»), затем порядок
     # поиска (документы уже отсортированы по близости), затем более содержательный абзац того же документа.
     # «Что такое CI?» — нужно определение или первый абзац о теме, а не самый длинный абзац документа.
@@ -329,6 +331,18 @@ def _leans_on_docs(reply: str, question: str, system: str) -> bool:
     return any(len(words & _words(content)) >= 4 or (title and title in reply) for title, content in _docs(system))
 
 
+def _absent_terms(question: str, system: str) -> set[str]:
+    """Короткие латинские термины вопроса (VPN, SSO, DNS…), которых нет ни в одном найденном документе.
+    Такой термин — суть вопроса, а не фон: совпадение остальных слов («работы», «дома») ответа не даёт.
+    Разговорные «CI», «PR» к этому моменту уже заменены словами документов (SYNONYMS)."""
+    docs = _docs(system)
+    if not docs:
+        return set()
+    terms = set(re.findall(r"(?<![a-z])[a-z]{2,4}(?![a-z])", _normalize(question)))
+    text = " ".join(f"{title} {content}" for title, content in docs).lower()
+    return {t for t in terms if not re.search(rf"(?<![a-z]){t}(?![a-z])", text)}
+
+
 def docs_guard(question: str, system: str, reply: str) -> str | None:
     """Страховка для любой модели (прогон GigaChat 12.11): поиск нашёл абзац, а модель говорит «этого нет» —
     показываем абзац с источником; поиск ничего не нашёл, а модель отвечает «как обычно бывает» (IT-отдел,
@@ -338,6 +352,10 @@ def docs_guard(question: str, system: str, reply: str) -> str | None:
         return None
     if asks_next(q) or any(w in q for w in (*STUCK_WORDS, *LEVEL_WORDS, *ORG_WORDS, *ABSENCE_WORDS, *_NOT_DOC_QUESTION)):
         return None
+    if _absent_terms(question, system):
+        # «Как настроить VPN для работы из дома?»: абзац про удалёнку совпадает словами «работы», «дома», но о VPN
+        # в найденных документах ни слова — значит, ответ модели про VPN не из документов (13.11, PR #105).
+        return _missing_text(question, system)
     best, wanted, need = _best_unit(question, system)
     if len(wanted) < 2:
         return None
