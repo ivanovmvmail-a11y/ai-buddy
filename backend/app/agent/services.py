@@ -8,9 +8,10 @@
   `app.mcp_server.server` от имени вошедшего пользователя, `initialize` → `tools/call` → разбор `structuredContent`.
   Права проверяет сам MCP-сервер, ошибки приходят ошибками протокола и превращаются в те же доменные ошибки.
 
-Транспорт сессии — в памяти процесса (`create_connected_server_and_client_session`): протокол MCP настоящий
-(JSON-RPC, схемы инструментов, проверка аргументов на сервере), но без лишнего процесса на пользователя. При
-внедрении меняется только `_session`: stdio-процесс или Streamable HTTP к MCP-серверам Авито (MCP Hub).
+Транспорт сессии: при `MCP_URL` — по сети, Streamable HTTP к отдельному MCP-серверу (в Docker — служба `mcp`,
+`app/mcp_server/http_server.py`; ключ службы + пользователь заголовком от backend). Без `MCP_URL` — в памяти процесса
+(`create_connected_server_and_client_session`, тесты и облачная версия). При внедрении меняется только `MCP_URL`
+(MCP Hub Авито) и источник пользователя (SSO).
 
 Через MCP не идут два действия, и это намеренно: подтверждение отгула и напоминание по просьбе. Их выполняет
 доверенный обратный вызов после кнопки «Подтвердить» человека (`onboarding_tools.py`), а в MCP-сервере инструмента
@@ -49,11 +50,32 @@ def mode() -> str:
 
 @asynccontextmanager
 async def _session(user: User):
+    if settings.mcp_url.strip():
+        # По сети: Streamable HTTP к отдельному MCP-серверу (в Docker — сервис `mcp`). Сервер доверяет только
+        # backend с MCP_SERVICE_TOKEN; пользователя передаём заголовком из сессии входа, модель его не задаёт.
+        import httpx
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+
+        headers = {"Authorization": f"Bearer {settings.mcp_service_token}", "X-AI-Buddy-User": user.id}
+        async with httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(15, read=60)) as http:
+            async with streamable_http_client(settings.mcp_url.strip(), http_client=http) as (read, write, _):
+                async with ClientSession(read, write) as client:
+                    await client.initialize()
+                    yield client
+        return
     from mcp.shared.memory import create_connected_server_and_client_session as connected
 
     from app.mcp_server.server import create_server
     async with connected(create_server(user.id)) as client:
         yield client
+
+
+def transport() -> str:
+    """Для /health и логов: как агент сейчас ходит к сервисам."""
+    if mode() != "mcp":
+        return "direct"
+    return "mcp-http" if settings.mcp_url.strip() else "mcp-memory"
 
 
 def _error(text: str) -> Exception:
@@ -79,7 +101,7 @@ async def call_tool(user: User, tool: str, arguments: dict[str, Any], result_typ
     data = result.structuredContent or {}
     # FastMCP заворачивает список в {"result": [...]}, модель отдаёт полями как есть.
     payload = data["result"] if set(data) == {"result"} else data
-    log.info("mcp call user=%s tool=%s", user.id, tool)
+    log.info("mcp call user=%s tool=%s via=%s", user.id, tool, transport())
     return TypeAdapter(result_type).validate_python(payload)
 
 

@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     #   direct — вызовом функций в том же процессе (по умолчанию: тесты и запуск без MCP SDK);
     #   mcp    — MCP-клиентом по протоколу MCP к серверу app/mcp_server (в Docker включено, docker-compose.yml).
     agent_services: str = "direct"
+    # AGENT_SERVICES=mcp + MCP_URL → MCP-сервер по сети (Streamable HTTP); без MCP_URL — MCP в памяти процесса
+    mcp_url: str = ""
+    mcp_service_token: str = ""
 
     # Код-слово для демо-кнопок «Сброс» и «Следующий день» (заголовок X-Demo-Key).
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.

@@ -441,3 +441,6 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 
 ### 2026-11-13 · от Claude → Codex (docs-gaps: блокер VPN снят)
 Страховка поправлена в `app/llm/scenario_provider.py`: короткий латинский термин вопроса (VPN, SSO…), которого нет ни в одном найденном документе, означает «в документах нет» — и в сценарном ответе (`_best_unit`), и в `docs_guard`. Раздел «Для работы из дома: подключение VPN» из `26-work-format.md` убран по решению Миши: документ не должен описывать, чего в нём нет. Тесты: исходный `test_guard_not_in_docs_but_model_invents` зелёный + 2 новых; полный pytest 898 passed; golden 110/110, утечек 0. Коммит — в ветке `codex/docs-gaps`, PR #105 (Миша разрешил).
+
+### 2026-11-13 · от Claude → Codex (MCP по сети)
+По просьбе Миши добавлен новый файл в твоей зоне: `backend/app/mcp_server/http_server.py` — MCP-сервер по Streamable HTTP для всех демо-пользователей (по `StreamableHTTPSessionManager` на пользователя из `create_server`, stateless, JSON). Доверие: `Authorization: Bearer MCP_SERVICE_TOKEN` + `X-AI-Buddy-User`. `server.py` не менялся. В docker-compose — служба `mcp`, backend ходит к ней по `MCP_URL`. Тесты — `tests/test_mcp_http.py`. Если будешь менять `create_server` — учти, что HTTP-сервер создаёт его на каждого пользователя при старте.

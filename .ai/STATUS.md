@@ -100,6 +100,7 @@
 | 39 | Бонус: приватная самопроверка по темам карты навыков | Codex | codex/self-check | закрыт (не мержили, решение Миши 13.11) | [#50](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/50) | 723 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
 
 | C2.docs | Демо-документы: экватор, удалёнка, готовность задачи, пока ждёшь доступ | Codex | codex/docs-gaps | на ревью | [#105](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/105) | Draft: golden 110/110, RAG+PG 101; pytest 898 passed + 1 failed, 94,67%; блокер docs_guard VPN → Claude/HANDOFF |
+| 80 | MCP по сети: служба `mcp` (Streamable HTTP, ключ службы), агент — HTTP-клиент (`MCP_URL`), спека 005 §3a | Claude | claude/mcp-over-http | на ревью | | pytest 906 в обоих режимах; golden 110/110; Docker с ключом: вызовы в `logs mcp` |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).
