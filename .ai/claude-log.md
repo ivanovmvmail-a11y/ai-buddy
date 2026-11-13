@@ -492,3 +492,7 @@
 - doc-05 с GigaChat: документы расходились (памятка 28 «по доступу — к наставнику» vs «К кому идти»: «ответственному за учебную среду») — согласовал текст 28. Короткий ответ без 4 общих слов теперь получает один источник (`_short_answer_source`: совпадение основ и с вопросом, и с ответом; ничья — без источника).
 - Смешанный ответ «OKR — это… (глоссарий), а твои цели не указаны» раньше терял источник из-за says_not_found; теперь при «нет» источник — только при сильном совпадении (≥6 слов).
 - pytest 900 passed; golden: без ключа 110/110, GigaChat 111/112 (live-12 — разброс, 2 из 3 проходит), утечек 0.
+
+## 2026-11-13 — MCP по сети (claude/mcp-over-http)
+- `app/mcp_server/http_server.py` (новый, зона Codex — с согласия Миши, записка в HANDOFF): Streamable HTTP, ключ службы + пользователь заголовком; `services._session` — HTTP-клиент при `MCP_URL`; docker-compose: служба `mcp`, backend `AGENT_SERVICES=mcp`, `MCP_URL`.
+- pytest 906 passed в direct и mcp, покрытие 95%; golden 110/110. Docker с GigaChat (проект aibuddy-net): план, отказ Петру, черновик Grafana, VPN — в `logs mcp` строки `mcp http user=…`.

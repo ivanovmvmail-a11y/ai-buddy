@@ -37,10 +37,33 @@ services:
       # в Docker backend всегда ходит в локальную базу, даже если в .env указан Supabase
       DATABASE_URL: postgresql://buddy:buddy@db:5432/ai_buddy
       FRONTEND_ORIGINS: http://localhost:3000
+      # агент → корпоративные сервисы по протоколу MCP через сеть (Streamable HTTP), спека 005
+      AGENT_SERVICES: mcp
+      MCP_URL: http://mcp:8001/mcp
+      MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-local-docker-demo}
     ports:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+
+  # MCP-сервер имитаций корпоративных сервисов (план, доступы, найм, отгулы) — отдельный процесс в сети Docker,
+  # как MCP-серверы сервисов Авито за MCP Hub. Наружу порт не открыт: вызывать его может только backend
+  # с MCP_SERVICE_TOKEN (локальное демо-значение, как пароль базы выше; для своего стенда задайте свой).
+  mcp:
+    build: ./backend
+    command: ["python", "-m", "app.mcp_server.http_server"]
+    environment:
+      DATABASE_URL: postgresql://buddy:buddy@db:5432/ai_buddy
+      MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-local-docker-demo}
+      MCP_PORT: "8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      backend:
         condition: service_healthy
 
   frontend:
@@ -52,6 +75,8 @@ services:
       - "3000:3000"
     depends_on:
       backend:
+        condition: service_healthy
+      mcp:
         condition: service_healthy
 
   grafana-init:
