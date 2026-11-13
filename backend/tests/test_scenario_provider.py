@@ -262,7 +262,6 @@ def test_guard_not_in_docs_but_model_invents(demo_docs, use_llm):
 
 @pytest.mark.parametrize("question,answer", [
     ("Привет!", "Привет! Чем помочь?"),
-    ("Как оформить отпуск?", "Это к HR BP — Елене Морозовой."),
     ("Какой у меня уровень по Git?", "Git — новичок."),
     ("Как оформить pull request?", "По документу «Регламент учебного код-ревью»: открой PR в основную ветку."),
 ])

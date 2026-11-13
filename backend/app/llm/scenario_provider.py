@@ -278,6 +278,24 @@ def _missing_text(question: str, system: str) -> str:
 
 MISSING_PHRASES = ("этого нет", "не нашел", "нет информации", "информации об этом нет", "нет в документ", "не нашлось",
                    "не нашла", "не найден", "не указан")
+def says_not_found(text: str) -> bool:
+    """Ответ говорит «в документах этого нет». Фраза — отдельными словами: «в плане указан» ≠ «не указан»
+    (прогон GigaChat 13.11: ответ про buddy потерял источник из-за «пла-не указан»)."""
+    low = text.lower().replace("ё", "е")
+    return any(re.search(rf"(?<![а-яa-z]){re.escape(p)}", low) for p in MISSING_PHRASES)
+
+
+def is_hr_question(q: str) -> bool:
+    """Организационный вопрос — сразу к HR BP (больничный, отпуск, зарплата, ДМС…)."""
+    return any(w in q for w in ORG_WORDS) or bool(SALARY.search(q))
+
+
+def hr_reply(question: str) -> str:
+    return (f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
+            f"вопросы не отвечает. Черновик сообщения, можно скопировать:\n\n«Здравствуйте! {_as_sentence(question)} "
+            "Подскажите, пожалуйста, как это оформить.»")
+
+
 # Вопросы, на которые отвечают инструменты, сводка плана или HR, а не абзац документа: страховку не применяем.
 _NOT_DOC_QUESTION = ("план", "заявк", "мой наставник", "кто наставник", "кто мой", "доступ", "уровень", "навык")
 
@@ -306,7 +324,7 @@ def docs_guard(question: str, system: str, reply: str) -> str | None:
     if len(wanted) < 2:
         return None
     low = reply.lower().replace("ё", "е")
-    says_missing = any(p in low for p in MISSING_PHRASES)
+    says_missing = says_not_found(low)
     if best[0] >= need:
         # Абзац нашёлся уверенно, а модель «этого нет» — показываем абзац; при слабом совпадении не вмешиваемся.
         return _found_text(best) if says_missing and _strong(best[0], wanted) else None
@@ -624,11 +642,8 @@ class ScenarioProvider:
             return call("get_plan")
         if role == "lead" and "заявк" in q and "list_absence_requests" in available:
             return call("list_absence_requests")
-        if any(w in q for w in ORG_WORDS) or SALARY.search(q):
-            return LLMReply(content=(
-                f"Это организационный вопрос — с ним лучше сразу к HR BP ({_hr_name()}): наставник на такие "
-                f"вопросы не отвечает. Черновик сообщения, можно скопировать:\n\n«Здравствуйте! {_as_sentence(question)} "
-                "Подскажите, пожалуйста, как это оформить.»"))
+        if is_hr_question(q):
+            return LLMReply(content=hr_reply(question))
         if "план" in q or any(w in q for w in STUCK_WORDS):
             if someone and "get_plan" in available:
                 return call("get_plan", {"intern_id": someone})

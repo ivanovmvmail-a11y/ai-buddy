@@ -7,7 +7,8 @@ from pydantic import ValidationError
 
 from app.llm import Message, get_llm
 from app.llm.base import ToolCall
-from app.llm.scenario_provider import (ABSENCE_WORDS, FREQUENT_WORDS, HR_ONLY, MISSING_PHRASES, RANKING_WORDS,
+from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WORDS, HR_ONLY, NEXT_WORDS, RANKING_WORDS,
+                                       REQUEST_WORDS, hr_reply, is_hr_question, says_not_found,
                                        ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule,
                                        docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
                                        search_query, second_note, split_actions)
@@ -50,7 +51,7 @@ def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict
     (ответ «в базе нет» повторяет вопрос и не должен выглядеть как ответ по документу).
     """
     titled = {d["title"] for d in docs if f"«{d['title']}»" in reply}
-    if not titled and any(p in reply.lower().replace("ё", "е") for p in MISSING_PHRASES):
+    if not titled and says_not_found(reply):
         return []  # «в документах этого нет» — ни на какой документ не опирается (проверка 12.11, В5)
     asked = set(_WORD.findall(question.lower().replace("ё", "е")))
     words = set(_WORD.findall(reply.lower().replace("ё", "е"))) - asked
@@ -205,7 +206,35 @@ class Agent:
                     "заявление не пишу — только причину из списка. Проверь дату и нажми «Подтвердить»: без этого "
                     "руководителю ничего не уйдёт.")
             return AgentResult(reply=text, actions=[action], tools=[call.name])
-        viewer = user.role.value in ("mentor", "lead", "curator")
+        role = user.role.value
+        # Оргвопрос (больничный, отпуск, зарплата) — к HR BP одинаково при любой модели (прогон 13.11: «я заболела»
+        # GigaChat то отправлял к HR BP, то нет).
+        if role == "intern" and is_hr_question(q):
+            return AgentResult(reply=hr_reply(question))
+        # Вопросы о данных — ответ из сервисов, а не пересказ модели (прогон 13.11: GigaChat написал, что заявку
+        # Ивана «подала Мария», и вместо следующего шага советовал «обратиться к ответственному за среду»).
+        data_call: str | None = None
+        if role == "intern" and "get_plan" in available and not _names_someone(q) and (
+                any(w in q for w in NEXT_WORDS) or any(w in q for w in EMOTION_WORDS)):
+            data_call = "get_plan"
+        elif role == "lead" and "заявк" in q and "list_absence_requests" in available:
+            data_call = "list_absence_requests"
+        elif (role == "mentor" and "заявк" in q and any(w in q for w in (*REQUEST_WORDS, "жд"))
+              and "list_access_requests" in available):
+            data_call = "list_access_requests"
+        if data_call:
+            result = await self.executor.call(user, ToolCall(id=f"rule_{data_call}", name=data_call, arguments={}))
+            if result.get("error"):
+                return AgentResult(reply="Сервис сейчас не ответил. Попробуй ещё раз чуть позже.", tools=[data_call])
+            scenario = ScenarioProvider()
+            if data_call == "get_plan":
+                text = scenario._plan(result, own=True, calm=any(w in q for w in EMOTION_WORDS)).content
+            elif data_call == "list_absence_requests":
+                text = scenario._absences(result).content
+            else:
+                text = scenario._requests(result, question, system).content
+            return AgentResult(reply=text, tools=[data_call])
+        viewer = role in ("mentor", "lead", "curator")
         if viewer and any(w in q for w in FREQUENT_WORDS) and any(w in q for w in ("спраш", "вопрос", "тем")):
             from .analytics import metrics
             try:
