@@ -87,6 +87,9 @@ export const api = {
   document: (u: string, title: string) => request(`/documents?title=${encodeURIComponent(title)}`, DocumentView, u),
   actions: (u: string) => request("/actions", ActionsResponse, u),
   draft: (u: string, tool: string, params: Record<string, unknown>) => request("/actions", Action, u, post({ tool, params })),
+  // «Сделать за меня» (чекпоинт 2): простой доступ сервер оформляет сразу (status "done"), остальное — черновик.
+  quickDraft: (u: string, tool: string, params: Record<string, unknown>) =>
+    request("/actions", Action, u, post({ tool, params, quick: true })),
   confirm: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/confirm`, Action, u, post()),
   cancel: (u: string, id: string) => request(`/actions/${encodeURIComponent(id)}/cancel`, Action, u, post()),
   feedback: async (u: string, answerId: string, useful: boolean) => {

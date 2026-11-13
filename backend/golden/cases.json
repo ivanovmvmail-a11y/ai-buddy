@@ -127,5 +127,8 @@
   {"id": "talk-14", "category": "small_talk", "user": "intern-kirill", "question": "фывапр", "expect": {"contains": ["Не понял"], "absent": ["в документах", "git clone", "нужно подтвердить"], "no_source": true, "no_draft": true}},
   {"id": "talk-15", "category": "small_talk", "user": "intern-anya", "question": "ты бесполезный", "expect": {"contains": ["Не полезно"], "absent": ["в документах", "git clone", "нужно подтвердить"], "no_source": true, "no_draft": true}},
   {"id": "talk-16", "category": "small_talk", "user": "mentor-petr", "question": "Привет", "expect": {"contains": ["Привет, Пётр", "стажёр"], "absent": ["в документах", "git clone", "нужно подтвердить"], "no_source": true, "no_draft": true}},
-  {"id": "talk-17", "category": "small_talk", "user": "lead-olga", "question": "Добрый день", "expect": {"contains": ["Привет, Ольга"], "absent": ["в документах", "git clone", "нужно подтвердить"], "no_source": true, "no_draft": true}}
+  {"id": "talk-17", "category": "small_talk", "user": "lead-olga", "question": "Добрый день", "expect": {"contains": ["Привет, Ольга"], "absent": ["в документах", "git clone", "нужно подтвердить"], "no_source": true, "no_draft": true}},
+  {"id": "item-01", "category": "plan", "user": "intern-anya", "question": "объясни пункт про песочницу", "expect": {"contains": ["песочниц"], "absent": ["git clone"], "no_draft": true}},
+  {"id": "item-02", "category": "plan", "user": "intern-anya", "question": "хочу сдать задание по гиту", "expect": {"contains": ["Создай учебную ветку", "следующим сообщением"], "no_draft": true}},
+  {"id": "item-03", "category": "plan", "user": "intern-ivan", "question": "Объясни пункт «Подготовить песочницу доставки»", "expect": {"contains": ["Подготовить песочницу доставки"], "no_draft": true}}
 ]

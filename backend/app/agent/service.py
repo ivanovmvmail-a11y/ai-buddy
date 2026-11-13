@@ -19,6 +19,7 @@ from app.llm.small_talk import small_talk_reply
 from app.rag import retrieve
 
 from .actions import Action, ActionStore, InMemoryActionStore
+from .chat_items import item_reply, one_click_allowed
 from .demo_tools import register_demo_tools
 from .levels import hint as level_hint
 from .levels import level_for
@@ -44,6 +45,8 @@ class AgentResult:
     actions: list[Action] = field(default_factory=list)  # черновики, созданные в этом ответе
     tools: list[str] = field(default_factory=list)  # какие инструменты вызывались (для аналитики, спека 302)
     refused: bool = False  # хотя бы один инструмент отказал по правам
+    item_id: str | None = None  # пункт плана, о котором ответ: чат покажет его кнопки (чекпоинт 2)
+    mode: str | None = None  # "practice" — следующее сообщение стажёра — ответ на задание
 
 
 _WORD = re.compile(r"[a-zа-яё0-9]{5,}")
@@ -138,6 +141,10 @@ class Agent:
         # «Привет» посреди разговора GigaChat продолжил прошлую тему и смешал два документа).
         if (talk := small_talk_reply(question, system)) is not None:
             return AgentResult(reply=talk)
+        # «Объясни пункт про песочницу», «хочу сдать задание по гиту» — как кнопки плана, но из чата (чекпоинт 2).
+        if (about := await item_reply(question, user)) is not None:
+            return AgentResult(reply=about.reply, sources=about.sources or [], item_id=about.item_id or None,
+                               mode=about.mode, tools=["get_plan"])
         # Разговорные слова («запулить», «пул реквест», «CI») дополняем словами документов — поиск их найдёт.
         docs = await retrieve(search_query(question), user, k=RAG_TOP_K)
         if docs:
@@ -301,6 +308,7 @@ class Agent:
             scenario = ScenarioProvider()
             if data_call == "get_plan":
                 text = scenario._plan(result, own=True, calm=any(w in q for w in EMOTION_WORDS)).content
+                return AgentResult(reply=text, tools=[data_call], item_id=(result.get("next_step") or {}).get("id"))
             elif data_call == "list_absence_requests":
                 text = scenario._absences(result).content
             else:
@@ -390,6 +398,14 @@ class Agent:
             raise ActionNotFound(NOT_FOUND_MESSAGE)
         title = draft_title(tool, args, user)
         return await self.store.create(user_id=user.id, tool=tool.name, title=title, params=args.model_dump())
+
+    async def quick(self, user: User, tool_name: str, params: dict) -> Action:
+        """«Сделать за меня» по кнопке (чекпоинт 2): простой доступ — сразу, без второго подтверждения; остальное —
+        черновик, как раньше. Нажатие кнопки — согласие стажёра; насколько доступ простой, решает сервер."""
+        action = await self.draft(user, tool_name, params)
+        if tool_name == "create_access_request" and await one_click_allowed(user, action.params):
+            return await self.confirm(user, action.id)
+        return action
 
     async def cancel(self, user: User, action_id: str) -> Action:
         action = await self._claim(user, action_id)

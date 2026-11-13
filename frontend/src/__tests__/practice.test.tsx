@@ -25,28 +25,35 @@ function open(userId: string) {
 const row = async (title: string) => (await screen.findByText(title)).closest("li")!;
 
 describe("задание на практике (спека 107)", () => {
-  it("стажёр сдаёт задание: сначала подсказка, потом «выполнено» с документом", async () => {
+  it("стажёр сдаёт задание в чате (чекпоинт 2): задание, подсказка, потом «выполнено» с документом", async () => {
     open("intern-anya");
     const item = await row("Практикум: ветки и pull request");
     await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Сдать задание" })));
-    const form = within(item).getByRole("form", { name: "Задание: Практикум: ветки и pull request" });
-    expect(within(form).getByText(/Создай учебную ветку, коммит и pull request/)).toBeTruthy();
-    const check = within(form).getByRole("button", { name: "Проверить" }) as HTMLButtonElement;
-    expect(check.disabled).toBe(true); // пустой ответ не отправляется
+    expect(await screen.findByText(/Задание: Создай учебную ветку, коммит и pull request/)).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toMatch(/Сдаёшь задание: «Практикум: ветки и pull request»/);
+    const input = screen.getByRole("textbox", { name: "Ответ на задание" });
 
-    fireEvent.change(within(form).getByRole("textbox"), { target: { value: "создала ветку и открыла PR" } });
-    await act(async () => fireEvent.click(check));
-    expect((await within(form).findByRole("status")).textContent).toMatch(/Почти/);
+    fireEvent.change(input, { target: { value: "создала ветку и открыла PR" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Отправить" })));
+    expect(await screen.findByText(/Почти/)).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Ответ на задание" })).toBeTruthy(); // режим сдачи остаётся
 
-    fireEvent.change(within(form).getByRole("textbox"), { target: { value: "создала ветку, сделала коммит, открыла PR" } });
-    await act(async () => fireEvent.click(check));
-    const status = await within(form).findByText(/Задание выполнено/);
-    expect(status.textContent).toMatch(/«Готово»/);
-    expect(within(form).getByText(/Учебный репозиторий — клонирование и ветки/)).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Ответ на задание" }), { target: { value: "создала ветку, сделала коммит, открыла PR" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Отправить" })));
+    const done = await screen.findByText(/Задание выполнено/);
+    expect(done.textContent).toMatch(/«Готово»/);
+    expect(screen.getAllByText(/Учебный репозиторий — клонирование и ветки/).length).toBeGreaterThan(0);
     expect(srv.calls.filter((c) => c.path.endsWith("/practice"))).toHaveLength(2);
+    expect(screen.getByRole("textbox", { name: "Сообщение" })).toBeTruthy(); // обычный чат вернулся
+  });
 
-    await act(async () => fireEvent.click(within(form).getByRole("button", { name: "Закрыть" })));
-    expect(within(item).queryByRole("form")).toBeNull();
+  it("сдачу задания можно отменить", async () => {
+    open("intern-anya");
+    const item = await row("Практикум: ветки и pull request");
+    await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Сдать задание" })));
+    await act(async () => fireEvent.click(await screen.findByRole("button", { name: "Отменить" })));
+    expect(screen.getByRole("textbox", { name: "Сообщение" })).toBeTruthy();
+    expect(srv.calls.filter((c) => c.path.endsWith("/practice"))).toHaveLength(0);
   });
 
   it("кнопки нет у пункта без проверяемого задания и у наставника", async () => {

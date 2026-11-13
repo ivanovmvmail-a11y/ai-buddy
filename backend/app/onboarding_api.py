@@ -359,13 +359,16 @@ def metrics_view():
 class DraftIn(BaseModel):
     tool: str
     params: dict = Field(default_factory=dict)
+    # Кнопка «Сделать за меня» (чекпоинт 2): простой доступ оформляется сразу, остальное — черновик.
+    quick: bool = False
 
 
 @bp.post("/actions")
 def create_draft():
     """«Сделать за меня»: черновик write-инструмента без модели. Выполнение — POST /actions/{id}/confirm."""
     body = _body(DraftIn)
-    return _json(async_runner.run(service.agent.draft(g.user, body.tool, body.params))), 201
+    make = service.agent.quick if body.quick else service.agent.draft
+    return _json(async_runner.run(make(g.user, body.tool, body.params))), 201
 
 
 # --- Демо-панель (явно помечена в интерфейсе как инструмент демонстрации) -------------------------

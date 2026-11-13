@@ -3,13 +3,13 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api, type ChatMessage } from "@/lib/api";
-import { approverText, msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
-import { useRefresh, useResources } from "@/lib/queries";
+import { approverText, itemActions, msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
+import { usePlan, useRefresh, useResources } from "@/lib/queries";
 import { findUser } from "@/lib/users";
 import { dayText } from "./AbsencePanel";
 import { RichText } from "./RichText";
 import { SourceLink } from "./SourceViewer";
-import type { AccessRequest, DemoUser } from "@/lib/types";
+import type { AccessRequest, DemoUser, PlanItem } from "@/lib/types";
 
 type Props = { actor: DemoUser; onAction: (a: BotAction) => void };
 
@@ -31,9 +31,13 @@ export async function askBot(actor: DemoUser, text: string) {
     .slice(-MAX_HISTORY);
   try {
     const res = await api.chat(actor.id, history);
+    // Ответ о пункте плана — с кнопками этого пункта, как в плане (чекпоинт 2).
+    const item = res.item_id ? await api.plan(actor.id).then((p) => p.items.find((i) => i.id === res.item_id)).catch(() => undefined) : undefined;
+    if (res.mode === "practice" && item) chat.setPractice({ itemId: item.id, title: item.title });
+    const actions = item ? itemActions(item, actor, res.mode === "practice" ? ["practice"] : []) : [];
     chat.push({
       id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources,
-      answerId: res.answer_id ?? undefined,
+      answerId: res.answer_id ?? undefined, actions: actions.length ? actions : undefined,
     });
     for (const action of res.actions) {
       chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action });
@@ -45,9 +49,37 @@ export async function askBot(actor: DemoUser, text: string) {
   }
 }
 
+/** Ответ на задание практикума прямо в чате (чекпоинт 2): сервер сверяет с учебным документом пункта. */
+export async function submitPractice(actor: DemoUser, text: string, onDone?: () => Promise<unknown>) {
+  const chat = useChat.getState();
+  const mode = chat.practice;
+  if (!mode || !text.trim() || chat.busy) return;
+  chat.push({ id: msgId(), role: "user", kind: "text", content: text.trim() });
+  chat.setBusy(true);
+  try {
+    const result = await api.practice(actor.id, mode.itemId, text.trim());
+    const item = await api.plan(actor.id).then((p) => p.items.find((i) => i.id === mode.itemId)).catch(() => undefined);
+    if (result.passed) chat.setPractice(null);
+    const actions = result.passed && item ? itemActions(item, actor, ["practice", "explain", "do"]) : [];
+    chat.push({
+      id: msgId(), role: "assistant", kind: "text", scripted: true, label: "проверка задания по документу пункта",
+      content: (result.passed ? "✓ " : "") + result.text + (result.passed ? "" : "\n\nПопробуй ещё раз — напиши ответ следующим сообщением."),
+      sources: result.source ? [result.source] : undefined, actions: actions.length ? actions : undefined,
+    });
+    await onDone?.();
+  } catch (err) {
+    chat.push({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
+  } finally {
+    chat.setBusy(false);
+  }
+}
+
 export function ChatPanel({ actor, onAction }: Props) {
   const messages = useChat((s) => s.messages);
   const busy = useChat((s) => s.busy);
+  const practice = useChat((s) => s.practice);
+  const setPractice = useChat((s) => s.setPractice);
+  const refresh = useRefresh();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +92,8 @@ export function ChatPanel({ actor, onAction }: Props) {
     e.preventDefault();
     const t = input;
     setInput("");
-    void askBot(actor, t);
+    if (practice) void submitPractice(actor, t, refresh);
+    else void askBot(actor, t);
   }
 
   return (
@@ -72,12 +105,26 @@ export function ChatPanel({ actor, onAction }: Props) {
         {busy && <div className="text-sm text-black/55 dark:text-white/55">AI-buddy думает…</div>}
         <div ref={bottomRef} />
       </div>
+      {practice && (
+        <div role="status" className="flex items-center gap-2 border-t border-violet-500/30 bg-violet-500/[0.06] px-3 py-1.5 text-sm">
+          <span className="min-w-0 flex-1 truncate">Сдаёшь задание: «{practice.title}» — ответ следующим сообщением</span>
+          <button
+            onClick={() => {
+              setPractice(null);
+              useChat.getState().push({ id: msgId(), role: "assistant", kind: "text", scripted: true, content: "Хорошо, задание отложим. Вернуться к нему — кнопка «Сдать задание» у пункта." });
+            }}
+            className="rounded-md px-2 py-0.5 text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10"
+          >
+            Отменить
+          </button>
+        </div>
+      )}
       <form onSubmit={onSubmit} className="flex gap-2 border-t border-black/10 p-3 dark:border-white/10">
         <input
-          aria-label="Сообщение"
+          aria-label={practice ? "Ответ на задание" : "Сообщение"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Спроси что угодно…"
+          placeholder={practice ? "Что и как сделано — своими словами…" : "Спроси что угодно…"}
           className="min-w-0 flex-1 rounded-xl border border-black/15 bg-transparent px-4 py-2.5 text-base outline-none focus:border-[#00aaff] dark:border-white/20"
         />
         <button type="submit" disabled={busy || !input.trim()} className="rounded-xl bg-[#00aaff] px-4 font-medium text-white disabled:opacity-40">
@@ -88,7 +135,22 @@ export function ChatPanel({ actor, onAction }: Props) {
   );
 }
 
+/** Кнопки пункта в старых сообщениях — по актуальному плану: закрытый пункт кнопок «сделать / сдать / готово» не
+ *  показывает, ждущий согласования — «Сделать за меня» (иначе повторное нажатие давало «заявка уже есть»). */
+function liveActions(actions: BotAction[] | undefined, items: PlanItem[] | undefined): BotAction[] {
+  if (!actions || !items) return actions ?? [];
+  return actions.filter((a) => {
+    if (!("itemId" in a) || !["do", "practice", "done"].includes(a.kind)) return true;
+    const item = items.find((i) => i.id === a.itemId);
+    if (!item) return true;
+    if (item.status === "done") return false;
+    return !(a.kind === "do" && item.status === "waiting");
+  });
+}
+
 function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Props["onAction"] }) {
+  const plan = usePlan(actor, actor.role === "intern" ? actor.id : undefined);
+  const actions = liveActions(m.actions, plan.data?.items);
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
@@ -115,9 +177,9 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
             · демо-данные, не регламент Авито
           </div>
         )}
-        {m.actions && m.actions.length > 0 && actor.role === "intern" && (
+        {actions.length > 0 && actor.role === "intern" && (
           <div className="mt-2 flex flex-wrap gap-2">
-            {m.actions.map((a, i) => (
+            {actions.map((a, i) => (
               <button
                 key={a.label}
                 onClick={() => onAction(a)}
