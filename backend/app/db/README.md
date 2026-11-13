@@ -36,3 +36,11 @@ LLM_PROVIDER=echo uv run --extra mcp --frozen --offline pytest --mcp-postgres --
 
 PostgreSQL-тесты используют только свои временные контейнеры с уже скачанным pgvector/pgvector:pg17.
 Новых переменных или зависимостей нет. Миграция для общего пула не требуется.
+
+## Переписка и черновики (13.11, Claude)
+`history.py` и `actions.py` — хранилища для протоколов `app.agent.history.HistoryStore` и `app.agent.actions.ActionStore`
+(таблицы `chat_messages`, `agent_actions`, миграция `20261113130000_chat_and_actions.sql`). Есть `DATABASE_URL` — данные
+переживают перезапуск; таблиц ещё нет — одно предупреждение в лог и работа в памяти. Подтверждение черновика —
+`UPDATE … WHERE status = 'pending' RETURNING`: из двух одновременных нажатий выполняется одно.
+Тесты: `pytest --mcp-postgres tests/mcp/test_chat_store_postgres.py` (в том числе проверка, что приложение при
+запуске действительно выбирает PostgreSQL, — раньше циклический импорт молча оставлял переписку в памяти).
