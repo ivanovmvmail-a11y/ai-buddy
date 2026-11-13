@@ -112,7 +112,16 @@ async def list_questions(user_id: str) -> list[MentorQuestion]:
                     and intern(data, q.intern_id).mentor_id == user.id))]
 
 
-async def draft_answer(user_id: str, question_id: str, text: str, publish: bool = False) -> ActionDraft:
+def _with_topic(content: str, topic: str | None) -> str:
+    """Тема от наставника — заголовком над ответом: по ней поиск находит ответ, даже если ответ другими словами
+    («Меню — в канале…» на «где меню столовой?»). Тему пишет и видит наставник (по умолчанию интерфейс подставляет
+    вопрос без имён); без темы публикуется только ответ, как раньше. Найдено на финальной проверке 13.11."""
+    topic = re.sub(r'\s+', ' ', _public_text(topic or '')).strip().lstrip('#').strip()[:200]
+    return f'## {topic}\n\n{content}' if topic else content
+
+
+async def draft_answer(user_id: str, question_id: str, text: str, publish: bool = False,
+                       topic: str | None = None) -> ActionDraft:
     user = drafts.actor(user_id)
     async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         question = _question(data, user, question_id, answering=True)
@@ -120,7 +129,8 @@ async def draft_answer(user_id: str, question_id: str, text: str, publish: bool 
             raise Conflict("На вопрос уже ответили")
         value = AnswerInput(text=text, publish=publish)
         return drafts.create(data, user, 'mentor.answer', {'question_id': question.id, 'text': value.text,
-            'publish': value.publish, 'public_content': _public_text(value.text) if value.publish else None})
+            'publish': value.publish,
+            'public_content': _with_topic(_public_text(value.text), topic) if value.publish else None})
 
 
 async def confirm_answer(user_id: str, draft_id: str) -> MentorQuestion:
@@ -150,13 +160,13 @@ async def confirm_answer(user_id: str, draft_id: str) -> MentorQuestion:
     return await retry_publication(user_id, result.id) if result.publication_status == 'pending' else result
 
 
-async def draft_publication(user_id: str, question_id: str) -> ActionDraft:
+async def draft_publication(user_id: str, question_id: str, topic: str | None = None) -> ActionDraft:
     user = drafts.actor(user_id)
     async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
         question = _question(data, user, question_id, answering=True)
         if question.status != 'answered' or question.publication_status != 'not_requested':
             raise Conflict("Публикация недоступна")
-        return drafts.create(data, user, 'mentor.publish', {'question_id': question.id, 'public_content': _public_text(question.answer)})
+        return drafts.create(data, user, 'mentor.publish', {'question_id': question.id, 'public_content': _with_topic(_public_text(question.answer), topic)})
 
 
 async def confirm_publication(user_id: str, draft_id: str) -> MentorQuestion:

@@ -80,10 +80,10 @@ export const api = {
   history: (u: string) => request("/chat/history", ChatHistory, u),
   mentorQuestions: (u: string) => request("/mentor/questions", MentorQuestionsResponse, u),
   askMentor: (u: string, text: string) => request("/mentor/questions", MentorQuestion, u, post({ text })),
-  answerMentor: (u: string, id: string, text: string, publish: boolean) =>
-    request(`/mentor/questions/${encodeURIComponent(id)}/answer`, MentorQuestion, u, post({ text, publish })),
-  publishMentor: (u: string, id: string) =>
-    request(`/mentor/questions/${encodeURIComponent(id)}/publish`, MentorQuestion, u, post()),
+  answerMentor: (u: string, id: string, text: string, publish: boolean, topic?: string) =>
+    request(`/mentor/questions/${encodeURIComponent(id)}/answer`, MentorQuestion, u, post({ text, publish, topic })),
+  publishMentor: (u: string, id: string, topic?: string) =>
+    request(`/mentor/questions/${encodeURIComponent(id)}/publish`, MentorQuestion, u, post({ topic })),
   document: (u: string, title: string) => request(`/documents?title=${encodeURIComponent(title)}`, DocumentView, u),
   actions: (u: string) => request("/actions", ActionsResponse, u),
   draft: (u: string, tool: string, params: Record<string, unknown>) => request("/actions", Action, u, post({ tool, params })),

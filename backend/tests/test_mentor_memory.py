@@ -76,3 +76,27 @@ def test_permissions(scenario):
     assert scenario.get("/mentor/questions", headers=as_user("lead-olga")).status_code == 404
     assert post(scenario, "/mentor/questions", "mentor-petr", {"text": "x"}).status_code == 404
     assert post(scenario, "/mentor/questions", "intern-anya", {"text": ""}).status_code == 422
+
+
+def test_answer_in_other_words_is_still_found(scenario):
+    """Финальная проверка 13.11: наставник ответил без слов вопроса — ответ всё равно находится по вопросу."""
+    q = post(scenario, "/mentor/questions", "intern-anya", {"text": "Где посмотреть меню столовой?"}).get_json()
+    done = post(scenario, f"/mentor/questions/{q['id']}/answer", "mentor-petr",
+                {"text": "Каждую неделю публикуют в канале Mattermost «офис-еда», спроси Петра Волкова.", "publish": True,
+                 "topic": "Где посмотреть меню столовой? Пётр знает"}).get_json()
+    assert done["public_content"].startswith("## Где посмотреть меню столовой?")
+    assert "Пётр" not in done["public_content"] and "Петра" not in done["public_content"]  # имена вычищены и в теме
+    reply = ask(scenario, "а где меню столовой посмотреть?", "intern-kirill")["reply"]
+    assert reply.startswith("Наставник уже отвечал") and "офис-еда" in reply
+    assert "Где посмотреть меню" not in reply  # вопрос — заголовок для поиска, в ответ бота он не попадает
+
+
+def test_without_topic_only_answer_is_published(scenario):
+    """Правило Codex сохраняется: без темы от наставника в базу идёт только ответ, вопрос стажёра — нет."""
+    q = post(scenario, "/mentor/questions", "intern-anya", {"text": "СЕКРЕТНЫЙ_ВОПРОС"}).get_json()
+    done = post(scenario, f"/mentor/questions/{q['id']}/answer", "mentor-petr", {"text": "Ответ.", "publish": True}).get_json()
+    assert done["public_content"] == "Ответ." and "СЕКРЕТНЫЙ" not in done["public_content"]
+    q2 = post(scenario, "/mentor/questions", "intern-anya", {"text": "второй"}).get_json()
+    post(scenario, f"/mentor/questions/{q2['id']}/answer", "mentor-petr", {"text": "Ответ два.", "publish": False})
+    pub = post(scenario, f"/mentor/questions/{q2['id']}/publish", "mentor-petr", {"topic": "Тема два"}).get_json()
+    assert pub["public_content"] == "## Тема два\n\nОтвет два."
