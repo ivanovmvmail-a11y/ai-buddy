@@ -2,13 +2,13 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { askBot, ChatPanel } from "@/components/ChatPanel";
+import { ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { ReminderBell } from "@/components/ReminderBell";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
-  absenceNudgeMsg, accessDraftParams, actionFor, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, msgId, reminderMsg,
+  absenceNudgeMsg, accessDraftParams, actionFor, explainScripted, finishedWeek, followupsFor, greeting, msgId, reminderMsg,
   nudgeMsg, useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
@@ -19,6 +19,7 @@ import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } f
 import { DEMO_USERS, findUser, ROLE_TITLES } from "@/lib/users";
 
 const DEMO_KEY_STORAGE = "ai-buddy-demo-key";
+const EXPLAIN_LABEL = "по документу пункта · глубина по карте навыков";
 
 function storedDemoKey(): string | undefined {
   try {
@@ -166,13 +167,13 @@ export default function Home() {
 
   async function onExplain(item: PlanItem, kind: ExplainKind = "explain") {
     setTab("chat");
-    if (!scriptedMode) return askBot(actor, followupQuestion(item, kind));
     const asked: Msg = { id: msgId(), role: "user", kind: "text", content: ASKED[kind](item) };
     try {
-      // Без модели ответ строит сервер по документу пункта и записывает в события (метрики, «полезно»).
+      // Ответ строит сервер по документу пункта и под уровень стажёра — и с ключом модели, и без (проверка 13.11:
+      // с GigaChat «Объяснить» давало пустые шаги, 5–7 источников и не учитывало уровень). Пишется в события.
       const res = await api.explained(actor.id, item.id, item.intern_id, kind);
       say(asked, {
-        id: msgId(), role: "assistant", kind: "text", scripted: true, content: res.text, answerId: res.answer_id,
+        id: msgId(), role: "assistant", kind: "text", scripted: true, label: EXPLAIN_LABEL, content: res.text, answerId: res.answer_id,
         sources: res.source ? [res.source] : undefined, followups: followupsFor(item, res.chips),
         actions: kind === "explain" && item.resource_id && item.status !== "done" && item.status !== "waiting" ? [actionFor(item)] : undefined,
       });

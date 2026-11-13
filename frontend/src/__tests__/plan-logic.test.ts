@@ -3,7 +3,7 @@ import { initialState } from "./fake/mock-data";
 import { canMarkDone, canRequestAccess, pluralDays, waitedFor } from "@/lib/plan-logic";
 import { findUser, firstName } from "@/lib/users";
 import {
-  actionFor, approverText, explainScripted, finishedWeek, followupQuestion, followupsFor, greeting, weeklySummaryMsg,
+  actionFor, approverText, explainScripted, finishedWeek, followupsFor, greeting, weeklySummaryMsg,
 } from "@/lib/chat";
 import type { Plan, SkillProfile } from "@/lib/types";
 
@@ -68,9 +68,6 @@ describe("сценарные ответы", () => {
     expect(followupsFor(notes, ["Как это сделать по шагам?", "Неизвестная"])).toEqual([
       { label: "Как это сделать по шагам?", kind: "steps", itemId: "anya.w1.notes", internId: "intern-anya" },
     ]);
-    expect(followupQuestion(notes, "steps")).toBe(`Как выполнить пункт плана «${notes.title}» по шагам?`);
-    expect(followupQuestion(notes, "who")).toBe(`К кому идти, если не получается пункт плана «${notes.title}»?`);
-    expect(followupQuestion(notes, "explain")).toMatch(/^Объясни пункт плана/);
   });
 
   it("действие для пункта и согласующий", () => {

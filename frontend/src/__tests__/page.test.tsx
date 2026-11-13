@@ -165,16 +165,17 @@ describe("экран «план + чат» на API", () => {
     expect(await screen.findByText("Не получилось связаться с сервером.")).toBeTruthy();
   });
 
-  it("с моделью объяснение уходит вопросом в /chat", async () => {
+  it("с моделью объяснение тоже строит сервер по пункту — не уходит в /chat (проверка 13.11)", async () => {
     srv.provider = "gigachat";
     open();
     const row = (await screen.findByText("Завести конспект встреч с наставником")).closest("li")!;
-    await waitFor(() => expect(screen.queryByText(/сценарный режим/)).toBeNull());
     await waitFor(() => expect(srv.calls.some((c) => c.path === "/health")).toBe(true));
+    await waitFor(() => expect(screen.queryByText(/сценарный режим/)).toBeNull());
     await click(within(row).getByRole("button", { name: "Объяснить" }));
-    expect(await screen.findByText("Ответ модели")).toBeTruthy();
-    const chat = srv.calls.find((c) => c.path === "/chat")!;
-    expect(JSON.stringify(chat.body)).toContain("Завести конспект");
+    expect(await screen.findByText(/^Из документа:/)).toBeTruthy();
+    expect(screen.getByText("по документу пункта · глубина по карте навыков")).toBeTruthy();
+    expect(srv.calls.some((c) => c.path.includes("/explained"))).toBe(true);
+    expect(srv.calls.some((c) => c.path === "/chat")).toBe(false);
   });
 
   it("кнопка действия в приветствии открывает черновик", async () => {
