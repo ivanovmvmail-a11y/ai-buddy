@@ -543,3 +543,9 @@
 - Токены в `globals.css` (`.card`, `--accent`…), шрифт Onest. Пользовательский пузырь — чёрный (белый на голубом не читается).
 - Раздел — в `useSession.section`; тесты плана открывают `section: "plan"`. Фронт 124 (+4 `home.test.tsx`), build OK.
 - Доп. правки по замечаниям Миши в #114: светлая колонка (чёрная — резкий контраст), бледные сделанные пункты, тонкие полосы прокрутки в цвет темы, переключатель темы (`ThemeToggle`, `data-theme` + `@custom-variant dark`, без вспышки — скрипт в `<head>`), след «↪ перенёс во вкладку …» и `STUDY_WORDS_RU` для вкладки «Учёба». pytest 982, фронт 126.
+
+## 2026-11-13 — внедряемость (claude/integrations)
+- `docs/INTEGRATION.md`: таблица «заглушка → сервис Авито → что поменять → файл», входы для систем, что готово к переносу.
+- `app/openapi.py`: OpenAPI 3.1 из маршрутов Flask (докстринги, pydantic-модели тела, параметры запроса) + Swagger UI `/docs`; тест — описан каждый адрес.
+- `app/integrations.py`: `POST /integrations/hired` (ключ службы; `hiring.apply_hiring_profile` — пересборка персональных пунктов + уведомление «по итогам собеседования», правка в зоне Codex) и `POST /integrations/mattermost` (токен Mattermost, соответствие логинов, тот же агент, черновики подтверждаются в приложении). В Docker демо-ключи `local-docker-demo`.
+- pytest 994 (+12 `test_integrations.py`).

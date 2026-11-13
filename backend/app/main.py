@@ -15,6 +15,8 @@ from app.agent.users import get_user
 from app.config import settings
 from app.http_body import BadBody, json_body
 from app.llm import Message
+from app import openapi
+from app.integrations import bp as integrations_bp
 from app.onboarding_api import bp as onboarding_bp
 
 USER_HEADER = "X-User-Id"
@@ -77,7 +79,10 @@ def create_app() -> Flask:
     @app.before_request
     def load_user():
         # ИМИТАЦИЯ авторизации: в Авито пользователь берётся из корпоративного SSO.
-        if request.endpoint in (None, "health") or request.method == "OPTIONS":
+        # Публичное: проверка живости и описание API; /integrations/* проверяют ключ службы сами (вызывают системы).
+        if request.endpoint in (None, "health", "openapi_json", "swagger_ui") or request.method == "OPTIONS":
+            return None
+        if request.endpoint and request.endpoint.startswith("integrations."):
             return None
         user_id = request.headers.get(USER_HEADER)
         if not user_id:
@@ -191,6 +196,8 @@ def create_app() -> Flask:
         return _action_json(async_runner.run(service.agent.cancel(g.user, action_id)))
 
     app.register_blueprint(onboarding_bp)
+    app.register_blueprint(integrations_bp)
+    openapi.register(app)
     return app
 
 

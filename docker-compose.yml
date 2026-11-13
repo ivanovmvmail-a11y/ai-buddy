@@ -41,6 +41,9 @@ services:
       AGENT_SERVICES: mcp
       MCP_URL: http://mcp:8001/mcp
       MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-local-docker-demo}
+      # Входы для систем Авито (docs/INTEGRATION.md): найм и Mattermost. Демо-значения, как пароль базы; на стенде — свои.
+      INTEGRATION_TOKEN: ${INTEGRATION_TOKEN:-local-docker-demo}
+      MATTERMOST_TOKEN: ${MATTERMOST_TOKEN:-local-docker-demo}
     ports:
       - "8000:8000"
     depends_on:

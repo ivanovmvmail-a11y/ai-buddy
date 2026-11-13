@@ -231,3 +231,40 @@ async def note_practice_passed(actor: User, item_id: str, found: list[str]) -> N
         events._record(data, actor, "practice_passed", {"intern_id": item.intern_id, "item_id": item.id})
         basis = "сдано практическое задание" + (": " + ", ".join(found) if found else "")
         _maybe_suggest(data, item.intern_id, item.topic, practice_item=item.id, practice_basis=basis[:200])
+
+
+async def apply_hiring_profile(intern_id: str, skills: dict[str, SkillLevel], strengths: list[str] | None = None,
+                               growth: list[str] | None = None) -> dict:
+    """Карта навыков из системы найма (внедряемость, чекпоинт 2; Claude 13.11): учётка стажёра уже есть в корпоративном
+    каталоге, найм присылает итоги собеседования — бот пересобирает персональную часть плана (общие пункты не трогает,
+    ручные пункты наставника и закрытые — тоже) и сообщает стажёру. Вызывает служба (SYSTEM_ACTOR), не человек."""
+    async with storage.get_store().transaction(include_events=False, copy_on_commit=False) as data:
+        profile = data.profiles.get(intern_id)
+        if profile is None or intern_id not in data.interns:
+            raise NotFound()
+        levels = {nonempty.validate_python(topic): skill_level.validate_python(level) for topic, level in skills.items()}
+
+        def personal() -> dict[str, str]:
+            return {item.id: item.title for item in data.items.values()
+                    if item.intern_id == intern_id and item.kind == "personal" and item.status != "done"}
+
+        before = personal()
+        profile.skills = {**profile.skills, **levels}
+        if strengths is not None:
+            profile.strengths = list(strengths)
+        if growth is not None:
+            profile.growth = list(growth)
+        profile.updated_by = "hiring"
+        profile.updated_at = timestamp(data, intern_id)
+        checklist._rebuild_personal(data, SYSTEM_ACTOR, intern_id)
+        after = personal()
+        added = [after[i] for i in after if i not in before]
+        removed = [before[i] for i in before if i not in after]
+        events._record(data, SYSTEM_ACTOR, "hiring_profile_received", {
+            "intern_id": intern_id, "topics": sorted(levels), "added": len(added), "removed": len(removed)})
+        if added or removed:
+            parts = ([f"добавлено: {', '.join(added)}"] if added else []) + ([f"убрано: {', '.join(removed)}"] if removed else [])
+            notify(data, intern_id, intern_id, "skill_changed", uuid4().hex,
+                   "План обновлён по итогам собеседования — " + "; ".join(parts), "plan")
+        return {"intern_id": intern_id, "skills": dict(profile.skills), "added": added, "removed": removed,
+                "personal": list(after.values())}
