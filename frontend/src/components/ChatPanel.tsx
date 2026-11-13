@@ -7,6 +7,7 @@ import { approverText, msgId, useChat, type BotAction, type Msg } from "@/lib/ch
 import { useRefresh, useResources } from "@/lib/queries";
 import { findUser } from "@/lib/users";
 import { dayText } from "./AbsencePanel";
+import { RichText } from "./RichText";
 import { SourceLink } from "./SourceViewer";
 import type { AccessRequest, DemoUser } from "@/lib/types";
 
@@ -15,6 +16,8 @@ type Props = { actor: DemoUser; onAction: (a: BotAction) => void };
 const LEVELS: Record<string, string> = { read: "чтение", edit: "редактирование", admin: "администрирование" };
 
 /** Отправить вопрос модели. Используется и полем ввода, и кнопками «Объяснить» / подсказками. */
+const MAX_HISTORY = 20;
+
 export async function askBot(actor: DemoUser, text: string) {
   const chat = useChat.getState();
   if (!text.trim() || chat.busy) return;
@@ -23,7 +26,9 @@ export async function askBot(actor: DemoUser, text: string) {
   const history: ChatMessage[] = useChat
     .getState()
     .messages.filter((m) => m.kind === "text" && !m.scripted)
-    .map((m) => ({ role: m.role, content: m.content }));
+    .map((m) => ({ role: m.role, content: m.content }))
+    // Модели нужна недавняя переписка; вся история после ~20 вопросов упиралась в лимит сервера (проверка 13.11).
+    .slice(-MAX_HISTORY);
   try {
     const res = await api.chat(actor.id, history);
     chat.push({
@@ -96,7 +101,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
       <div className={`max-w-[92%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
         m.kind === "error" ? "bg-red-500/10 text-red-800 dark:text-red-300" : "bg-black/5 dark:bg-white/10"
       }`}>
-        <div className="whitespace-pre-wrap">{m.content}</div>
+        <RichText text={m.content} />
         {m.draft && <DraftCard m={m} actor={actor} />}
         {m.sources && m.sources.length > 0 && (
           <div className="mt-2 text-xs text-black/55 dark:text-white/55">

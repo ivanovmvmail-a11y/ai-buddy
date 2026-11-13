@@ -23,7 +23,8 @@ log = logging.getLogger("ai_buddy.api")
 
 
 MAX_MESSAGE_CHARS = 4000  # длиннее вопрос стажёра не бывает; защита от 200-КБ сообщений (аудит D8)
-MAX_HISTORY = 40
+MAX_HISTORY = 40  # модели уходят последние 40 сообщений; более старые отбрасываются, а не ломают чат
+MAX_HISTORY_ACCEPTED = 400  # защита от огромных запросов; длинная переписка обрезается, а не даёт 422 (проверка 13.11)
 
 
 class ChatMessageIn(BaseModel):
@@ -32,7 +33,7 @@ class ChatMessageIn(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessageIn] = Field(min_length=1, max_length=MAX_HISTORY)
+    messages: list[ChatMessageIn] = Field(min_length=1, max_length=MAX_HISTORY_ACCEPTED)
 
 
 class Source(BaseModel):
@@ -124,7 +125,7 @@ def create_app() -> Flask:
             return jsonify(detail="Пустое сообщение"), 422
 
         # системные сообщения от клиента не принимаем — системный промпт задаёт только сервер
-        history = [Message(role=m.role, content=m.content) for m in req.messages if m.role != "system"]
+        history = [Message(role=m.role, content=m.content) for m in req.messages if m.role != "system"][-MAX_HISTORY:]
         started = time.perf_counter()
         try:
             result = async_runner.run(service.agent.answer(history, g.user))
