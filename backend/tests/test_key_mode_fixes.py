@@ -122,3 +122,32 @@ def test_access_draft_has_clean_justification_and_no_random_source(demo_docs):
     res = ask(demo_docs, "как получить доступ к джире")
     assert res["actions"][0]["params"]["justification"] == "Для учебных задач стажировки: Учебный Jira"
     assert "Учебный репозиторий — клонирование и ветки" not in [s["title"] for s in res["sources"]]
+
+
+# --- Проверка 13.11 «глазами эксперта»: мелочи --------------------------------------------------------------------
+
+def test_publication_removes_non_demo_names_and_contacts():
+    from app.mcp_server.mentor_inbox import _public_text
+    assert _public_text("пиши Свете Ивановой, +7 999 123-45-67, sveta@example.com") == \
+        "пиши [имя удалено], [контакт удалён], [контакт удалён]"
+    assert _public_text("спроси у Марины Соколовой.") == "спроси у [имя удалено]."
+    assert _public_text("Открой Учебный Jira в браузере.") == "Открой Учебный Jira в браузере."
+
+
+def test_hrbp_is_not_sent_to_hrbp(demo_docs):
+    from .test_scenario_provider import ask
+    reply = ask(demo_docs, "как стажёру оформить отгул", "hrbp-elena")["reply"]
+    assert "лучше сразу к HR BP" not in reply and "Отгул на один день" in reply
+
+
+def test_curator_reason_of_absence_and_stuck_summary(demo_docs):
+    from .test_scenario_provider import ask
+    reason = ask(demo_docs, "почему Аня брала отгул?", "curator-dmitry")["reply"]
+    assert reason.startswith("Причину отгула в чате не раскрываю") and "руководитель" in reason
+    summary = ask(demo_docs, "у кого из стажёров что зависло?", "curator-dmitry")["reply"]
+    assert summary.startswith("Стажёров не сравниваю") and "Аня" in summary
+
+
+def test_summary_from_data_has_no_random_source(demo_docs):
+    from .test_scenario_provider import ask
+    assert ask(demo_docs, "у кого из стажёров что зависло?", "curator-dmitry")["sources"] == []

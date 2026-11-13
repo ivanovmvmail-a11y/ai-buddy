@@ -159,7 +159,9 @@ class Agent:
         if (ruled := await self._product_rules(first, system, available, user)) is not None:
             if second:
                 ruled.reply += second_note(second)
-            ruled.sources = cited_sources(ruled.reply, docs, question)
+            ruled.sources = cited_sources(ruled.reply, docs, question, short=False)
+            if ruled.tools:  # сводка из сервисов — не пересказ документа: источник, только если он назван (13.11)
+                ruled.sources = [s for s in ruled.sources if f"«{s['title']}»" in ruled.reply]
             return ruled
         if second:
             history = [*history[:-1], Message(role="user", content=first)] if history else history

@@ -155,8 +155,11 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
           <CopyDraft text={questionDraft(m.content)!} toMentor={actor.role === "intern" && /Черновик вопроса/.test(m.content) ? actor : null} />
         )}
         {m.answerId && <Feedback m={m} actor={actor} />}
-        {m.scripted && m.kind === "text" && (
-          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">{m.label ?? "сценарный ответ · из данных плана"}</div>
+        {/* Подпись — откуда ответ (проверка 13.11: с ключом приветствие было «сценарным», а у ответов модели подписи не было). */}
+        {m.kind === "text" && (m.scripted || m.answerId) && (
+          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">
+            {m.scripted ? (m.label ?? "из данных плана") : "ответ ИИ · сверяй с источником"}
+          </div>
         )}
       </div>
     </div>
