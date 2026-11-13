@@ -56,6 +56,15 @@ describe("кнопки пункта плана в чате", () => {
     expect(srv.calls.filter((c) => c.path === "/chat")).toHaveLength(1); // ответ на задание не ушёл модели
   });
 
+  it("у практикума «Готово» в чате нет до сдачи задания — только «Сдать задание»", async () => {
+    srv.chatReplies.push({ reply: "Про практикум", itemId: "anya.p.git" });
+    open();
+    await ask("расскажи про практикум по гиту");
+    const bubble = (await screen.findByText("Про практикум")).closest("[class*=rounded-bl-md]") as HTMLElement;
+    expect(within(bubble).getByRole("button", { name: "Сдать задание" })).toBeTruthy();
+    expect(within(bubble).queryByRole("button", { name: "Готово" })).toBeNull();
+  });
+
   it("у наставника кнопок пункта стажёра в чате нет", async () => {
     srv.chatReplies.push({ reply: "Ответ про пункт", itemId: "anya.w1.notes" });
     open("mentor-petr");

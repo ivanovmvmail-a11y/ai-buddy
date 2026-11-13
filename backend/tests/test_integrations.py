@@ -1,4 +1,6 @@
 """Внедряемость (чекпоинт 2, 13.11): описание API, событие найма, бот в Mattermost."""
+import urllib.parse
+
 import pytest
 
 from app import async_runner
@@ -113,6 +115,18 @@ def test_mattermost_drafts_need_confirmation_in_app(client, tokens, use_llm):
     assert "Черновик ждёт подтверждения в AI-buddy" in body["text"]
     actions = client.get("/actions", headers=as_user("intern-liza")).get_json()["actions"]
     assert actions and actions[0]["status"] == "pending"  # ничего не отправлено без подтверждения
+
+
+@pytest.mark.parametrize("body", [
+    "token=mm-token&user_name=liza.k&text=привет".encode("cp1251"),  # консоль Windows: curl -d "text=привет"
+    "token=mm-token&user_name=liza.k&text=" + urllib.parse.quote("привет", encoding="cp1251"),  # --data-urlencode
+    "token=mm-token&user_name=liza.k&text=" + urllib.parse.quote("привет"),  # как шлёт сам Mattermost (UTF-8)
+])
+def test_mattermost_form_in_windows_encoding(client, tokens, use_llm, body):
+    """Финальная проверка 13.11: пример из docs/INTEGRATION.md в консоли Windows давал «Неверный токен»."""
+    use_llm()
+    res = client.post("/integrations/mattermost", data=body, content_type="application/x-www-form-urlencoded")
+    assert res.status_code == 200 and res.get_json()["text"].startswith("Привет, Лиза!")
 
 
 def test_mattermost_rejects_wrong_token_and_unknown_user(client, tokens):

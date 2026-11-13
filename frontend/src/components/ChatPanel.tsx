@@ -75,7 +75,7 @@ export async function submitPractice(actor: DemoUser, text: string, onDone?: () 
     const result = await api.practice(actor.id, mode.itemId, text.trim());
     const item = await api.plan(actor.id).then((p) => p.items.find((i) => i.id === mode.itemId)).catch(() => undefined);
     if (result.passed) chat.setPractice(null);
-    const actions = result.passed && item ? itemActions(item, actor, ["practice", "explain", "do"]) : [];
+    const actions = result.passed && item ? itemActions(item, actor, ["practice", "explain", "do"], true) : [];
     chat.push({
       id: msgId(), role: "assistant", kind: "text", scripted: true, label: "проверка задания по документу пункта",
       content: (result.passed ? "✓ " : "") + result.text + (result.passed ? "" : "\n\nПопробуй ещё раз — напиши ответ следующим сообщением."),
