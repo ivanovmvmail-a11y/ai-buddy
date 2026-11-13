@@ -296,8 +296,11 @@ export default function Home() {
           <ReminderBell actor={actor} onOpen={openReminder} />
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-dashed border-black/20 px-2 py-1 text-xs dark:border-white/20">
-          <span className="text-black/45 dark:text-white/45">
-            Демо<span className="hidden sm:inline">-панель</span>
+          <span
+            className="text-black/45 dark:text-white/45"
+            title="В демо свой календарь: «сегодня» после «Сброс» — среда 11.11.2026, «Следующий день» сдвигает его. Даты отгула и напоминаний в ответах — по этому календарю."
+          >
+            Демо<span className="hidden sm:inline">-панель · календарь с 11.11</span>
             {scriptedMode && <span className="hidden sm:inline"> · сценарный режим (без ключа модели)</span>}
           </span>
           <button onClick={nextDay} className="rounded-md bg-black/5 px-2 py-1 hover:bg-black/10 dark:bg-white/10">Следующий день</button>

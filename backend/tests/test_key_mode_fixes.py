@@ -99,3 +99,26 @@ def test_waiting_question_answers_from_document_not_plan(demo_docs):
     reply = ask(demo_docs, "а что мне делать, пока жду доступ?")
     assert "Следующий шаг" not in reply["reply"] and "Доступ к пространству команды" in str(reply["sources"])
     assert "Следующий шаг" in ask(demo_docs, "что мне делать дальше?")["reply"]
+
+
+def test_named_resource_access_is_drafted_by_server_with_model(agent, use_llm, fresh_onboarding):
+    """Проверка 13.11 «глазами эксперта»: с ключом на «как получить доступ к джире» был текст модели, без ключа —
+    черновик. Теперь заявку с названным ресурсом готовит сервер в любом режиме; модель не вызывается."""
+    llm = use_llm(text_reply("Подай заявку в Jira, согласует наставник."))
+    result = run_agent(agent, "intern-anya", text="как получить доступ к джире")
+    assert [a.tool for a in result.actions] == ["create_access_request"]
+    assert result.actions[0].params["resource_id"] == "jira" and llm.calls == []
+
+
+def test_progress_question_is_answered_from_plan_with_model(agent, use_llm, fresh_onboarding):
+    llm = use_llm(text_reply("Ты на этапе доступов."))
+    reply = run_agent(agent, "intern-anya", text="скок я уже закрыла по плану").reply
+    assert "закрыто" in reply and llm.calls == []
+
+
+def test_access_draft_has_clean_justification_and_no_random_source(demo_docs):
+    """Проверка 13.11: обоснование было текстом вопроса, источник — «Учебный репозиторий» (не про доступы)."""
+    from .test_scenario_provider import ask
+    res = ask(demo_docs, "как получить доступ к джире")
+    assert res["actions"][0]["params"]["justification"] == "Для учебных задач стажировки: Учебный Jira"
+    assert "Учебный репозиторий — клонирование и ветки" not in [s["title"] for s in res["sources"]]

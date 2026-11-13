@@ -460,6 +460,26 @@ def test_mentor_foreign_plan_is_refused_before_model(client, use_llm):
 
 def test_two_actions_with_model_first_done_second_named(client, use_llm):
     seen = use_llm(text_reply("Черновик заявки готов, проверь и нажми «Подтвердить»."))
-    reply = ask(client, "оформи доступ в джиру и напомни завтра")["reply"]
-    assert seen.calls[-1][0][-1].content == "оформи доступ в джиру"  # модель видит только первую просьбу
+    # Ресурс не назван (с названным — черновик готовит сервер без модели, проверка 13.11): модель видит первую просьбу.
+    reply = ask(client, "оформи доступ к репозиторию команды и напомни завтра")["reply"]
+    assert seen.calls[-1][0][-1].content == "оформи доступ к репозиторию команды"
     assert "Про «напомни завтра»" in reply
+
+
+# --- Проверка 13.11 «глазами эксперта»: разговорные вопросы без ключа ------------------------------------------------
+
+@pytest.mark.parametrize("question", ["че мне щас делать то?", "чо делать щас", "что сейчас делать по плану?"])
+def test_colloquial_next_step(demo_docs, question):
+    assert "Следующий шаг" in ask(demo_docs, question)["reply"]
+
+
+@pytest.mark.parametrize("question", ["скок я уже закрыла по плану", "сколько я закрыла пунктов?",
+                                      "сколько уже сделано в плане"])
+def test_colloquial_progress_count(demo_docs, question):
+    reply = ask(demo_docs, question)["reply"]
+    assert "закрыто" in reply and "из" in reply
+
+
+@pytest.mark.parametrize("question", ["а можно работать удаленно?", "можно на удалёнке поработать?"])
+def test_colloquial_remote_work(demo_docs, question):
+    assert [s["title"] for s in ask(demo_docs, question)["sources"]] == ["Формат работы: офис и удалёнка"]

@@ -13,6 +13,7 @@ from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WO
                                        docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
                                        search_query, second_note, split_actions)
 from app.llm.scenario_provider import _overlap as _stem_overlap
+from app.llm.scenario_provider import _resource_named
 from app.llm.scenario_provider import _words as _stems
 from app.rag import retrieve
 
@@ -47,7 +48,7 @@ class AgentResult:
 _WORD = re.compile(r"[a-zа-яё0-9]{5,}")
 
 
-def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict]:
+def cited_sources(reply: str, docs: list[dict], question: str = "", short: bool = True) -> list[dict]:
     """Источники — только документы, на которые ответ действительно опирается.
 
     Поиск всегда возвращает top-k фрагментов, но ответ «следующий шаг по плану» или «в базе этого нет»
@@ -75,7 +76,8 @@ def cited_sources(reply: str, docs: list[dict], question: str = "") -> list[dict
         if score >= (6 if missing else 4) and score > scores.get(doc["title"], (0, doc))[0]:
             scores[doc["title"]] = (score, doc)
     if not scores:
-        return [] if missing else _short_answer_source(reply, docs, question)
+        # short=False — ответ про действие сервиса (черновик заявки): короткий текст не пересказывает документ.
+        return [] if missing or not short else _short_answer_source(reply, docs, question)
     # Проверка 13.11: с ключом под ответом стояло 5–7 документов — половина по общим словам («наставник», «задача»).
     # Оставляем самые близкие к ответу: не больше двух и не слабее половины лучшего.
     best = max(s for s, _ in scores.values())
@@ -165,6 +167,13 @@ class Agent:
         used: list[str] = []
         refused = False
         llm = get_llm()
+        # «Как получить доступ к джире?» с названным ресурсом — заявку готовит сервер, как без ключа: каталог → черновик
+        # (проверка 13.11 «глазами эксперта»: GigaChat вместо черновика писал «создай заявку в Jira, согласует
+        # наставник», а без ключа на тот же вопрос был черновик с автоматической выдачей — режимы противоречили).
+        low = first.lower()
+        if (user.role.value == "intern" and "доступ" in low and _resource_named(low)
+                and {"list_access_resources", "create_access_request"} <= available):
+            llm = ScenarioProvider()
 
         # «Что у Ани зависло?» от наставника: план стажёра загружаем сами (с проверкой прав) и кладём в контекст —
         # модель только пересказывает. Не «поддельным» вызовом инструмента: GigaChat требует свой functions_state_id.
@@ -207,8 +216,10 @@ class Agent:
                         text = f"{level_opening(*levelled)}\n\n{text}"
                 if second and "Вторую просьбу" not in text and f"«{second}»" not in text:
                     text += second_note(second)
-                return AgentResult(reply=text, sources=cited_sources(text, docs, question), actions=created,
-                                   tools=used, refused=refused)
+                sources = cited_sources(text, docs, question, short=not used)
+                if created:  # к черновику — только документ, названный в ответе (правило отгула), не похожий по словам
+                    sources = [s for s in sources if f"«{s['title']}»" in text]
+                return AgentResult(reply=text, sources=sources, actions=created, tools=used, refused=refused)
             messages.append(Message(role="assistant", content=reply.content, tool_calls=reply.tool_calls))
             for call in reply.tool_calls:
                 result = await self.executor.call(user, call)

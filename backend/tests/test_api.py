@@ -188,6 +188,16 @@ def test_chat_limits_and_empty_message(client):
     assert huge.status_code == 413 and huge.get_json() == {"detail": "Слишком большой запрос"}
 
 
+def test_long_conversation_is_trimmed_not_rejected(client):
+    """Проверка 13.11: после ~20 вопросов сайт слал 42+ сообщений, сервер отвечал 422 — чат «умирал»."""
+    turns = []
+    for i in range(30):
+        turns += [{"role": "user", "content": f"вопрос {i}"}, {"role": "assistant", "content": f"ответ {i}"}]
+    turns.append({"role": "user", "content": "что мне делать дальше?"})
+    res = client.post(CHAT, json={"messages": turns}, headers=as_user("intern-anya"))
+    assert res.status_code == 200 and res.get_json()["reply"]
+
+
 def test_broken_json_and_unknown_routes_answer_json(client):
     anya = as_user("intern-anya")
     broken = client.post(CHAT, data="{not json", headers=anya | {"Content-Type": "application/json"})
