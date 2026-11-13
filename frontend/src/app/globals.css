@@ -48,6 +48,16 @@
   }
 }
 
+/* Полосы прокрутки (Миша, 13.11: белая полоса в тёмной теме бросалась в глаза): браузер знает тему страницы,
+   полоса тонкая и в цвет интерфейса, без собственного фона. */
+:root {
+  color-scheme: light dark;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(127 127 127 / 0.35) transparent;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
