@@ -95,6 +95,26 @@ describe("экран «план + чат» на API", () => {
     expect(srv.calls.some((c) => c.path.endsWith("/confirm"))).toBe(false);
   });
 
+  it("«Сделать за меня» у двух пунктов подряд — каждый ответ под своим вопросом (Railway, 14.11)", async () => {
+    open();
+    const w1 = await week1();
+    const btns = within(w1).getAllByRole("button", { name: "Сделать за меня" });
+    // Первый (простой доступ) отвечает дольше: выдаёт доступ, обновляет план. Второй — черновик, сразу.
+    await act(async () => {
+      fireEvent.click(btns[0]);
+      fireEvent.click(btns[btns.length - 1]);
+    });
+    await screen.findByText(/на чтение выдан/);
+    await screen.findByText(/Заявка на доступ · черновик/);
+    const feed = useChat.getState().messages.filter((m) => m.topic === "requests").map((m) => m.kind === "draft" ? "черновик" : m.content);
+    expect(feed[0]).toMatch(/^Сделай за меня: Запросить базовые доступы/);
+    expect(feed[1]).toMatch(/на чтение выдан/);
+    expect(feed[2]).toMatch(/^Сделай за меня: /);
+    expect(feed[2]).not.toBe(feed[0]);
+    expect(feed[3]).toBe("черновик");
+    expect(feed.some((c) => c === "Оформляю заявку…")).toBe(false);
+  });
+
   it("повторная заявка — понятная ошибка", async () => {
     srv.state.requests.push({ ...srv.state.requests[0], id: "REQ-9", intern_id: "intern-anya", resource_id: "base-access" });
     open();
