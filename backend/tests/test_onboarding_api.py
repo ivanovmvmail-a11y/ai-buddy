@@ -187,6 +187,21 @@ def test_skill_level_validation(client):
     assert res.status_code == 422
 
 
+def test_demo_calendar_one_date_for_everyone_moves_only_by_button(client):
+    """Миша 14.11: «день скачет». Дата одна на всех; у стажёров разный номер дня, потому что они вышли в разные даты."""
+    cal = get(client, "/demo/calendar", "mentor-petr").get_json()
+    assert cal["today"] == "2026-11-11"
+    days = {i["id"]: (i["day"], i["start_date"]) for i in cal["interns"]}
+    assert days["intern-anya"] == (2, "2026-11-10") and days["intern-ivan"] == (8, "2026-11-04")
+    assert get(client, "/demo/calendar", "intern-anya").get_json() == cal  # просмотр и вход другим не двигают день
+    post(client, "/demo/next-day", {}, "intern-kirill")
+    after = get(client, "/demo/calendar", "intern-anya").get_json()
+    assert after["today"] == "2026-11-12"
+    assert {i["id"]: i["day"] for i in after["interns"]}["intern-anya"] == 3
+    assert {i["id"]: i["start_date"] for i in after["interns"]} == {i["id"]: i["start_date"] for i in cal["interns"]}
+    assert client.get("/demo/calendar").status_code == 401
+
+
 def test_next_day_creates_reminders_then_snooze_and_done(client):
     days = post(client, "/demo/next-day", {}, "intern-ivan").get_json()["days"]
     assert days["intern-ivan"] >= 2

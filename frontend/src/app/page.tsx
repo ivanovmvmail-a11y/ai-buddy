@@ -6,7 +6,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
 import { HomePanel } from "@/components/HomePanel";
 import { ProfilePanel } from "@/components/ProfilePanel";
-import { SECTIONS, Sidebar, type Section } from "@/components/Sidebar";
+import { SECTIONS, Sidebar, demoDate, type Section } from "@/components/Sidebar";
 import { ReminderBell } from "@/components/ReminderBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
@@ -338,7 +338,9 @@ export default function Home() {
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
       if (plan) await showWeekly(actor, plan.current_day);
       const shown = await showReminders(actor, plan);
-      if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, topic: "assistant", content: "Новый день. Зависших пунктов нет." });
+      const today = (await api.calendar(actor.id).catch(() => null))?.today;
+      const when = today ? `Новый день в демо: ${demoDate(today)} — у всех стажёров сразу.` : "Новый день.";
+      if (!shown) say({ id: msgId(), role: "assistant", kind: "text", scripted: true, topic: "assistant", content: `${when} Зависших пунктов нет.` });
     } catch (err) {
       setDemoError((err as Error).message);
     }

@@ -21,6 +21,7 @@ export const keys = {
   absenceFacts: (u: string, intern: string) => ["absence-facts", u, intern] as const,
   document: (u: string, title: string) => ["document", u, title] as const,
   mentorQuestions: (u: string) => ["mentor-questions", u] as const,
+  calendar: ["calendar"] as const,
 };
 
 /** Документ из «Источник»: грузится только когда окно открыто; текст не меняется — кэш на 10 минут. */
@@ -43,6 +44,10 @@ export const useInterns = (actor: DemoUser) =>
     queryFn: async () => (await api.interns(actor.id)).interns,
     enabled: PLAN_ROLES.has(actor.role),
   });
+
+/** Демо-календарь: дата меняется только кнопками «Следующий день» и «Сброс» (они обновляют кэш). */
+export const useCalendar = (actor: DemoUser) =>
+  useQuery({ queryKey: keys.calendar, queryFn: () => api.calendar(actor.id), staleTime: Infinity });
 
 export const usePlan = (actor: DemoUser, internId: string | undefined) =>
   useQuery({
@@ -164,7 +169,7 @@ export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts", "catalog", "mentor-questions"].map((k) =>
+      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts", "catalog", "mentor-questions", "calendar"].map((k) =>
         client.invalidateQueries({ queryKey: [k] }),
       ),
     );

@@ -179,6 +179,12 @@ export const RequestsResponse = z.object({ requests: z.array(AccessRequest) });
 export const ResourcesResponse = z.object({ resources: z.array(AccessResource) });
 export const RemindersResponse = z.object({ reminders: z.array(Reminder) });
 export const DaysResponse = z.object({ days: z.record(z.string(), z.number()) });
+// Демо-календарь (14.11, Миша: «день скачет»): одна дата на всех, у стажёра — свой номер дня и дата выхода.
+export const DemoCalendar = z.object({
+  today: z.string().nullable(),
+  interns: z.array(z.object({ id: z.string(), day: z.number(), start_date: z.string() })),
+});
+export type DemoCalendar = z.infer<typeof DemoCalendar>;
 export const ResetResponse = z.object({ status: z.string() });
 
 // GET /plan/summary — «Итоги недели» (SPEC 3.2): только факты из событий, без оценок.

@@ -384,6 +384,12 @@ export function installFakeServer(): FakeServer {
     if (p.startsWith("/demo/") && srv.demoKey && decodeURIComponent(demoKey ?? "") !== srv.demoKey) {
       return err(403, "Нужно код-слово демо");
     }
+    if (p === "/demo/calendar") {
+      // Как на сервере: одна дата на всех (после «Сброс» — 11.11), у стажёра — свой номер дня и дата выхода.
+      const iso = (base: number) => new Date(Date.UTC(2026, 10, base)).toISOString().slice(0, 10);
+      const today = 11 + (s.days["intern-anya"] - 2);
+      return ok({ today: iso(today), interns: Object.entries(s.days).map(([id, day]) => ({ id, day, start_date: iso(today - day + 1) })) });
+    }
     if (p === "/demo/next-day") {
       for (const k of Object.keys(s.days)) s.days[k] += 1;
       return ok({ days: s.days });

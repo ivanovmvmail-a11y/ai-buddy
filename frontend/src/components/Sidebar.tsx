@@ -2,7 +2,7 @@
 
 // Левая колонка (редизайн 13.11, по мотивам онбординга Т-Банка; светлая, как career.avito.com: тёмная давала слишком резкий контраст): навигация — карточка профиля с прогрессом,
 // разделы, внизу — демо-панель («Войти как», «Следующий день», «Сброс»), чтобы она не мешала самому продукту.
-import { usePlan } from "@/lib/queries";
+import { useCalendar, usePlan } from "@/lib/queries";
 import { DEMO_USERS, ROLE_TITLES } from "@/lib/users";
 import type { DemoUser } from "@/lib/types";
 
@@ -22,6 +22,15 @@ type Props = {
   scriptedMode: boolean;
   demoError: string | null;
 };
+
+const WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+
+/** «2026-11-11» → «ср, 11.11» (без сдвига часового пояса: дата демо-календаря, не время). */
+export function demoDate(iso: string, weekday = true): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const short = `${String(d).padStart(2, "0")}.${String(m).padStart(2, "0")}`;
+  return weekday ? `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${short}` : short;
+}
 
 export function initials(name: string) {
   return name.split(" ").map((p) => p[0]).join("").slice(0, 2);
@@ -52,6 +61,8 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
   const work = plan.data?.items.filter((i) => i.stage === "week1" || i.stage === "week2") ?? [];
   const done = work.filter((i) => i.status === "done").length;
   const sections: Section[] = intern ? ["home", "plan", "profile"] : ["plan"];
+  const calendar = useCalendar(actor).data;
+  const mine = calendar?.interns.find((i) => i.id === actor.id);
 
   return (
     <aside aria-label="Навигация" className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain border-r border-line bg-sidebar p-4 text-foreground">
@@ -73,7 +84,10 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
           <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white/90 p-2.5">
             <ProgressRing done={done} total={work.length} size={48} />
             <div className="text-sm leading-tight">
-              <div className="font-semibold">День {plan.data.current_day}</div>
+              <div className="font-semibold">
+                День {plan.data.current_day}
+                {mine && <span className="font-normal text-black/60"> · с {demoDate(mine.start_date, false)}</span>}
+              </div>
               <div className="text-black/60">закрыто {done} из {work.length} · недели 1–2</div>
             </div>
           </div>
@@ -97,12 +111,14 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
 
       {/* Демо-панель: инструмент показа, не часть продукта — внизу и приглушённо. */}
       <section aria-label="Демо-панель" className="mt-auto space-y-2 rounded-2xl border border-dashed border-line p-3 text-sm">
-        <div
-          className="text-xs text-[var(--muted)]"
-          title="В демо свой календарь: «сегодня» после «Сброс» — среда 11.11.2026, «Следующий день» сдвигает его."
-        >
-          Демо-панель · календарь с 11.11{scriptedMode && " · сценарный режим (без ключа модели)"}
+        <div className="text-xs text-[var(--muted)]">
+          Демо-панель{scriptedMode && " · сценарный режим (без ключа модели)"}
         </div>
+        {/* Миша 14.11: «день скачет». Дата одна на всех и меняется только кнопкой; номер дня у стажёров разный —
+            они вышли в разные даты, поэтому при «Войти как» он меняется, а дата — нет. */}
+        <p className="text-sm" title="День меняется только кнопкой «Следующий день» — сразу у всех стажёров. «Сброс» возвращает среду 11.11.">
+          Сегодня в демо: <b>{calendar?.today ? demoDate(calendar.today) : "…"}</b>
+        </p>
         <label className="block">
           <span className="text-xs text-[var(--muted)]">Войти как</span>
           <select
