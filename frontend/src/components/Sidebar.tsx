@@ -23,7 +23,11 @@ type Props = {
   demoError: string | null;
 };
 
-const WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+const GROUPS = [
+  ["intern", "Стажёры"], ["mentor", "Наставники"], ["lead", "Руководители"], ["curator", "Куратор"], ["hrbp", "HR BP"],
+] as const;
+
+const WEEKDAYS =["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 
 /** «2026-11-11» → «ср, 11.11» (без сдвига часового пояса: дата демо-календаря, не время). */
 export function demoDate(iso: string, weekday = true): string {
@@ -77,7 +81,9 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-white text-sm font-bold">{initials(actor.name)}</span>
           <div className="min-w-0">
             <div className="truncate font-semibold leading-tight">{actor.name}</div>
-            <div className="truncate text-sm text-black/70">{ROLE_TITLES[actor.role]} · {actor.team}</div>
+            {/* Роль и команда — двумя строками: в одну «стажёр · Платформа об…» обрезалось (финальная проверка 13.11). */}
+            <div className="text-sm leading-snug text-black/70">{ROLE_TITLES[actor.role]}</div>
+            <div className="text-sm leading-snug text-black/70">{actor.team}</div>
           </div>
         </div>
         {intern && plan.data && (
@@ -126,8 +132,13 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
             onChange={(e) => onUser(e.target.value)}
             className="mt-1 block w-full rounded-lg border border-line bg-surface px-2 py-1.5"
           >
-            {DEMO_USERS.map((u) => (
-              <option key={u.id} value={u.id}>{u.name} — {ROLE_TITLES[u.role]}</option>
+            {/* Роль — заголовком группы, в строке только имя: «Ольга Новикова — руков…» обрезалось. */}
+            {GROUPS.map(([role, title]) => (
+              <optgroup key={role} label={title}>
+                {DEMO_USERS.filter((u) => u.role === role).map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>

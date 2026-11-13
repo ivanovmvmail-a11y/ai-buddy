@@ -94,10 +94,11 @@ export function itemActions(item: PlanItem, actor: DemoUser, skip: ItemActionKin
   const out: BotAction[] = [];
   if (canRequestAccess(actor, item)) out.push({ label: "Сделать за меня", kind: "do", ...base });
   if (item.practice_check) out.push({ label: "Сдать задание", kind: "practice", ...base });
-  out.push({ label: "Объяснить", kind: "explain", ...base });
   // У практикума «Готово» — только после сданного задания (кнопка под ответом проверки), как в плане
-  // (финальная проверка 13.11: из чата пункт закрывался без сдачи).
+  // (финальная проверка 13.11: из чата пункт закрывался без сдачи). Порядок — как главная кнопка на «Главной»:
+  // сделать → сдать → готово → объяснить (проверка: у Ивана на «Главной» главной была «Готово», в чате — «Объяснить»).
   if (canMarkDone(actor, item) && (!item.practice_check || passed)) out.push({ label: "Готово", kind: "done", ...base });
+  out.push({ label: "Объяснить", kind: "explain", ...base });
   return out.filter((a) => !skip.includes(a.kind as ItemActionKind));
 }
 
@@ -158,6 +159,8 @@ export function weeklySummaryMsg(s: WeeklySummary, titles: Record<string, string
     "Эту же сводку видит наставник — удобно обсудить на встрече 1:1.",
   ];
   const next = s.carry_over.find((c) => c.owner_role === "intern" && c.status !== "waiting");
+  // Кнопка без подписи была непонятна: к какому пункту «Объяснить»? (финальная проверка 13.11)
+  if (next) lines.push(`Начать предлагаю с «${next.title}».`);
   return scripted(lines.join("\n"), { actions: next ? [actionFor(next)] : undefined, topic: "assistant" });
 }
 
@@ -258,7 +261,12 @@ export function approverText(resource: AccessResource | undefined, actor: DemoUs
 }
 
 /** Восстановленная переписка (сервер вкладку не хранит): раскладываем по словам сообщения. */
-export function guessTopic(content: string): Topic {
+export function guessTopic(content: string, question?: string): Topic {
+  // Сначала — по вопросу: кнопки-уточнения пункта («Как это сделать по шагам?», «К кому идти, если не получается?»)
+  // — это «Учёба», хотя в ответе есть слово «заявка» (финальная проверка 13.11: после F5 они разъезжались).
+  const q = (question ?? "").toLowerCase();
+  if (/^объясни пункт|^как это сделать по шагам|^к кому идти, если|^сдать задание|^хочу сдать|практикум|песочниц/.test(q)) return "study";
+  if (/заявк|отгул|отпрос|напомни|доступ к|дай доступ|нужен доступ|к врачу/.test(q)) return "requests";
   const c = content.toLowerCase();
   if (/заявк|отгул|заявлени|доступ к «|напомни/.test(c)) return "requests";
   if (/^объясни пункт|^сдать задание|задание|практикум|по шагам|по разделу/.test(c)) return "study";

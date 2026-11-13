@@ -174,7 +174,8 @@ def _doc_part(view: View) -> str:
     heading, paragraphs = _best_section(doc, f"{item.title} {item.summary} {item.practice or ''}")
     sentences = _sentences(paragraphs)
     if not view.is_intern:  # уровень — подсказка глубины для самого стажёра, другим — раздел целиком
-        return f"Из раздела «{heading}»:\n" + "\n".join(paragraphs)
+        # Документ написан для стажёра («твой наставник согласует») — говорим, чей это текст (финальная проверка 13.11).
+        return f"Что стажёр прочитает в документе, раздел «{heading}»:\n" + "\n".join(paragraphs)
     if level == "confident" and sentences:
         return f"Эту тему ты знаешь уверенно, поэтому коротко. Главное из раздела «{heading}»: {sentences[0]}"
     if level == "familiar":
