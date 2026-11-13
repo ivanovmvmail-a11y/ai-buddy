@@ -56,6 +56,7 @@ export async function askBot(actor: DemoUser, text: string) {
     chat.push({
       id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources, topic: where,
       answerId: res.answer_id ?? undefined, actions: actions.length ? actions : undefined, draft: first,
+      server: res.scripted || undefined,
     });
     for (const action of more) {
       chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action, topic: where });
@@ -288,7 +289,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
         {/* Подпись — откуда ответ (проверка 13.11: с ключом приветствие было «сценарным», а у ответов модели подписи не было). */}
         {m.kind === "text" && (m.scripted || m.answerId) && (
           <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/60 dark:text-white/60">
-            {m.scripted ? (m.label ?? "из данных плана") : "ответ ИИ · сверяй с источником"}
+            {m.scripted || m.server ? (m.label ?? "из данных плана") : "ответ ИИ · сверяй с источником"}
           </div>
         )}
       </div>

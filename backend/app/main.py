@@ -51,6 +51,8 @@ class ChatResponse(BaseModel):
     item_id: str | None = None  # пункт плана, о котором ответ (кнопки пункта в чате)
     mode: str | None = None  # "practice": следующее сообщение — ответ на задание
     topic: str = "assistant"  # вкладка чата: assistant | study | requests
+    # Ответ собрал сервер из данных и документов, без модели (14.11: сводка плана была подписана «ответ ИИ»).
+    scripted: bool = False
 
 
 def _action_json(action: Action) -> dict:
@@ -151,7 +153,7 @@ def create_app() -> Flask:
         try:
             async_runner.run(chat_history.record_turn(
                 g.user.id, question, result.reply, sources=result.sources, answer_id=answer_id,
-                scripted=settings.llm_provider in SCRIPTED_PROVIDERS))
+                scripted=not result.by_model))
         except Exception:  # история — удобство, ответ важнее
             log.exception("chat history not saved user=%s", g.user.id)
         return ChatResponse(
@@ -162,6 +164,7 @@ def create_app() -> Flask:
             item_id=result.item_id,
             mode=result.mode,
             topic=result.chat_topic(question),
+            scripted=not result.by_model,
         ).model_dump(mode="json")
 
     @app.get("/chat/history")

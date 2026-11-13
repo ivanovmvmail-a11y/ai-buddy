@@ -123,7 +123,7 @@ export default function Home() {
       const question = m.role === "user" ? m : past[i - 1]?.role === "user" ? past[i - 1] : undefined;
       const topic: Topic = guessTopic(answer?.content ?? m.content, question?.content);
       say({
-        id: msgId(), role: m.role, kind: "text", content: m.content, scripted: m.scripted || undefined, topic,
+        id: msgId(), role: m.role, kind: "text", content: m.content, server: m.scripted || undefined, topic,
         sources: m.sources.length ? m.sources : undefined, answerId: m.answer_id ?? undefined,
       });
     }

@@ -159,6 +159,7 @@ export const ChatResponse = z.object({
   item_id: z.string().nullable().optional(),
   mode: z.enum(["practice"]).nullable().optional(),
   topic: z.enum(["assistant", "study", "requests"]).default("assistant"), // вкладка чата
+  scripted: z.boolean().default(false), // 14.11: ответ собрал сервер, без модели — подпись «из данных плана»
 });
 export type ChatResponse = z.infer<typeof ChatResponse>;
 

@@ -81,7 +81,11 @@ def colloquial(q: str) -> str:
 def asks_next(q: str) -> bool:
     """Вопрос о следующем шаге по плану; «что делать, пока жду…» — не он."""
     q = colloquial(q)
-    return any(w in q for w in NEXT_WORDS) and not any(w in q for w in WAITING_WORDS)
+    if not any(w in q for w in NEXT_WORDS) or any(w in q for w in WAITING_WORDS):
+        return False
+    # «Что мне делать по git?» — вопрос о теме, а не о следующем шаге плана (Миша 14.11: бот отвечал сводкой плана).
+    from app.agent.levels import topic_of  # levels импортирует этот модуль — импорт здесь, без цикла
+    return topic_of(q) is None
 
 
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
