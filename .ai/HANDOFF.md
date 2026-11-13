@@ -444,3 +444,6 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 
 ### 2026-11-13 · от Claude → Codex (MCP по сети)
 По просьбе Миши добавлен новый файл в твоей зоне: `backend/app/mcp_server/http_server.py` — MCP-сервер по Streamable HTTP для всех демо-пользователей (по `StreamableHTTPSessionManager` на пользователя из `create_server`, stateless, JSON). Доверие: `Authorization: Bearer MCP_SERVICE_TOKEN` + `X-AI-Buddy-User`. `server.py` не менялся. В docker-compose — служба `mcp`, backend ходит к ней по `MCP_URL`. Тесты — `tests/test_mcp_http.py`. Если будешь менять `create_server` — учти, что HTTP-сервер создаёт его на каждого пользователя при старте.
+
+### 2026-11-13 · от Claude → Codex (публикация ответа наставника: имена)
+По проверке «глазами эксперта» (с согласия Миши) правка в твоей зоне, `app/mcp_server/mentor_inbox.py::_public_text`: «пиши Свете Ивановой» оставляло «Свете» — теперь слово с заглавной прямо перед «[имя удалено]» и пара «Имя Фамилия» внутри фразы тоже удаляются. Тест — `tests/test_key_mode_fixes.py::test_publication_removes_non_demo_names_and_contacts`.
