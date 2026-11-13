@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Журнал сервера: DEBUG | INFO | WARNING. INFO — видно права, черновики и вызовы инструментов (без текстов вопросов).
     log_level: str = "INFO"
 
+    # Как агент чата ходит к корпоративным сервисам (app/agent/services.py):
+    #   direct — вызовом функций в том же процессе (по умолчанию: тесты и запуск без MCP SDK);
+    #   mcp    — MCP-клиентом по протоколу MCP к серверу app/mcp_server (в Docker включено, docker-compose.yml).
+    agent_services: str = "direct"
+
     # Код-слово для демо-кнопок «Сброс» и «Следующий день» (заголовок X-Demo-Key).
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.
     demo_key: str = ""

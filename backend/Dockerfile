@@ -12,14 +12,17 @@ WORKDIR /app
 
 # Сначала только зависимости — этот слой кешируется, пока не меняется uv.lock
 COPY pyproject.toml uv.lock .python-version ./
-RUN uv sync --frozen --no-dev --no-install-project
+# --extra mcp: официальный MCP SDK — агент чата ходит к сервисам по протоколу MCP (AGENT_SERVICES=mcp ниже)
+RUN uv sync --frozen --no-dev --no-install-project --extra mcp
 
 COPY certs ./certs
 COPY app ./app
 
 ENV PATH="/app/.venv/bin:$PATH" \
     # без backend/.env — сценарный режим (спека 003): весь маршрут демо без ключей
-    LLM_PROVIDER=scenario
+    LLM_PROVIDER=scenario \
+    # агент → сервисы через MCP-клиент (app/agent/services.py); direct — прямой вызов в процессе
+    AGENT_SERVICES=mcp
 
 RUN useradd --create-home --uid 10001 buddy
 USER buddy

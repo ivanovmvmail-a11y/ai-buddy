@@ -92,3 +92,10 @@ def test_at_most_two_closest_sources():
     ]
     titles = [s["title"] for s in cited_sources(reply, docs)]
     assert titles[0] == "Пайплайн" and len(titles) <= 2 and "Слабый" not in titles
+
+
+def test_waiting_question_answers_from_document_not_plan(demo_docs):
+    from .test_scenario_provider import ask
+    reply = ask(demo_docs, "а что мне делать, пока жду доступ?")
+    assert "Следующий шаг" not in reply["reply"] and "Доступ к пространству команды" in str(reply["sources"])
+    assert "Следующий шаг" in ask(demo_docs, "что мне делать дальше?")["reply"]

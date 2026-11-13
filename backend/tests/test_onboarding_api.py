@@ -295,7 +295,7 @@ def test_plan_context_mentions_waiting_and_skips_on_error(fresh_onboarding, monk
 
     async def broken(*a, **k):
         raise Conflict()
-    monkeypatch.setattr(onboarding_tools.checklist, "get_plan", broken)
+    monkeypatch.setattr(onboarding_tools.services, "get_plan", broken)
     assert async_runner.run(onboarding_tools.plan_context(DEMO_USERS["intern-anya"])) == ""
 
 

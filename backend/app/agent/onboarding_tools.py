@@ -1,7 +1,7 @@
 """Инструменты агента для сценария «Первые недели и чек-лист» (спека 101, задача T4).
 
 Логика и права — в имитациях сервисов `app.mcp_server` (зона Codex): функции сами проверяют, кто
-что может. Здесь — только описание инструментов для модели и короткие ответы без лишних полей.
+что может. Ходим к ним через шлюз `services.py`: напрямую или по протоколу MCP (`AGENT_SERVICES=mcp`). Здесь — только описание инструментов для модели и короткие ответы без лишних полей.
 Права `ROLE_PERMISSIONS` решают, какие инструменты вообще показать модели; точную проверку
 (свой стажёр, свой пункт) делает сервис.
 
@@ -14,16 +14,17 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-from app.mcp_server import absence, access, checklist, clock, hiring
+from app.mcp_server import absence, clock
 from app.mcp_server.absence_models import REASONS
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
 from app.mcp_server.models import PlanItem
 from app.mcp_server.seed import load_seed
 
+from . import services
 from .tools import FORBIDDEN_MESSAGE, Tool, ToolRegistry
 from .users import DEMO_USERS, Role, User, can_view_intern
 
-DOMAIN_ERRORS = (NotFound, Forbidden, Conflict, ValidationError)
+DOMAIN_ERRORS = (NotFound, Forbidden, Conflict, ValidationError, services.InvalidArguments)
 
 
 def domain_error(exc: Exception) -> dict[str, Any]:
@@ -68,7 +69,7 @@ class PlanArgs(BaseModel):
 
 async def get_plan(user: User, args: PlanArgs) -> dict:
     async def run():
-        plan = await checklist.get_plan(user, _target(user, args.intern_id))
+        plan = await services.get_plan(user, _target(user, args.intern_id))
         return {
             "intern_id": plan.intern_id,
             "current_day": plan.current_day,
@@ -90,7 +91,7 @@ class StatusArgs(BaseModel):
 
 async def set_plan_item_status(user: User, args: StatusArgs) -> dict:
     async def run():
-        item = await checklist.set_item_status(user, args.item_id, args.status, args.reason)
+        item = await services.set_item_status(user, args.item_id, args.status, args.reason)
         return {"status": "updated", "item": _item_brief(item)}
     return await _safe(run())
 
@@ -103,7 +104,7 @@ class NoArgs(BaseModel):
 
 async def list_access_resources(user: User, args: NoArgs) -> dict:
     async def run():
-        return {"resources": [r.model_dump(mode="json") for r in await access.list_resources(user)]}
+        return {"resources": [r.model_dump(mode="json") for r in await services.list_resources(user)]}
     return await _safe(run())
 
 
@@ -120,14 +121,14 @@ LEVEL_TITLES = {"read": "чтение", "edit": "редактирование", 
 async def resource_visible(user: User, args: RequestArgs) -> bool:
     """Ресурс есть в списке, доступном стажёру (своя команда или общий). Чужой — как несуществующий."""
     try:
-        return any(r.id == args.resource_id for r in await access.list_resources(user))
+        return any(r.id == args.resource_id for r in await services.list_resources(user))
     except DOMAIN_ERRORS:
         return False
 
 
 async def create_access_request(user: User, args: RequestArgs) -> dict:
     async def run():
-        req = await access.create_request(user, args.resource_id, args.level, args.justification)
+        req = await services.create_request(user, args.resource_id, args.level, args.justification)
         return {"status": "created", "request": req.model_dump(mode="json")}
     return await _safe(run())
 
@@ -138,7 +139,7 @@ class RequestsArgs(BaseModel):
 
 async def list_access_requests(user: User, args: RequestsArgs) -> dict:
     async def run():
-        reqs = await access.list_requests(user, args.intern_id)
+        reqs = await services.list_requests(user, args.intern_id)
         return {"requests": [r.model_dump(mode="json") for r in reqs]}
     return await _safe(run())
 
@@ -151,7 +152,7 @@ class DecideArgs(BaseModel):
 
 async def decide_access_request(user: User, args: DecideArgs) -> dict:
     async def run():
-        req = await access.decide_request(user, args.request_id, args.approve, args.reason)
+        req = await services.decide_request(user, args.request_id, args.approve, args.reason)
         return {"status": "decided", "request": req.model_dump(mode="json")}
     return await _safe(run())
 
@@ -160,7 +161,7 @@ async def decide_access_request(user: User, args: DecideArgs) -> dict:
 
 async def get_skill_profile(user: User, args: PlanArgs) -> dict:
     async def run():
-        profile = await hiring.get_skill_profile(user, _target(user, args.intern_id))
+        profile = await services.get_skill_profile(user, _target(user, args.intern_id))
         return profile.model_dump(mode="json", exclude={"updated_by", "updated_at"})
     return await _safe(run())
 
@@ -208,7 +209,7 @@ async def create_absence_request(user: User, args: AbsenceArgs) -> dict:
 
 async def list_absence_requests(user: User, args: NoArgs) -> dict:
     async def run():
-        return {"requests": [r.model_dump(mode="json") for r in await absence.list_requests(user.id)]}
+        return {"requests": [r.model_dump(mode="json") for r in await services.list_absence_requests(user)]}
     return await _safe(run())
 
 
@@ -308,8 +309,8 @@ async def plan_context(user: User) -> str:
     if user.role != Role.INTERN:
         return ""
     try:
-        plan = await checklist.get_plan(user, user.id)
-        profile = await hiring.get_skill_profile(user, user.id)
+        plan = await services.get_plan(user, user.id)
+        profile = await services.get_skill_profile(user, user.id)
     except DOMAIN_ERRORS:
         return ""
     lines = [f"\n\nПлан стажёра: день {plan.current_day}."]

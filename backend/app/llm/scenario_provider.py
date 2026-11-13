@@ -53,6 +53,18 @@ MONTHS = ("январ", "феврал", "март", "апрел", "ма", "ию�
 NEXT_WORDS = ("дальше", "следующ", "что мне делать", "кого жд", "кого я жд", "мой план", "что у меня", "с чего начать",
               "ничего не понима", "что делать сейчас", "за что браться", "сколько мне осталось", "до конца недел", "сколько пунктов",
               "what should i do", "what to do", "next step", "what's next", "whats next")
+# «Что делать, пока жду доступ?» — вопрос к документу («Пока доступ на согласовании»), а не «следующий шаг» по плану
+# (проверка 13.11: «что мне делать» уводило в сводку плана).
+WAITING_WORDS = ("пока жд", "пока я жд", "пока не выдал", "пока нет доступ", "пока нет ноутбук", "пока доступ",
+                 "пока заявк", "пока согласу")
+
+
+def asks_next(q: str) -> bool:
+    """Вопрос о следующем шаге по плану; «что делать, пока жду…» — не он."""
+    q = q.lower()
+    return any(w in q for w in NEXT_WORDS) and not any(w in q for w in WAITING_WORDS)
+
+
 ACCESS_VERBS = ("оформ", "запрос", "получ", "дай", "нужен", "нужн", "сделай", "подай", "закажи", "выдай", "открой")
 REQUEST_WORDS = ("мои", "статус", "какие", "ждут", "список", "покажи")
 GREETINGS = ("привет", "здравствуй", "добрый день", "хай", "hello")
@@ -324,7 +336,7 @@ def docs_guard(question: str, system: str, reply: str) -> str | None:
     q = question.lower().strip()
     if THANKS.fullmatch(q) or any(q.startswith(g) for g in GREETINGS):
         return None
-    if any(w in q for w in (*NEXT_WORDS, *STUCK_WORDS, *LEVEL_WORDS, *ORG_WORDS, *ABSENCE_WORDS, *_NOT_DOC_QUESTION)):
+    if asks_next(q) or any(w in q for w in (*STUCK_WORDS, *LEVEL_WORDS, *ORG_WORDS, *ABSENCE_WORDS, *_NOT_DOC_QUESTION)):
         return None
     best, wanted, need = _best_unit(question, system)
     if len(wanted) < 2:
@@ -709,7 +721,7 @@ class ScenarioProvider:
                 return call("get_plan", {"intern_id": someone})
             if other:
                 return LLMReply(content="У тебя нет доступа к планам стажёров — подробности не раскрываю.")
-        if any(w in q for w in NEXT_WORDS) and "get_plan" in available:
+        if asks_next(q) and "get_plan" in available:
             return call("get_plan")
         # «доступ в Redash» без глагола — тоже заявка: ресурс назван прямо (каталог #90).
         if ("доступ" in q and (any(v in q for v in ACCESS_VERBS) or _resource_named(q))

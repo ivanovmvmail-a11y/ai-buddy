@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.llm import Message, get_llm
 from app.llm.base import ToolCall
-from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WORDS, HR_ONLY, NEXT_WORDS, RANKING_WORDS,
+from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WORDS, HR_ONLY, RANKING_WORDS, asks_next,
                                        REQUEST_WORDS, hr_reply, is_hr_question, says_not_found,
                                        ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule, is_reminder_request, reminder_plan,
                                        docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
@@ -247,7 +247,7 @@ class Agent:
         # Ивана «подала Мария», и вместо следующего шага советовал «обратиться к ответственному за среду»).
         data_call: str | None = None
         if role == "intern" and "get_plan" in available and not _names_someone(q) and (
-                any(w in q for w in NEXT_WORDS) or any(w in q for w in EMOTION_WORDS)):
+                asks_next(q) or any(w in q for w in EMOTION_WORDS)):
             data_call = "get_plan"
         elif role == "lead" and "заявк" in q and "list_absence_requests" in available:
             data_call = "list_absence_requests"
