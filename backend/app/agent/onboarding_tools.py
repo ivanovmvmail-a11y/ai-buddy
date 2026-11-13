@@ -85,6 +85,7 @@ class StatusArgs(BaseModel):
     item_id: str = Field(description="id пункта плана, например anya.w1.notes")
     status: Literal["in_progress", "done"] = Field(description="новый статус")
     reason: str | None = Field(default=None, max_length=300, description="причина — обязательна, если наставник возвращает пункт")
+    title: str | None = Field(default=None, max_length=200, description="название пункта — для карточки черновика")
 
 
 async def set_plan_item_status(user: User, args: StatusArgs) -> dict:
@@ -222,7 +223,8 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
         description=("Отметить пункт плана: done — сделано, in_progress — вернуть в работу (наставник, с причиной). "
                      "Пункты с доступами закрываются только заявкой. Выполняется после подтверждения."),
         args_model=StatusArgs, permission="plan:write", handler=set_plan_item_status, kind="write",
-        describe=lambda a: f"Пункт плана {a.item_id}: {'сделано' if a.status == 'done' else 'вернуть в работу'}",
+        describe=lambda a: (f"{'Отметить сделанным' if a.status == 'done' else 'Вернуть в работу'}: "
+                            f"«{a.title or a.item_id}»"),
     ))
     registry.register(Tool(
         name="list_access_resources",

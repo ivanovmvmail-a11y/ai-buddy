@@ -92,7 +92,7 @@ def make_draft(client, use_llm, user="intern-anya"):
         tool_reply("create_reminder", {"text": "Запросить доступ к GitLab", "remind_on": "2026-11-20"}),
         text_reply("Черновик готов, подтверди его."),
     )
-    res = ask(client, "напомни запросить доступ", user=user)
+    res = ask(client, "запланируй запрос доступа", user=user)
     assert res.status_code == 200
     return res.get_json()
 

@@ -7,8 +7,10 @@ from pydantic import ValidationError
 
 from app.llm import Message, get_llm
 from app.llm.base import ToolCall
-from app.llm.scenario_provider import (MISSING_PHRASES, ScenarioProvider, absence_rule, docs_conflict, docs_guard,
-                                       named_intern_plan, policy_reply, search_query, second_note, split_actions)
+from app.llm.scenario_provider import (ABSENCE_WORDS, FREQUENT_WORDS, HR_ONLY, MISSING_PHRASES, RANKING_WORDS,
+                                       ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule,
+                                       docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
+                                       search_query, second_note, split_actions)
 from app.rag import retrieve
 
 from .actions import Action, ActionStore, InMemoryActionStore
@@ -118,6 +120,11 @@ class Agent:
 
         # Две просьбы в одной фразе: модель выполняет первую, про вторую честно говорим сами (не теряем молча).
         first, second = split_actions(question)
+        if (ruled := await self._product_rules(first, system, available, user)) is not None:
+            if second:
+                ruled.reply += second_note(second)
+            ruled.sources = cited_sources(ruled.reply, docs, question)
+            return ruled
         if second:
             history = [*history[:-1], Message(role="user", content=first)] if history else history
         created: list[Action] = []
@@ -154,6 +161,9 @@ class Agent:
                       and (fixed := docs_guard(question, system, text)) and fixed != text):
                     log.info("docs guard replaced model reply user=%s", user.id)
                     text = fixed
+                if getattr(llm, "name", "") != "scenario":
+                    # Модель назвала внутренний инструмент или выдумала документ (прогон на Railway 12.11) — убираем.
+                    text = scrub_reply(text, set(self.registry.tools), {d["title"] for d in docs})
                 if second and "Вторую просьбу" not in text and f"«{second}»" not in text:
                     text += second_note(second)
                 return AgentResult(reply=text, sources=cited_sources(text, docs, question), actions=created,
@@ -173,6 +183,54 @@ class Agent:
 
         log.warning("tool step limit reached user=%s", user.id)
         return AgentResult(reply=STEP_LIMIT_REPLY, sources=[], actions=created, tools=used, refused=refused)
+
+    async def _product_rules(self, question: str, system: str, available: set[str], user: User) -> AgentResult | None:
+        """Сценарии, где ответ — данные сервисов, а не текст модели, поэтому одинаковы для GigaChat и без ключа
+        (проверка 12.11: модель отвечала «вызови инструмент…», путала дату отгула, не знала частых тем):
+        отгул с разбором даты, обзор своих стажёров без рейтинга, частые темы вопросов."""
+        q = question.lower()
+        if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
+                and not any(w in q for w in HR_ONLY) and (today := _today(system))):
+            day, note = absence_plan(q, today)
+            if note:
+                return AgentResult(reply=note)
+            call = ToolCall(id="rule_absence", name="create_absence_request",
+                            arguments={"day": day.isoformat(), "reason": _reason(q)})
+            result = await self.executor.call(user, call)
+            action = await self.store.get(result["action_id"]) if result.get("status") == "awaiting_confirmation" else None
+            if action is None:
+                return AgentResult(reply="Сервис отсутствий сейчас не ответил. Попробуй ещё раз чуть позже.",
+                                   tools=[call.name])
+            text = (f"{absence_rule(system)}Подготовил черновик: {result['summary']}. Подробности вроде врача в "
+                    "заявление не пишу — только причину из списка. Проверь дату и нажми «Подтвердить»: без этого "
+                    "руководителю ничего не уйдёт.")
+            return AgentResult(reply=text, actions=[action], tools=[call.name])
+        viewer = user.role.value in ("mentor", "lead", "curator")
+        if viewer and any(w in q for w in FREQUENT_WORDS) and any(w in q for w in ("спраш", "вопрос", "тем")):
+            from .analytics import metrics
+            try:
+                data = await metrics(user)
+            except Exception:  # noqa: BLE001 — нет стажёров в зоне видимости
+                return None
+            topics = ", ".join(f"{t['title']} — {t['count']}" for t in data["topics"][:5])
+            gaps = ", ".join(f"{t['title']} — {t['count']}" for t in data["unanswered_topics"][:3])
+            text = (f"Вопросов боту от твоих стажёров: {data['questions']}. Частые темы: {topics or 'пока нет'}."
+                    + (f"\nБез ответа в документах: {gaps} — эти темы стоит дописать в документы команды." if gaps else "")
+                    + "\nТексты вопросов не показываю — только темы.")
+            return AgentResult(reply=text, tools=["metrics"])
+        if viewer and "get_plan" in available and any(w in q for w in RANKING_WORDS) and not _names_someone(q):
+            from .users import DEMO_USERS, Role, can_view_intern
+            interns = [u for u in DEMO_USERS.values() if u.role == Role.INTERN and can_view_intern(user, u)]
+            lines = ["Стажёров не сравниваю и не ранжирую — вот факты по каждому:"]
+            for intern in interns:
+                result = await self.executor.call(user, ToolCall(id=f"rule_plan_{intern.id}", name="get_plan",
+                                                                 arguments={"intern_id": intern.id}))
+                if not result.get("error"):
+                    lines.append(ScenarioProvider()._plan(result, own=False).content.replace("\n", " "))
+            if len(lines) == 1:
+                return None
+            return AgentResult(reply="\n• ".join(lines), tools=["get_plan"])
+        return None
 
     async def _claim(self, user: User, action_id: str) -> Action:
         """Атомарно забрать свой черновик в работу: из одновременных подтверждений выполняет один (аудит D1)."""
