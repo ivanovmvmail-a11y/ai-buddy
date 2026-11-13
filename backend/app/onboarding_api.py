@@ -21,7 +21,7 @@ from app.http_body import json_body
 from app.agent import analytics, explain, history, practice, service
 from app.agent.onboarding_tools import resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
-from app.mcp_server import absence, access, checklist, clock, hiring
+from app.mcp_server import absence, access, checklist, clock, hiring, mentor_inbox, storage
 from app.mcp_server.absence_models import REASONS
 from app.mcp_server.errors import Conflict, Forbidden, NotFound
 
@@ -290,7 +290,7 @@ def set_skill():
 
 @bp.get("/reminders")
 def reminders():
-    items = async_runner.run(clock.list_reminders(g.user))
+    items = async_runner.run(clock.list_reminders(g.user, include_mentor=True))
     return {"reminders": [_json(r) for r in items if r.status == "active"]}
 
 
@@ -406,3 +406,71 @@ def reset():
     async_runner.run(service.agent.store.clear())
     async_runner.run(history.history.clear())  # черновики старого прогона ссылались бы на сброшенные данные
     return {"status": "reset"}
+
+
+# --- «Память»: вопрос наставнику → ответ → база знаний команды (PR #45 Codex + Claude 13.11) ------------
+
+class MentorQuestionBody(BaseModel):
+    text: str = Field(min_length=1, max_length=3000)
+
+
+class MentorAnswerBody(BaseModel):
+    text: str = Field(min_length=1, max_length=6000)
+    publish: StrictBool = True
+
+
+def _mentor_question(q) -> dict:
+    view = _json(q)
+    intern = DEMO_USERS.get(q.intern_id)
+    view["intern_name"] = intern.name if intern else q.intern_id
+    return view
+
+
+@bp.get("/mentor/questions")
+def mentor_questions():
+    """Стажёр — свои вопросы наставнику, наставник — вопросы своих стажёров; новые сверху."""
+    items = async_runner.run(mentor_inbox.list_questions(g.user.id))
+    items.sort(key=lambda q: (q.status != "pending", -q.created_day))
+    return {"questions": [_mentor_question(q) for q in items]}
+
+
+@bp.post("/mentor/questions")
+def mentor_ask():
+    """Стажёр нажал «Отправить наставнику» под текстом вопроса — это и есть его подтверждение."""
+    body = _body(MentorQuestionBody)
+
+    async def run():
+        draft = await mentor_inbox.draft_question(g.user.id, body.text)
+        return await mentor_inbox.confirm_question(g.user.id, draft.id)
+    return _mentor_question(async_runner.run(run())), 201
+
+
+@bp.post("/mentor/questions/<question_id>/answer")
+def mentor_answer(question_id: str):
+    """Наставник отвечает; publish — добавить ответ в базу знаний команды (имена и контакты вычищаются)."""
+    body = _body(MentorAnswerBody)
+
+    async def run():
+        draft = await mentor_inbox.draft_answer(g.user.id, question_id, body.text, body.publish)
+        return await mentor_inbox.confirm_answer(g.user.id, draft.id)
+    return _mentor_question(async_runner.run(run()))
+
+
+@bp.post("/mentor/questions/<question_id>/publish")
+def mentor_publish(question_id: str):
+    """Добавить в базу знаний уже данный ответ."""
+    async def run():
+        draft = await mentor_inbox.draft_publication(g.user.id, question_id)
+        return await mentor_inbox.confirm_publication(g.user.id, draft.id)
+    return _mentor_question(async_runner.run(run()))
+
+
+async def published_answer(title: str, team: str) -> dict | None:
+    """Опубликованный ответ наставника для окна «Источник»: только своей команды, только обезличенный текст."""
+    async with storage.get_store().read() as data:
+        found = [q for q in data.mentor_questions.values() if q.team == team and q.publication_status == "published"
+                 and q.public_content and q.answered_at
+                 and mentor_inbox.publication_title(q) == title]
+    if not found:
+        return None
+    return {"title": title, "team": team, "content": "\n\n".join(q.public_content for q in found)}

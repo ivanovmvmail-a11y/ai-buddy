@@ -95,6 +95,8 @@ export type FakeServer = {
   /** GET /chat/history по пользователю (сервер хранит переписку, SPEC 9). */
   history: Record<string, Array<Record<string, unknown>>>;
   metrics: Record<string, unknown> | null;
+  /** «Память»: вопросы наставнику (как /mentor/questions). */
+  mentorQuestions: Array<Record<string, unknown>>;
   /** Код-слово демо-кнопок, как DEMO_KEY на сервере; не задано — кнопки открыты. */
   demoKey?: string;
   /** Сервер ещё не умеет предложения и сравнение (как настоящий до работ Codex) — 404. */
@@ -110,7 +112,7 @@ const DOCUMENTS = [
 
 export function installFakeServer(): FakeServer {
   const srv: FakeServer = {
-    state: initialState(), actions: [], history: {}, provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null,
+    state: initialState(), actions: [], history: {}, provider: "echo", chatReplies: [], calls: [], feedback: [], metrics: null, mentorQuestions: [],
     addKirill: () => {
       DEMO_USERS = [...BASE_USERS, KIRILL];
       addKirill(srv.state);
@@ -296,6 +298,30 @@ export function installFakeServer(): FakeServer {
       });
     }
     if (p === "/chat/history") return ok({ messages: srv.history[actor.id] ?? [] });
+    if (p === "/mentor/questions" && method === "GET") {
+      if (actor.role !== "intern" && actor.role !== "mentor") return err(404, "Не найдено");
+      const mine = srv.mentorQuestions.filter((q) => (actor.role === "intern" ? q.intern_id : q.mentor_id) === actor.id);
+      return ok({ questions: mine });
+    }
+    if (p === "/mentor/questions" && method === "POST") {
+      if (actor.role !== "intern") return err(404, "Не найдено");
+      const q = {
+        id: `MQ-${srv.mentorQuestions.length + 1}`, intern_id: actor.id, intern_name: actor.name, mentor_id: actor.mentor_id,
+        question: (body as { text: string }).text, created_day: 2, status: "pending", answer: null,
+        publication_status: "not_requested", public_content: null,
+      };
+      srv.mentorQuestions.unshift(q);
+      return ok(q);
+    }
+    m = p.match(/^\/mentor\/questions\/(.+)\/(answer|publish)$/);
+    if (m) {
+      const q = srv.mentorQuestions.find((x) => x.id === m![1] && x.mentor_id === actor.id);
+      if (!q) return err(404, "Не найдено");
+      const b = body as { text?: string; publish?: boolean };
+      if (m[2] === "answer") Object.assign(q, { status: "answered", answer: b.text, publication_status: b.publish ? "published" : "not_requested" });
+      else Object.assign(q, { publication_status: "published" });
+      return ok(q);
+    }
     if (p === "/documents") {
       // Как на сервере: общий документ или своей команды, иначе 404 (не раскрываем, что документ есть).
       const doc = DOCUMENTS.find((d) => d.title === url.searchParams.get("title"));

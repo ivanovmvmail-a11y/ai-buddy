@@ -8,6 +8,7 @@ from psycopg.types.json import Jsonb
 from app.db.pool import PostgresPoolOwner
 
 from .errors import Conflict
+from .mentor_models import MentorQuestion
 from .models import (AccessRequest, AccessResource, ActionDraft, Event, InternState, OnboardingData,
                      PlanItem, Reminder, SkillProfile, CatalogItem, SkillSuggestion)
 
@@ -21,6 +22,7 @@ TABLES = (
     ("absence_requests", "absence_requests", AbsenceRequest, "id"),
     ("requests", "access_requests", AccessRequest, "id"),
     ("profiles", "skill_profiles", SkillProfile, "intern_id"),
+    ("mentor_questions", "mentor_questions", MentorQuestion, "id"),
     ("suggestions", "skill_suggestions", SkillSuggestion, "id"),
     ("reminders", "reminders", Reminder, "id"),
 )
@@ -35,7 +37,10 @@ def _dump(model):
     if isinstance(model, SkillSuggestion):
         return {**model.model_dump(mode="json", exclude={"intern_name", "topic_title"}),
                 "evidence": model.evidence}
-    return model.model_dump(mode="json", exclude=DERIVED_FIELDS)
+    values = model.model_dump(mode="json", exclude=DERIVED_FIELDS)
+    if isinstance(model, Reminder):
+        values["mentor_question_id"] = model.mentor_question_id
+    return values
 
 
 class PostgresStore(PostgresPoolOwner):

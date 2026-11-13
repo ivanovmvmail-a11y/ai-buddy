@@ -13,12 +13,14 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import StrictBool, ValidationError
 
+from app import rag
 from app.agent.users import DEMO_USERS
 from app.async_runner import run
 
-from . import access, checklist, clock, hiring, storage
+from . import access, checklist, clock, drafts, hiring, mentor_inbox, storage
+from .mentor_models import MentorQuestion
 from .errors import Conflict, Forbidden, NotFound
-from .models import AccessLevel, AccessRequest, AccessResource, ItemStatus, Plan, PlanItem, Reminder, SkillProfile
+from .models import ActionDraft, AccessLevel, AccessRequest, AccessResource, ItemStatus, Plan, PlanItem, Reminder, SkillProfile
 
 log = logging.getLogger("ai_buddy.mcp")
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
@@ -46,7 +48,8 @@ def create_server(user_id: str) -> FastMCP:
         except ValidationError:
             raise ToolError("Некорректные параметры") from None
         except Exception as error:
-            log.warning("MCP service %s failed (%s)", operation.__name__, type(error).__name__)
+            name = args[0].__name__ if operation is drafts.invoke_by_id else operation.__name__
+            log.warning("MCP service %s failed (%s)", name, type(error).__name__)
             raise ToolError("Сервис временно недоступен") from None
 
     @server.tool(annotations=READ)
@@ -117,7 +120,37 @@ def create_server(user_id: str) -> FastMCP:
     @server.tool(annotations=READ)
     async def list_reminders() -> list[Reminder]:
         """Только активные личные напоминания пользователя, как HTTP /reminders."""
-        return [reminder for reminder in await call(clock.list_reminders) if reminder.status == "active"]
+        return [reminder for reminder in await call(clock.list_reminders, include_mentor=True) if reminder.status == "active"]
+
+    @server.tool(annotations=CREATE)
+    async def mentor_draft_question(text: str) -> ActionDraft:
+        """Подготовить личный вопрос наставнику; отправка только после подтверждения в UI."""
+        return await call(drafts.invoke_by_id, mentor_inbox.draft_question, text)
+
+    @server.tool(annotations=READ)
+    async def mentor_get_question(question_id: str) -> MentorQuestion:
+        """Личный вопрос доступен его стажёру и назначенному наставнику."""
+        return await call(drafts.invoke_by_id, mentor_inbox.get_question, question_id)
+
+    @server.tool(annotations=READ)
+    async def mentor_list_questions() -> list[MentorQuestion]:
+        """Свои отправленные вопросы либо личные входящие наставника."""
+        return await call(drafts.invoke_by_id, mentor_inbox.list_questions)
+
+    @server.tool(annotations=CREATE)
+    async def mentor_draft_answer(question_id: str, text: str, publish: StrictBool = False) -> ActionDraft:
+        """Черновик ответа и, при publish, обезличенной публикации; требуется подтверждение UI."""
+        return await call(drafts.invoke_by_id, mentor_inbox.draft_answer, question_id, text, publish)
+
+    @server.tool(annotations=CREATE)
+    async def mentor_draft_publication(question_id: str) -> ActionDraft:
+        """Подготовить публикацию уже отправленного ответа в базу знаний команды."""
+        return await call(drafts.invoke_by_id, mentor_inbox.draft_publication, question_id)
+
+    @server.tool(annotations=READ)
+    async def mentor_get_draft(draft_id: str) -> ActionDraft:
+        """Прочитать только собственный черновик перед подтверждением человеком."""
+        return await call(drafts.invoke_by_id, drafts.get_draft, draft_id)
 
     return server
 
@@ -134,7 +167,12 @@ def main(argv=None):
     try:
         run(server.run_stdio_async(), timeout=None)
     finally:
-        run(storage.get_store().close())
+        try:
+            run(storage.get_store().close())
+        finally:
+            service = rag.cached_service()
+            if service is not None:
+                run(service.store.close())
 
 
 if __name__ == "__main__":

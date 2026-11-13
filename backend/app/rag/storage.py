@@ -32,6 +32,10 @@ class DocumentStore(Protocol):
         """Освободить ресурсы на event loop владельца хранилища."""
         ...
 
+    async def delete(self, source_id: str) -> None:
+        """Идемпотентно удалить документ и его фрагменты по внутреннему source_id."""
+        ...
+
     async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
         """Атомарно заменить документ и все его фрагменты по source_id."""
         ...
@@ -42,11 +46,15 @@ class DocumentStore(Protocol):
 
 
 class InMemoryDocumentStore:
-    def __init__(self) -> None:
+    def __init__(self, *, min_similarity: float | None = None) -> None:
+        self.min_similarity = min_similarity
         self.documents: dict[str, tuple[Document, list[Chunk]]] = {}
 
     async def close(self) -> None:
         pass
+
+    async def delete(self, source_id: str) -> None:
+        self.documents.pop(source_id, None)
 
     async def upsert(self, document: Document, chunks: list[Chunk]) -> None:
         self.documents[document.source_id] = (document, chunks)
@@ -61,6 +69,8 @@ class InMemoryDocumentStore:
                 norm = math.sqrt(sum(value * value for value in chunk.embedding))
                 similarity = sum(a * b for a, b in zip(embedding, chunk.embedding, strict=True))
                 similarity /= query_norm * norm
+                if self.min_similarity is not None and similarity < self.min_similarity:
+                    continue
                 ranked.append((-similarity, source_id, index, SearchHit(
                     title=document.title, content=chunk.content, url=document.url, team=document.team,
                 )))

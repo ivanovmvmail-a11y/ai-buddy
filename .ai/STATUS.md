@@ -75,8 +75,9 @@
 | 70 | Проверка 13.11, чат: отгул понимает дни недели, «на 3 дня» → отпуск, выходные; правила для любой модели (отгул, «взлом», напоминание по просьбе, обзор стажёров без рейтинга, частые темы); из ответа модели убираются имена инструментов и выдуманные документы; «отметь, что я прошла…», тревога, заявки руководителя, прогресс недели; документы «о команде», CI/OKR в глоссарии; +22 вопроса в золотом наборе | Claude | claude/chat-quality-1213 | готово | #94
 | 71 | [API] «Источник» открывает документ в окне (GET /documents, только общий или своей команды) вместо ссылки на example.invalid; на телефоне 375 px нет прокрутки вбок | Claude | claude/source-viewer | готово | #95
 | 72 | GigaChat 106 вопросов: 99 → 105; данные (следующий шаг, заявки) и оргвопросы — ответ сервера до модели; ложное «не указан»; README — совет эксперту про ключ | Claude | claude/gigachat-1313 | готово | #96
-| 73 | Сданное практическое задание → основание предложения наставнику (что именно засчитано); правка в hiring.py записана в HANDOFF | Claude | claude/practice-to-mentor | на ревью | #98 | backend 813, PostgreSQL 843; проверено в браузере |
+| 73 | Сданное практическое задание → основание предложения наставнику (что именно засчитано); правка в hiring.py записана в HANDOFF | Claude | claude/practice-to-mentor | готово | #98 | backend 813, PostgreSQL 843; проверено в браузере |
 | 74 | Railway: чтение из PostgreSQL одним запросом вместо 12 (зона Codex, HANDOFF) | Claude | claude/railway-latency | готово | #97 | PostgreSQL 1229; эффект замерить после мержа |
+| 75 | «Память» (второе УТП): Codex #45 доведён — main влит, HTTP /mentor/questions, «Отправить наставнику» в чате, блоки у стажёра и наставника, уведомления сразу, ответ «Наставник уже отвечал»; спека 108; миграция видов уведомлений | Claude | claude/mentor-memory | на ревью | #99
 
 | C1.01 | Чекпоинт 1, 0+1: seed и персональный план | Codex | codex/personal-plan-catalog | на ревью | [#67](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/67) | 791 passed / 97,75%; /health=200; DEMO_USERS добавляет Claude |
 | C1.5 | Чекпоинт 1, 5: отгул и напоминания | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 847 passed / 98,15%; после #67; уведомления и +1 день сроков |
@@ -89,6 +90,10 @@
 | C2.1112 | Проверка 12.11: UTF-8, seed отгула, темы Grafana, имя в уведомлении | Codex | codex/review-1112-fixes | на ревью | [#87](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/87) | Ревью: текст, авто-обновление Grafana, паритет тем; 735 / 1134 теста, 95,68% / 98,61%; golden 81/81, утечек 0; Docker OK |
 
 | C2.access | Учебные Redash и Grafana в каталоге доступов | Codex | codex/access-redash-grafana | на ревью | [#90](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/90) | 755 / 1176 тестов; 95,68% / 98,61%; golden 81/81, утечек 0; Docker /health=200; распознавание чата — HANDOFF Claude |
+
+| 37 | Бонус: входящие наставника и ответ в RAG | Codex | codex/mentor-inbox | на ревью | [#45](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/45) | 747 passed / 98,47% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 38 | Бонус: отгул через имитацию сервиса отсутствий | Codex | codex/absence | на ревью | [#46](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/46) | 712 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
+| 39 | Бонус: приватная самопроверка по темам карты навыков | Codex | codex/self-check | на ревью | [#50](https://github.com/ivanovmvmail-a11y/ai-buddy/pull/50) | 723 passed / 98,33% с ветвлениями; оба PostgreSQL-флага; /health=200 |
 
 ## Блокеры
 - нет (блокер #62 снят: текст документа 13 исправлен, #62 слит 11.11).

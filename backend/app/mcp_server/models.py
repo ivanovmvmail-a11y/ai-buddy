@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, PrivateAttr, model_validator
 
 from app.agent.users import Role, User
+from .mentor_models import MentorQuestion
 from .absence_models import AbsenceRequest
 
 Stage = Literal["week1", "week2", "month1", "month2", "after3m"]
@@ -148,13 +149,13 @@ class SkillSuggestion(Model):
 
 ReminderKind = Literal["plan_item", "access_request", "skill_changed", "personal_item_added",
                        "skill_suggestion", "absence_pending", "absence_decided", "absence_today",
-                       "absence_new", "absence_fact"]
+                       "absence_new", "absence_fact", "mentor_question", "mentor_answer"]
 
 
 class ReminderAction(Model):
     topic: str | None = Field(default=None, exclude_if=lambda value: value is None)
     label: str
-    target: Literal["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern"]
+    target: Literal["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern", "mentor_question"]
 
 
 class Reminder(Model):
@@ -167,6 +168,7 @@ class Reminder(Model):
     suggestion_id: str | None = None
     plan_item_id: str | None = None
     request_id: str | None = None
+    mentor_question_id: str | None = Field(default=None, exclude=True)
     text: str
     status: Literal["active", "snoozed", "done"] = "active"
     created_day: int = Field(ge=1)
@@ -209,6 +211,7 @@ class OnboardingData(Model):
     _suggestions_available: bool = PrivateAttr(default=True)
 
     interns: dict[str, InternState] = Field(default_factory=dict)
+    mentor_questions: dict[str, MentorQuestion] = Field(default_factory=dict)
     items: dict[str, PlanItem] = Field(default_factory=dict)
     resources: dict[str, AccessResource] = Field(default_factory=dict)
     absence_requests: dict[str, AbsenceRequest] = Field(default_factory=dict)

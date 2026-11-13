@@ -14,7 +14,7 @@ def notify(data, user_id, intern_id, kind, key, text, target, *, day=None, topic
     if id in data.reminders:
         return None
     reminder = Reminder(id=id, user_id=user_id, intern_id=intern_id, kind=kind,
-        text=text, action={'label': {'absence_pending': 'Напомнить', 'absence_new': 'Решить', 'skill_suggestion': 'Решить'}.get(kind, 'Открыть'), 'target': target, 'topic': topic},
+        text=text, action={'label': {'absence_pending': 'Напомнить', 'absence_new': 'Решить', 'skill_suggestion': 'Решить', 'mentor_question': 'Ответить'}.get(kind, 'Открыть'), 'target': target, 'topic': topic},
         created_day=day if day is not None else data.interns[intern_id].current_day, **links)
     data.reminders[id] = reminder
     events._record(data, SYSTEM_ACTOR, 'reminder_created', {

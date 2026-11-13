@@ -241,6 +241,17 @@
 (`CatalogItem`.) Стажёр, руководитель, куратор, HR BP: `404` на эндпоинты наставника. События:
 `personal_item_added` / `personal_item_removed` (payload без текстов).
 
+## «Память»: вопрос наставнику → база знаний команды (PR #45 Codex + Claude 13.11)
+Сервис — `app/mcp_server/mentor_inbox.py`. Нажатие кнопки человеком — его подтверждение (черновик сервиса создаётся и подтверждается в одном запросе).
+
+- `GET /mentor/questions` → `{"questions": [MentorQuestion]}`. Стажёр — свои, наставник — вопросы своих стажёров; остальным ролям `404`. Без ответа — сверху.
+- `POST /mentor/questions` `{"text": str (1–3000)}` → `201 MentorQuestion` — только стажёр (`404` остальным). Наставник сразу получает уведомление `kind: "mentor_question"`, кнопка «Ответить».
+- `POST /mentor/questions/{id}/answer` `{"text": str (1–6000), "publish": bool = true}` → `MentorQuestion`. Только наставник этого стажёра (`404` остальным), повтор — `409`. `publish: true` — обезличенный ответ (`public_content`: имена и контакты заменены метками) добавляется в базу знаний команды как документ «Ответ наставника, ДД.ММ.ГГГГ»; бот и поиск находят его только для этой команды. Стажёр получает уведомление `kind: "mentor_answer"` (факт, «Открыть»).
+- `POST /mentor/questions/{id}/publish` → `MentorQuestion` — добавить в базу уже данный ответ; повтор — `409`.
+
+`MentorQuestion`: `{"id", "intern_id", "intern_name", "mentor_id", "team", "question", "created_day", "status": "pending"|"answered", "answer": str|null, "answered_day", "answered_at", "publication_status": "not_requested"|"pending"|"published", "public_content": str|null, "source_id"}`.
+Новые значения: `Reminder.kind` — `mentor_question`, `mentor_answer`; `Reminder.action.target` — `mentor_question` (блок «Вопросы наставнику»). `GET /documents?title=Ответ наставника, …` — опубликованный ответ своей команды.
+
 ## Предложения по уровню (SPEC 4)
 Бот **предлагает**, наставник **решает**. Стажёр предложений не видит — ни до решения, ни после отказа; он видит
 только результат (новый уровень в `/profile/skills` и уведомление).

@@ -76,8 +76,10 @@ def no_configured_database(monkeypatch):
     monkeypatch.setattr(settings, "database_url", "")
     clear_cache = rag.get_service.cache_clear
     clear_cache()
+    rag.get_memory_service.cache_clear()
     yield
     clear_cache()
+    rag.get_memory_service.cache_clear()
 
 
 @pytest.fixture

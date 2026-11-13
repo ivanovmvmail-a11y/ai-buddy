@@ -53,6 +53,8 @@ def _tick(data: OnboardingData, day: int | None = None, intern_ids: set[str] | N
         events._record(data, SYSTEM_ACTOR, "reminder_created", {"intern_id": item.intern_id, "reminder_id": reminder.id,
                       "item_id": item.id, "day": current_day})
     from .absence import _tick_absences
+    from .mentor_inbox import tick_questions
+    created.extend(tick_questions(data, day, intern_ids))
     created.extend(_tick_absences(data, day, intern_ids))
     for reminder in data.reminders.values():
         if reminder.kind in {"plan_item", "access_request"} or reminder.status != "snoozed":
@@ -97,13 +99,17 @@ async def cron_tick(actor: Actor, day: int | None = None) -> list[Reminder]:
         return _tick(data, day)
 
 
-async def list_reminders(actor: User) -> list[Reminder]:
+async def list_reminders(actor: User, *, include_mentor: bool = False) -> list[Reminder]:
     known_actor(actor)
     async with storage.get_store().read() as data:
-        return [reminder.model_copy(deep=True) for reminder in data.reminders.values() if reminder.user_id == actor.id]
+        return [reminder.model_copy(deep=True) for reminder in data.reminders.values() if reminder.user_id == actor.id
+                and (include_mentor or reminder.mentor_question_id is None)]
 
 
 def _reminder_context(data: OnboardingData, reminder: Reminder) -> dict:
+    if reminder.mentor_question_id:
+        question = data.mentor_questions[reminder.mentor_question_id]
+        return {"kind": "mentor_question", "day": data.interns[question.intern_id].current_day}
     item = data.items.get(reminder.plan_item_id)
     request = data.requests.get(reminder.request_id)
     intern_id = reminder.intern_id or (item.intern_id if item else (request.intern_id if request else reminder.user_id))

@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
-  CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, DocumentView, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
+  CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, DocumentView, MentorQuestion, MentorQuestionsResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
   PlanCompare, PracticeResult, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
   SkillSuggestion, SuggestionsResponse, WeeklySummary,
 } from "./types";
@@ -78,6 +78,12 @@ export const api = {
   snooze: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/snooze`, Reminder, u, post({ days: 1 })),
   doneReminder: (u: string, id: string) => request(`/reminders/${encodeURIComponent(id)}/done`, Reminder, u, post()),
   history: (u: string) => request("/chat/history", ChatHistory, u),
+  mentorQuestions: (u: string) => request("/mentor/questions", MentorQuestionsResponse, u),
+  askMentor: (u: string, text: string) => request("/mentor/questions", MentorQuestion, u, post({ text })),
+  answerMentor: (u: string, id: string, text: string, publish: boolean) =>
+    request(`/mentor/questions/${encodeURIComponent(id)}/answer`, MentorQuestion, u, post({ text, publish })),
+  publishMentor: (u: string, id: string) =>
+    request(`/mentor/questions/${encodeURIComponent(id)}/publish`, MentorQuestion, u, post()),
   document: (u: string, title: string) => request(`/documents?title=${encodeURIComponent(title)}`, DocumentView, u),
   actions: (u: string) => request("/actions", ActionsResponse, u),
   draft: (u: string, tool: string, params: Record<string, unknown>) => request("/actions", Action, u, post({ tool, params })),

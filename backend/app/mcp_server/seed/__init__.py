@@ -10,6 +10,7 @@ from app.agent.users import DEMO_USERS, User
 from .. import checklist, events, storage
 from .._domain import known_actor, owner_id, timestamp
 from .._system import SYSTEM_ACTOR
+from ..mentor_models import MentorQuestion
 from ..models import CatalogItem, AccessRequest, AccessResource, InternState, OnboardingData, PlanItem, SkillProfile
 
 SEED_PATH = Path(__file__).with_name("onboarding.json")
@@ -64,14 +65,32 @@ def load_seed() -> OnboardingData:
             events._record(data, SYSTEM_ACTOR, "access_request_decided", {**payload, "approver": "auto"})
         if item and request.status == "pending_approval":
             checklist._change_status(data, user, item, "waiting", waiting_for=user.mentor_id, day=request.created_day)
+    for entry in json.loads(SEED_PATH.with_name("mentor_inbox.json").read_text(encoding="utf-8")):
+        user = DEMO_USERS[entry["intern_id"]]
+        question = MentorQuestion(**entry, mentor_id=user.mentor_id, team=user.team,
+            answered_at=timestamp(data, user.id, 1))
+        data.mentor_questions[question.id] = question
     return data
 
 
 async def reset_demo(actor: User) -> None:
+    await _reset_store(actor, storage.get_store())
+
+
+async def _reset_store(actor: User, store) -> None:
     known_actor(actor)
-    store = storage.get_store()
     seed = await store.seed_for_schema(load_seed())
     async with store.transaction() as data:
+        sources = [q.source_id for q in data.mentor_questions.values() if q.source_id]
+        if sources:
+            from app import rag
+            from ..errors import Conflict
+            try:
+                service = rag.get_service() or rag.get_memory_service()
+                for source_id in sources:
+                    await service.store.delete(source_id)
+            except Exception:
+                raise Conflict("Не удалось очистить опубликованные ответы; повторите сброс после восстановления RAG") from None
         for field in OnboardingData.model_fields:
             setattr(data, field, getattr(seed, field))
         events._record(data, actor, "demo_reset", {})
