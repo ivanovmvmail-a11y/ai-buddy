@@ -99,7 +99,7 @@ def test_ac7_mentor_sees_requests(scenario):
 
 
 def test_greeting_and_empty_requests(scenario):
-    assert "сценарном режиме" in ask(scenario, "Привет")["reply"]
+    assert ask(scenario, "Привет")["reply"].startswith("Привет, Аня! Чем помочь?")
     assert ask(scenario, "Покажи мои заявки")["reply"] == "Заявок нет."
 
 
@@ -174,7 +174,7 @@ def test_other_team_document_is_not_matched_by_shared_prefix():
 @pytest.mark.parametrize("text", ["Спасибо", "спасибо большое!", "Понятно", "ок"])
 def test_thanks_is_not_sent_to_documents(scenario, text):
     body = ask(scenario, text)
-    assert body["reply"].startswith("Пожалуйста!") and "в документах" not in body["reply"]
+    assert body["reply"].startswith(("Пожалуйста!", "Хорошо!")) and "в документах" not in body["reply"]
 
 
 @pytest.mark.parametrize(("user", "mentor"), [("intern-anya", "Пётр Волков"), ("intern-ivan", "Мария Орлова")])
@@ -291,7 +291,6 @@ def test_guard_key_term_present_keeps_answer(demo_docs, use_llm):
 
 
 @pytest.mark.parametrize("question,answer", [
-    ("Привет!", "Привет! Чем помочь?"),
     ("Какой у меня уровень по Git?", "Git — новичок."),
     ("Как оформить pull request?", "По документу «Регламент учебного код-ревью»: открой PR в основную ветку."),
 ])

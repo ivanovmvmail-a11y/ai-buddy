@@ -108,13 +108,14 @@ async def list_reminders(actor: User, *, include_mentor: bool = False) -> list[R
                 and (include_mentor or reminder.mentor_question_id is None)]
 
 
-def _custom_text(text: str) -> str:
-    # «напомни про 1:1» → «Ты просил(а) напомнить про 1:1»; «напомни оформить пропуск» → «…: оформить пропуск».
+def _custom_text(text: str, female: bool = False) -> str:
+    # «напомни про 1:1» → «Ты просил(а)» → по роду: «Ты просила напомнить про 1:1»; «напомни оформить пропуск» → «…: оформить пропуск».
+    asked = "Ты просила" if female else "Ты просил"
     if re.match(r"(?:что|чтобы)\s", text, re.IGNORECASE):
-        return f"Ты просил(а) напомнить, {text}"
+        return f"{asked} напомнить, {text}"
     if re.match(r"(?:про|о|об|насч[её]т)\s", text, re.IGNORECASE):
-        return f"Ты просил(а) напомнить {text}"
-    return f"Ты просил(а) напомнить: {text}"
+        return f"{asked} напомнить {text}"
+    return f"{asked} напомнить: {text}"
 
 
 CUSTOM_MAX_DAYS = 60  # дальше двух месяцев — это уже календарь, а не напоминание стажировки
@@ -140,7 +141,7 @@ async def add_custom_reminder(actor: User, text: str, day: date) -> Reminder:
             raise Conflict("Напоминание можно поставить не дальше чем на два месяца вперёд")
         later = target > state.current_day
         reminder = Reminder(id=f"REM-{uuid4().hex}", user_id=actor.id, intern_id=actor.id, kind="custom",
-                            action={"label": "Открыть", "target": "plan"}, text=_custom_text(text),
+                            action={"label": "Открыть", "target": "plan"}, text=_custom_text(text, getattr(actor, "female", False)),
                             created_day=state.current_day, status="snoozed" if later else "active",
                             snooze_until_day=target if later else None)
         data.reminders[reminder.id] = reminder

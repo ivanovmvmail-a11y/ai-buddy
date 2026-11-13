@@ -15,6 +15,7 @@ from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WO
 from app.llm.scenario_provider import _overlap as _stem_overlap
 from app.llm.scenario_provider import _resource_named
 from app.llm.scenario_provider import _words as _stems
+from app.llm.small_talk import small_talk_reply
 from app.rag import retrieve
 
 from .actions import Action, ActionStore, InMemoryActionStore
@@ -132,10 +133,13 @@ class Agent:
 
     async def answer(self, history: list[Message], user: User) -> AgentResult:
         question = next((m.content for m in reversed(history) if m.role == "user"), "")
+        system = SYSTEM_PROMPT + user_context(user.name, user.role.value, user.team) + await plan_context(user)
+        # «Привет», «спасибо», «как дела», «ааа» — отвечает сервер, без модели и документов (проверка 13.11: на
+        # «Привет» посреди разговора GigaChat продолжил прошлую тему и смешал два документа).
+        if (talk := small_talk_reply(question, system)) is not None:
+            return AgentResult(reply=talk)
         # Разговорные слова («запулить», «пул реквест», «CI») дополняем словами документов — поиск их найдёт.
         docs = await retrieve(search_query(question), user, k=RAG_TOP_K)
-
-        system = SYSTEM_PROMPT + user_context(user.name, user.role.value, user.team) + await plan_context(user)
         if docs:
             context = "\n\n".join(f"### {d['title']}\n{d['content']}" for d in docs)
             system += (

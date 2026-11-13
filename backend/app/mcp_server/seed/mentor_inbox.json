@@ -1,4 +1,4 @@
 [
-  {"id":"MQ-demo-platform","intern_id":"intern-anya","question":"Где потренировать ревью в учебной команде? Демо-данные, не регламент Авито.","created_day":1,"status":"answered","answer":"Используйте учебный репозиторий и небольшой пробный diff. Демо-данные, не регламент Авито.","answered_day":1},
-  {"id":"MQ-demo-delivery","intern_id":"intern-ivan","question":"Как проверить учебный статус доставки? Демо-данные, не регламент Авито.","created_day":1,"status":"answered","answer":"Сравните входной статус и ожидаемый переход на синтетическом заказе. Демо-данные, не регламент Авито.","answered_day":1}
+  {"id":"MQ-demo-platform","intern_id":"intern-anya","question":"Где потренировать ревью в учебной команде?","created_day":1,"status":"answered","answer":"Используй учебный репозиторий и небольшой пробный diff.","answered_day":1},
+  {"id":"MQ-demo-delivery","intern_id":"intern-ivan","question":"Как проверить учебный статус доставки?","created_day":1,"status":"answered","answer":"Сравни входной статус и ожидаемый переход на синтетическом заказе.","answered_day":1}
 ]

@@ -1,0 +1,137 @@
+"""Разговорные сообщения без вопроса: «привет», «спасибо», «как дела», «кто ты», «ааа», «???».
+
+Проверка 13.11 с ключом: на «Привет» посреди разговора GigaChat продолжил прошлую тему и выдал инструкцию,
+смешав два документа. Такие сообщения не требуют ни модели, ни документов — отвечает сервер, одинаково
+с ключом и без. Если в сообщении есть хоть что-то кроме вежливости («привет, где взять ноутбук?»),
+это обычный вопрос: функция вернёт None.
+"""
+import re
+
+from app.agent.users import DEMO_USERS, Role, User
+
+# Порядок важен: сначала длинные фразы, потом отдельные слова.
+PHRASES: dict[str, tuple[str, ...]] = {
+    "who": ("кто ты", "ты кто", "что ты умеешь", "что умеешь", "чем ты можешь помочь", "чем можешь помочь",
+            "как тебя зовут", "ты бот", "ты человек", "ты робот", "что ты такое", "who are you"),
+    "how": ("как дела", "как ты", "как жизнь", "как поживаешь", "как настроение", "что нового", "как оно",
+            "how are you"),
+    "greet": ("добрый день", "добрый вечер", "доброе утро", "доброй ночи", "привет", "приветик", "приветствую",
+              "здравствуй", "здравствуйте", "приветики", "здрасте", "здрасьте", "здорово", "здарова", "хай", "салют", "хелло", "hello", "hi", "hey"),
+    "bye": ("до свидания", "до завтра", "до встречи", "всего доброго", "спокойной ночи", "хорошего дня", "увидимся",
+            "пока", "бай", "bye"),
+    "thanks": ("большое спасибо", "спасибо", "спасибки", "спасибочки", "спс", "пасиб", "благодарю", "сенкс", "thanks", "thank you", "thx"),
+    "ack": ("понятно", "поняла", "понял", "ясно", "хорошо", "ладно", "отлично", "супер", "класс", "круто", "окей",
+            "ок", "ok", "okay", "ага", "угу", "принято", "договорились", "буду знать"),
+    "rude": ("бесполезный", "бесполезен", "тупой", "дурак", "идиот", "бред", "отстой", "не помог", "ты не помог"),
+}
+# Слова, которые не меняют смысла реплики («привет, бот!», «спасибо тебе большое»).
+FILLER = {"а", "и", "ну", "же", "тебе", "вам", "большое", "огромное", "всё", "все", "бот", "ботик", "buddy", "бади",
+          "ai", "друг", "дружище", "ещё", "еще", "раз", "очень", "такой", "такое", "там", "мне", "всем", "снова",
+          "опять", "да", "уже", "вообще", "просто", "вот", "так"}
+QUESTION_WORDS = {"где", "как", "что", "когда", "кто", "кому", "почему", "зачем", "куда", "можно", "сколько", "какой",
+                  "какая", "какие", "чем", "откуда"}
+KEYBOARD_ROWS =("йцукенгшщзхъ", "фывапролджэ", "ячсмитьбю", "qwertyuiop", "asdfghjkl", "zxcvbnm")
+VOWELS = set("аеёиоуыэюяaeiouy")
+
+
+def _normalize(text: str) -> str:
+    text = text.lower().replace("ё", "е")
+    return re.sub(r"[^a-zа-я0-9 ]+", " ", text).strip()
+
+
+def _gibberish(words: list[str]) -> bool:
+    """«ааааа», «фывфыв», «ыыы», «asdf», «кккк» — набор букв без смысла."""
+    for w in words:
+        if len(w) < 3:
+            return False
+        repeated = len(set(w)) <= 2
+        # «sql», «ssh», «vpn» — аббревиатуры, не бессмыслица: правило «без гласных» только для кириллицы
+        no_vowels = not (set(w) & VOWELS) and bool(re.fullmatch(r"[а-я]+", w))
+        mash = len(w) >= 4 and any(w[i:i + 4] in row or w[i:i + 4] in row[::-1]
+                                    for row in KEYBOARD_ROWS for i in range(len(w) - 3))
+        if not (repeated or no_vowels or mash):
+            return False
+    return True
+
+
+def classify(question: str) -> set[str] | None:
+    """Множество видов реплики, если в ней нет ничего, кроме разговорных слов; иначе None (это вопрос)."""
+    raw = question.strip()
+    if not raw:
+        return {"empty"}
+    text = _normalize(raw)
+    if not re.search(r"[a-zа-я]", text):
+        return {"empty"}  # «???», «...», «👍», «123»
+    found: set[str] = set()
+    rest = f" {text} "
+    for kind, phrases in PHRASES.items():
+        for phrase in sorted(phrases, key=len, reverse=True):
+            pattern = rf"(?<![a-zа-я]){re.escape(_normalize(phrase))}(?![a-zа-я])"
+            if re.search(pattern, rest):
+                found.add(kind)
+                rest = re.sub(pattern, " ", rest)
+    words = [w for w in rest.split() if w not in FILLER]
+    if not words:
+        return found or None
+    if not found and _gibberish(words):
+        return {"gibberish"}
+    # Имя бота или пользователя после приветствия («привет, Аня») тоже не вопрос.
+    names = {part.lower().replace("ё", "е") for u in DEMO_USERS.values() for part in u.name.split()}
+    if found and all(w in names for w in words):
+        return found
+    asks = "?" in raw or any(w in QUESTION_WORDS for w in words)
+    if found & {"rude"} and len(words) <= 3 and not asks:
+        return found
+    return None
+
+
+def _current(system: str) -> User | None:
+    match = re.search(r"Текущий пользователь: ([^,]+),", system)
+    return next((u for u in DEMO_USERS.values() if match and u.name == match.group(1)), None)
+
+
+def _offer(user: User | None, system: str) -> str:
+    step = re.search(r"Следующий шаг: «([^»]+)»", system)
+    if user is None or user.role == Role.INTERN:
+        if step:
+            return (f"Следующий шаг по плану — «{step.group(1)}». Могу объяснить его, подсказать по документам "
+                    "команды или оформить заявку на доступ.")
+        return "Могу подсказать следующий шаг по плану, найти ответ в документах команды или оформить заявку на доступ."
+    if user.role == Role.MENTOR:
+        return "Могу показать, что зависло у твоих стажёров, их заявки на доступ и частые вопросы."
+    if user.role == Role.LEAD:
+        return "Могу показать заявки на отгул и прогресс стажёров твоей команды."
+    if user.role == Role.CURATOR:
+        return "Могу показать прогресс стажёров и что у кого зависло."
+    return "Могу подсказать, к кому идти с вопросом, и найти ответ в общих документах."
+
+
+def small_talk_reply(question: str, system: str) -> str | None:
+    kinds = classify(question)
+    if not kinds:
+        return None
+    user = _current(system)
+    first = user.name.split()[0] if user else ""
+    hello = f"Привет, {first}!" if first else "Привет!"
+    offer = _offer(user, system)
+    if "who" in kinds:
+        return ("Я AI-buddy — помощник стажёра в Авито. Подсказываю следующий шаг по плану, объясняю пункты и "
+                "документы команды, готовлю заявки на доступ и отгул, помогаю сформулировать вопрос наставнику. "
+                "Отвечаю только по документам и данным сервисов — если чего-то не знаю, так и скажу.")
+    if "rude" in kinds:
+        return ("Жаль, что ответ не помог. Напиши, что именно не так, — попробую иначе. А кнопка «Не полезно» под "
+                "ответом покажет команде, какие документы стоит дописать.")
+    if "how" in kinds:
+        return (f"{hello + ' ' if 'greet' in kinds else ''}У меня всё хорошо, спасибо! Как у тебя продвигается? "
+                f"{offer}")
+    if "greet" in kinds:
+        return f"{hello} Чем помочь? {offer}"
+    if "bye" in kinds:
+        return "Пока! Удачи — я здесь, если понадоблюсь."
+    if "thanks" in kinds:
+        return "Пожалуйста! Если появится вопрос — спрашивай."
+    if "ack" in kinds:
+        return "Хорошо! Если что-то будет непонятно — пиши."
+    # «empty», «gibberish»
+    return ("Не понял сообщение 🙂 Переформулируй, пожалуйста. Например: «что мне делать дальше?» или "
+            "«как получить доступ к Jira?».")

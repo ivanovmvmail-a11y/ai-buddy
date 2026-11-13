@@ -159,7 +159,7 @@ async def confirm_answer(user_id: str, draft_id: str) -> MentorQuestion:
             drafts.finish(draft, question.id)
             events._record(data, user, 'mentor_question_answered', {'status': 'answered'})
             notify(data, question.intern_id, question.intern_id, 'mentor_answer', question.id,
-                   f'{user.name} ответил на твой вопрос', 'mentor_question')
+                   f'{user.name} {"ответила" if getattr(user, "female", False) else "ответил"} на твой вопрос', 'mentor_question')
         result = question.model_copy(deep=True)
     return await retry_publication(user_id, result.id) if result.publication_status == 'pending' else result
 

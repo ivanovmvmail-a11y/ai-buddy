@@ -303,11 +303,12 @@ async def plan_context(user: User) -> str:
     if user.role in (Role.MENTOR, Role.LEAD, Role.CURATOR):
         visible = [u for u in DEMO_USERS.values() if u.role == Role.INTERN and can_view_intern(user, u)]
         if not visible:
-            return ""
+            return _name_forms([user])
         names = ", ".join(f"{u.name} (intern_id {u.id})" for u in visible)
-        return f"\n\nСтажёры, чьи планы тебе доступны: {names}. Для их плана вызывай get_plan с intern_id."
+        return (f"\n\nСтажёры, чьи планы тебе доступны: {names}. Для их плана вызывай get_plan с intern_id."
+                + _name_forms([user, *visible]))
     if user.role != Role.INTERN:
-        return ""
+        return _name_forms([user])
     try:
         plan = await services.get_plan(user, user.id)
         profile = await services.get_skill_profile(user, user.id)
@@ -331,4 +332,23 @@ async def plan_context(user: User) -> str:
     levels = {"novice": "новичок", "familiar": "знаком", "confident": "уверенно"}
     if profile.skills:
         lines.append("Уровень по темам: " + ", ".join(f"{k} — {levels[v]}" for k, v in profile.skills.items()) + ".")
-    return " ".join(lines)
+    # Проверка 13.11: GigaChat велел стажёру «подтвердить» пункты наставника («Назначить встречи 1:1»).
+    others = [i.title for i in plan.items if i.owner_role != "intern" and i.status != "done"
+              and i.stage in ("week1", "week2")]
+    if others:
+        lines.append("Эти пункты отмечает не стажёр, а наставник или руководитель — стажёру подтверждать их не нужно: "
+                     + ", ".join(f"«{t}»" for t in others) + ".")
+    return " ".join(lines) + _name_forms([user, mentor, lead])
+
+
+def _name_forms(people: list[User | None]) -> str:
+    """Готовые падежи имён для модели (проверка 13.11: «обратись к наставнику Петра Волкова»)."""
+    known = [p for p in people if p is not None and p.forms]
+    if not known:
+        return ""
+    forms = "; ".join(f"{p.name} — у {p.forms[0]}, к {p.forms[1]}, с {p.forms[2]}" for p in known)
+    me = people[0]
+    gender = ""
+    if me is not None and me.role == Role.INTERN:
+        gender = " Стажёр — " + ("девушка: «ты сделала», «ты нашла»." if me.female else "парень: «ты сделал», «ты нашёл».")
+    return f"\n\nФормы имён (бери готовые, сам не склоняй): {forms}.{gender}"

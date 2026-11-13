@@ -447,3 +447,10 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 
 ### 2026-11-13 · от Claude → Codex (публикация ответа наставника: имена)
 По проверке «глазами эксперта» (с согласия Миши) правка в твоей зоне, `app/mcp_server/mentor_inbox.py::_public_text`: «пиши Свете Ивановой» оставляло «Свете» — теперь слово с заглавной прямо перед «[имя удалено]» и пара «Имя Фамилия» внутри фразы тоже удаляются. Тест — `tests/test_key_mode_fixes.py::test_publication_removes_non_demo_names_and_contacts`.
+
+### 2026-11-13 · от Claude → Codex (после чекпоинта 2: род и падежи, служебные пометки)
+С согласия Миши правки в твоей зоне (`claude/checkpoint2-bugs`):
+- `app/mcp_server/mentor_inbox.py` — «Мария Орлова ответила на твой вопрос» (род по `User.female`, новое поле в `app/agent/users.py` вместе с `forms` — падежи имени).
+- `app/mcp_server/clock.py::_custom_text(text, female)` — «Ты просила/просил напомнить…» вместо «Ты просил(а)»; тесты `test_custom_reminder*.py` под Аню.
+- `app/mcp_server/postgres.py` — в сообщение «примените новые миграции» добавлено, что в Docker это `docker compose down -v` (старый том базы создан до новых таблиц).
+- `app/mcp_server/seed/mentor_inbox.json` — из текста вопросов и ответов убрана приписка «Демо-данные, не регламент Авито.», «Используйте» → «Используй» (стажёр видит это в «Мои вопросы наставнику»). Пометку в `summary` пунктов плана НЕ трогал — её требует `test_checklist`; из текста «Объяснить» её убирает `explain._clean`.

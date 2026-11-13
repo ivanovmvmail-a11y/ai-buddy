@@ -225,8 +225,8 @@ def test_prompt_has_plan_context_for_intern(client, use_llm):
 
 def test_tools_shown_by_role(client, use_llm):
     llm = use_llm(text_reply("ok"))
-    ask(client, "?", "intern-anya")
-    ask(client, "?", "hrbp-elena")
+    ask(client, "расскажи про ревью", "intern-anya")
+    ask(client, "расскажи про ревью", "hrbp-elena")
     intern_tools = {t.name for t in llm.calls[0][1]}
     hr_tools = {t.name for t in llm.calls[1][1]}
     assert {"get_plan", "create_access_request", "get_skill_profile"} <= intern_tools
