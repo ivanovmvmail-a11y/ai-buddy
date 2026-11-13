@@ -9,7 +9,7 @@ from app.llm import Message, get_llm
 from app.llm.base import ToolCall
 from app.llm.scenario_provider import (ABSENCE_WORDS, EMOTION_WORDS, FREQUENT_WORDS, HR_ONLY, NEXT_WORDS, RANKING_WORDS,
                                        REQUEST_WORDS, hr_reply, is_hr_question, says_not_found,
-                                       ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule,
+                                       ScenarioProvider, _names_someone, _reason, _today, absence_plan, absence_rule, is_reminder_request, reminder_plan,
                                        docs_conflict, docs_guard, named_intern_plan, policy_reply, scrub_reply,
                                        search_query, second_note, split_actions)
 from app.rag import retrieve
@@ -191,7 +191,7 @@ class Agent:
         отгул с разбором даты, обзор своих стажёров без рейтинга, частые темы вопросов."""
         q = question.lower()
         if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
-                and not any(w in q for w in HR_ONLY) and (today := _today(system))):
+                and not any(w in q for w in HR_ONLY) and not is_reminder_request(question) and (today := _today(system))):
             day, note = absence_plan(q, today)
             if note:
                 return AgentResult(reply=note)
@@ -206,6 +206,21 @@ class Agent:
                     "заявление не пишу — только причину из списка. Проверь дату и нажми «Подтвердить»: без этого "
                     "руководителю ничего не уйдёт.")
             return AgentResult(reply=text, actions=[action], tools=[call.name])
+        # Напоминание по просьбе (13.11): дату и текст разбирает сервер — одинаково для GigaChat и без ключа.
+        if "create_reminder" in available and is_reminder_request(question) and (today := _today(system)):
+            day, text = reminder_plan(question, today)
+            if day is None:
+                return AgentResult(reply=text)
+            call = ToolCall(id="rule_reminder", name="create_reminder",
+                            arguments={"text": text, "remind_on": day.isoformat()})
+            result = await self.executor.call(user, call)
+            action = await self.store.get(result["action_id"]) if result.get("status") == "awaiting_confirmation" else None
+            if action is None:
+                return AgentResult(reply="Сервис напоминаний сейчас не ответил. Попробуй ещё раз чуть позже.",
+                                   tools=[call.name])
+            when = "сегодня" if day == today else f"{day:%d.%m}"
+            return AgentResult(reply=(f"Подготовил напоминание на {when}: {text}. Нажми «Подтвердить» — и в этот день "
+                                      "оно придёт в колокольчик 🔔."), actions=[action], tools=[call.name])
         role = user.role.value
         # Оргвопрос (больничный, отпуск, зарплата) — к HR BP одинаково при любой модели (прогон 13.11: «я заболела»
         # GigaChat то отправлял к HR BP, то нет).

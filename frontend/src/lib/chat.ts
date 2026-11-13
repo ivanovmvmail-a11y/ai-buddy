@@ -1,7 +1,7 @@
 // Лента чата. Приветствие и напоминания собираются из данных сервера (план, заявки, напоминания).
 // Объяснение пункта: с настоящей моделью — вопрос в /chat; без ключа (LLM_PROVIDER=scenario или echo) —
 // сценарный ответ из тех же данных плана и профиля (SPEC, раздел 8).
-import { isInfo, kindOf } from "./notifications";
+import { doneOnOpen, kindOf } from "./notifications";
 import { create } from "zustand";
 import { findUser } from "./users";
 import { waitedFor } from "./plan-logic";
@@ -137,7 +137,7 @@ export function absenceNudgeMsg(leadName: string): Msg {
 
 export function reminderMsg(r: Reminder, item: PlanItem | undefined): Msg {
   // Уведомление-факт («Наставник отметил…», «Отгул согласован») — без кнопок: ничего делать не нужно.
-  if (isInfo(r) || kindOf(r) === "skill_suggestion" || kindOf(r) === "absence_new") return scripted(`🔔 ${r.text}`);
+  if (doneOnOpen(r) || kindOf(r) === "skill_suggestion" || kindOf(r) === "absence_new") return scripted(`🔔 ${r.text}`);
   const actions: BotAction[] = [];
   if (kindOf(r) === "absence_pending") {
     actions.push({ label: "Написать руководителю", kind: "nudge-lead" });

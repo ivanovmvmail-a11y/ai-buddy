@@ -12,7 +12,7 @@ import {
   nudgeMsg, useChat, weeklySummaryMsg,
   type BotAction, type Msg,
 } from "@/lib/chat";
-import { isInfo, kindOf, sectionFor, targetOf } from "@/lib/notifications";
+import { doneOnOpen, kindOf, sectionFor, targetOf } from "@/lib/notifications";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
 import { savedUserId, useSession } from "@/lib/store";
 import type { AccessRequest, DemoUser, ExplainKind, Plan, PlanItem, Reminder } from "@/lib/types";
@@ -226,7 +226,7 @@ export default function Home() {
   /** Из колокольчика (SPEC 3.6): кнопка ведёт туда, где действие, — к блоку на панели плана или в чат. */
   async function openReminder(r: Reminder) {
     // Факт прочитан — из колокольчика уходит, куда бы ни вела кнопка (кнопки «Готово» больше нет).
-    if (isInfo(r)) void api.doneReminder(actor.id, r.id).then(refresh, () => undefined);
+    if (doneOnOpen(r)) void api.doneReminder(actor.id, r.id).then(refresh, () => undefined);
     const section = sectionFor(r);
     if (section) {
       setTab("plan");

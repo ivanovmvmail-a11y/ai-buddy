@@ -28,9 +28,9 @@ class User(BaseModel):
 
 # Права — строки «ресурс:действие». Решают, какие инструменты показать модели; точную проверку
 # (свой стажёр, свой пункт, назначенный согласующий) делают имитации сервисов в app/mcp_server.
-_BASE = frozenset({"profile:read", "reminders:write"})
+_BASE = frozenset({"profile:read"})
 ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
-    Role.INTERN: _BASE | {"plan:read", "plan:write", "access:request", "access:read", "skills:read",
+    Role.INTERN: _BASE | {"reminders:write", "plan:read", "plan:write", "access:request", "access:read", "skills:read",
                           "absence:request", "absence:read"},
     Role.MENTOR: _BASE | {"interns:read", "plan:read", "plan:write", "access:read", "access:approve", "skills:read"},
     Role.LEAD: _BASE | {"interns:read", "plan:read", "plan:write", "absence:read"},

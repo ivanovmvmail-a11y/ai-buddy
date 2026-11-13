@@ -334,7 +334,7 @@ def test_live_questions_get_on_topic_answer(scenario, question, user, expected):
 def test_two_actions_first_done_second_explained(scenario):
     body = ask(scenario, "оформи доступ в джиру и напомни завтра")
     assert [a["tool"] for a in body["actions"]] == ["create_access_request"]
-    assert "напомни завтра" in body["reply"] and "колокольчик" in body["reply"]
+    assert "напомни завтра" in body["reply"] and "отдельным сообщением" in body["reply"]
 
 
 def test_second_non_reminder_action_is_named(scenario):

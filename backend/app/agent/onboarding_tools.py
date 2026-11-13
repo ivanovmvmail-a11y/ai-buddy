@@ -212,6 +212,24 @@ async def list_absence_requests(user: User, args: NoArgs) -> dict:
     return await _safe(run())
 
 
+class ReminderArgs(BaseModel):
+    text: str = Field(min_length=1, max_length=300, description="О чём напомнить, коротко: «1:1 с наставником»")
+    remind_on: date = Field(description="Дата напоминания, ГГГГ-ММ-ДД, не раньше сегодняшней")
+
+
+def describe_reminder(args: ReminderArgs, user: User | None = None) -> str:
+    return f"Напоминание на {args.remind_on:%d.%m.%Y}: {args.text}"
+
+
+async def create_reminder(user: User, args: ReminderArgs) -> dict:
+    """После «Подтвердить»: напоминание ложится в сервис и всплывёт в колокольчике в этот день (HANDOFF 13.11 п. 2)."""
+    async def run():
+        reminder = await clock.add_custom_reminder(user, args.text, args.remind_on)
+        return {"status": "created", "reminder": {"id": reminder.id, "text": args.text,
+                                                   "remind_on": args.remind_on.isoformat()}}
+    return await _safe(run())
+
+
 def register_onboarding_tools(registry: ToolRegistry) -> None:
     registry.register(Tool(
         name="get_plan",
@@ -263,6 +281,13 @@ def register_onboarding_tools(registry: ToolRegistry) -> None:
                      "этот инструмент, это к HR BP. Уходит руководителю только после подтверждения стажёром."),
         args_model=AbsenceArgs, permission="absence:request", handler=create_absence_request, kind="write",
         describe=describe_absence,
+    ))
+    registry.register(Tool(
+        name="create_reminder",
+        description=("Напоминание стажёру самому себе на дату («напомни в пятницу про 1:1»). В этот день оно придёт "
+                     "в колокольчик. Ставится только после подтверждения."),
+        args_model=ReminderArgs, permission="reminders:write", handler=create_reminder, kind="write",
+        describe=describe_reminder,
     ))
     registry.register(Tool(
         name="list_absence_requests",

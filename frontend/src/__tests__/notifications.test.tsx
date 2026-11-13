@@ -68,6 +68,20 @@ describe("колокольчик и сообщения бота (SPEC 3.6)", () 
     await waitFor(() => expect(screen.queryByRole("button", { name: /Напоминания: \d/ })).toBeNull());
   });
 
+  it("своё напоминание стажёра: можно «Напомнить завтра», а «Открыть» показывает его в чате и убирает", async () => {
+    srv.state.notifications.push(note({
+      id: "REM-c", kind: "custom", text: "Ты просил(а) напомнить про 1:1 с наставником",
+    }));
+    open("intern-anya");
+    const dialog = await bell();
+    const item = within(dialog).getByText(/Ты просил\(а\) напомнить/).closest("li")!;
+    expect(within(item).getByRole("button", { name: "Напомнить завтра" })).toBeTruthy();
+    expect(sectionFor(note({ kind: "custom" }))).toBeNull();
+    await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Открыть" })));
+    await waitFor(() => expect(srv.calls.some((c) => c.path === "/reminders/REM-c/done")).toBe(true));
+    expect((await screen.findAllByText("🔔 Ты просил(а) напомнить про 1:1 с наставником")).length).toBeGreaterThan(0);
+  });
+
   it("«В план добавлен пункт…» уходит из колокольчика после «Открыть», хотя ведёт в чат", async () => {
     srv.state.notifications.push(note({
       id: "REM-p", kind: "personal_item_added", action: { label: "Открыть", target: "plan_item" },

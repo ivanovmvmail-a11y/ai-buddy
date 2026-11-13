@@ -114,7 +114,7 @@ export type SkillProfile = z.infer<typeof SkillProfile>;
 export const ReminderKind = z.enum([
   "plan_item", "access_request", "skill_changed", "personal_item_added", "skill_suggestion",
   "absence_pending", "absence_decided", "absence_today", "absence_new", "absence_fact",
-  "mentor_question", "mentor_answer",
+  "mentor_question", "mentor_answer", "custom",
 ]);
 export type ReminderKind = z.infer<typeof ReminderKind>;
 export const ReminderTarget = z.enum(["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern", "mentor_question"]);

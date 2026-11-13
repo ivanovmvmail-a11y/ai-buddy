@@ -253,6 +253,8 @@
 `MentorQuestion`: `{"id", "intern_id", "intern_name", "mentor_id", "team", "question", "created_day", "status": "pending"|"answered", "answer": str|null, "answered_day", "answered_at", "publication_status": "not_requested"|"pending"|"published", "public_content": str|null, "source_id"}`.
 Новые значения: `Reminder.kind` — `mentor_question`, `mentor_answer`; `Reminder.action.target` — `mentor_question` (блок «Вопросы наставнику»). `GET /documents?title=Ответ наставника, …` — опубликованный ответ своей команды.
 
+**Напоминание по просьбе стажёра (13.11).** «Напомни в пятницу про 1:1» → черновик `create_reminder` `{"text", "remind_on": "YYYY-MM-DD"}` → после «Подтвердить» `result` = `{"status": "created", "reminder": {"id", "text", "remind_on"}}`. Новое значение `Reminder.kind` — `custom` (`action`: «Открыть», `target: "plan"`; интерфейс показывает его в чате). До своего дня напоминание лежит отложенным и в `GET /reminders` не приходит; в этот демо-день становится активным, «Напомнить завтра» и «Готово» — как у остальных. Только стажёр и только себе, не раньше сегодняшнего дня и не дальше 60 дней; другим ролям инструмент не показывается, бот честно советует календарь.
+
 ## Предложения по уровню (SPEC 4)
 Бот **предлагает**, наставник **решает**. Стажёр предложений не видит — ни до решения, ни после отказа; он видит
 только результат (новый уровень в `/profile/skills` и уведомление).
