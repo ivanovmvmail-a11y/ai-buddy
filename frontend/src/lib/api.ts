@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import type { ExplainKind } from "./types";
 import {
-  CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, DocumentView, MentorQuestion, MentorQuestionsResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
+  CatalogResponse, AbsenceFactsResponse, AbsenceRequest, AbsenceRequestsResponse, AccessRequest, Action, ActionsResponse, ChatHistory, ChatResponse, DaysResponse, DemoCalendar, DocumentView, MentorQuestion, MentorQuestionsResponse, ExplainedResponse, Health, InternsResponse, Metrics, Plan, PlanItem,
   PlanCompare, PracticeResult, Reminder, RemindersResponse, RequestsResponse, ResetResponse, ResourcesResponse, SkillLevel, SkillProfile,
   SkillSuggestion, SuggestionsResponse, WeeklySummary,
 } from "./types";
@@ -135,6 +135,7 @@ export const api = {
   absenceFacts: (u: string, internId: string) => request(`/absence/facts${q(internId)}`, AbsenceFactsResponse, u),
   compare: (u: string, a: string, b: string) =>
     request(`/plan/compare?intern_ids=${encodeURIComponent(a)},${encodeURIComponent(b)}`, PlanCompare, u),
+  calendar: (u: string) => request("/demo/calendar", DemoCalendar, u),
   nextDay: (u: string, key?: string) => request("/demo/next-day", DaysResponse, u, { ...post(), headers: demoKey(key) }),
   reset: (u: string, key?: string) => request("/demo/reset", ResetResponse, u, { ...post(), headers: demoKey(key) }),
 };

@@ -6,6 +6,7 @@
 черновик и `POST /actions/{id}/confirm`.
 """
 import hmac
+from datetime import timedelta
 import logging
 import time
 from urllib.parse import unquote
@@ -19,7 +20,7 @@ from app import async_runner
 from app.config import settings
 from app.http_body import json_body
 from app.agent import analytics, explain, history, practice, service
-from app.agent.onboarding_tools import resource_titles
+from app.agent.onboarding_tools import intern_today, resource_titles
 from app.agent.users import DEMO_USERS, Role, can_view_intern
 from app.mcp_server import absence, access, checklist, clock, hiring, mentor_inbox, storage
 from app.mcp_server.absence_models import REASONS
@@ -399,6 +400,27 @@ def next_day():
         return denied
     body = _body(NextDayIn)
     return {"days": async_runner.run(clock.advance_day(g.user, body.intern_id))}
+
+
+@bp.get("/demo/calendar")
+def demo_calendar():
+    """Демо-календарь: одна дата «сегодня» для всех и номер дня каждого стажёра.
+
+    Миша 14.11: «день иногда скачет». День меняется только кнопкой «Следующий день» (у всех стажёров сразу), но у
+    стажёров разный номер дня — они вышли в разные даты (Аня — день 2, Иван — день 8), и при «Войти как» казалось, что
+    день сдвинулся. Интерфейс показывает общую дату и дату выхода стажёра. Только даты и номера дней — без планов."""
+    interns = []
+    for user in DEMO_USERS.values():
+        if user.role != Role.INTERN:
+            continue
+        today = async_runner.run(intern_today(user))
+        if today is None:
+            continue
+        day = async_runner.run(clock.get_day(user, user.id))
+        interns.append({"id": user.id, "day": day, "start_date": (today - timedelta(days=day - 1)).isoformat(),
+                        "today": today.isoformat()})
+    today = max((i["today"] for i in interns), default=None)
+    return {"today": today, "interns": [{k: v for k, v in i.items() if k != "today"} for i in interns]}
 
 
 @bp.post("/demo/reset")
