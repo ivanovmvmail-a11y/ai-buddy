@@ -151,11 +151,11 @@ def test_assignment_and_team_rechecked(store, monkeypatch):
 
 def test_reminder_threshold_once_snooze_complete(store, snapshot):
     q = send()
-    assert not [r for r in run(clock.cron_tick(SYSTEM_ACTOR, q.created_day + 1)) if r.mentor_question_id]
-    created = [r for r in run(clock.cron_tick(SYSTEM_ACTOR, q.created_day + 2)) if r.mentor_question_id]
-    assert len(created) == 1 and created[0].user_id == PETR
-    rem = created[0]
-    assert not [r for r in run(clock.cron_tick(SYSTEM_ACTOR, q.created_day + 3)) if r.mentor_question_id]
+    # Claude 13.11: наставник узнаёт о вопросе сразу (колокольчик, «Ответить»); тик не создаёт второе напоминание.
+    [rem] = [r for r in snapshot().reminders.values() if r.mentor_question_id == q.id]
+    assert rem.user_id == PETR and rem.kind == 'mentor_question' and rem.action.label == 'Ответить'
+    for day in (q.created_day + 1, q.created_day + 2, q.created_day + 3):
+        assert not [r for r in run(clock.cron_tick(SYSTEM_ACTOR, day)) if r.mentor_question_id]
     assert rem.id not in {r.id for r in run(clock.list_reminders(DEMO_USERS[ANYA]))}
     with pytest.raises(NotFound): run(clock.done_reminder(DEMO_USERS[ANYA], rem.id))
     snoozed = run(clock.snooze_reminder(DEMO_USERS[PETR], rem.id, 2))
@@ -165,10 +165,13 @@ def test_reminder_threshold_once_snooze_complete(store, snapshot):
     assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR], include_mentor=True)) if r.id == rem.id).status == 'active'
     answer(q)
     assert next(r for r in run(clock.list_reminders(DEMO_USERS[PETR], include_mentor=True)) if r.id == rem.id).status == 'done'
+    [told] = [r for r in run(clock.list_reminders(DEMO_USERS[ANYA])) if r.kind == 'mentor_answer']
+    assert 'ответил на твой вопрос' in told.text and told.action.target == 'mentor_question'
     assert all('intern_id' not in e.payload for e in snapshot().events if e.type.startswith('mentor_'))
     other = send('intern-ivan')
     run(clock.advance_day(DEMO_USERS[ANYA], ANYA))
-    assert not [r for r in snapshot().reminders.values() if r.mentor_question_id == other.id]
+    # только сразу созданное уведомление Марии, день Ани чужой вопрос не трогает
+    assert len([r for r in snapshot().reminders.values() if r.mentor_question_id == other.id]) == 1
 
 def test_persistence_and_postgres_rag(store, monkeypatch):
     from app.mcp_server.postgres import PostgresStore

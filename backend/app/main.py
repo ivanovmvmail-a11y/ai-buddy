@@ -164,6 +164,9 @@ def create_app() -> Flask:
         """Текст документа из «Источник» — только общий или своей команды (как поиск); чужой — 404."""
         title = (request.args.get("title") or "")[:200]
         doc = explain.view_document(title, g.user) if title.strip() else None
+        if doc is None and title.startswith("Ответ наставника"):
+            from app.onboarding_api import published_answer
+            doc = async_runner.run(published_answer(title.strip(), g.user.team))
         if doc is None:
             return jsonify(detail="Документ не найден или недоступен"), 404
         return doc

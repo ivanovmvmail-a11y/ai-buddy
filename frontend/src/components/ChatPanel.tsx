@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { api, type ChatMessage } from "@/lib/api";
 import { approverText, msgId, useChat, type BotAction, type Msg } from "@/lib/chat";
 import { useRefresh, useResources } from "@/lib/queries";
@@ -145,7 +146,9 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
             ))}
           </div>
         )}
-        {questionDraft(m.content) && <CopyDraft text={questionDraft(m.content)!} />}
+        {questionDraft(m.content) && (
+          <CopyDraft text={questionDraft(m.content)!} toMentor={actor.role === "intern" && /Черновик вопроса/.test(m.content) ? actor : null} />
+        )}
         {m.answerId && <Feedback m={m} actor={actor} />}
         {m.scripted && m.kind === "text" && (
           <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">сценарный ответ · из данных плана</div>
@@ -268,9 +271,12 @@ export function questionDraft(content: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-/** Кнопка «Скопировать»: отправлять сообщения бот не умеет — стажёр вставляет вопрос сам (SPEC 3.7). */
-function CopyDraft({ text }: { text: string }) {
+/** «Скопировать» и, для вопроса наставнику, «Отправить наставнику»: вопрос уходит во входящие наставника;
+ *  ответ придёт уведомлением, а с согласия наставника попадёт в базу знаний команды («память», 13.11). */
+function CopyDraft({ text, toMentor }: { text: string; toMentor: DemoUser | null }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const refresh = useRefresh();
+  const send = useMutation({ mutationFn: () => api.askMentor(toMentor!.id, questionOnly(text)), onSuccess: refresh });
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
@@ -284,7 +290,28 @@ function CopyDraft({ text }: { text: string }) {
       <button onClick={copy} className="rounded-lg border border-black/15 px-2.5 py-1 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
         {state === "copied" ? "Скопировано" : "Скопировать вопрос"}
       </button>
+      {toMentor && !send.isSuccess && (
+        <button
+          onClick={() => send.mutate()}
+          disabled={send.isPending}
+          className="rounded-lg bg-[#00aaff] px-2.5 py-1 font-medium text-white disabled:opacity-50"
+        >
+          Отправить наставнику
+        </button>
+      )}
+      {send.isSuccess && (
+        <span role="status" className="text-xs text-black/60 dark:text-white/60">
+          Отправлено. Ответ придёт в колокольчик 🔔 и в «Мои вопросы наставнику».
+        </span>
+      )}
+      {send.isError && <span role="alert" className="text-xs text-red-700 dark:text-red-300">{send.error.message}</span>}
       {state === "failed" && <span role="alert" className="text-xs text-red-700 dark:text-red-300">Не получилось — выдели текст и скопируй вручную.</span>}
     </div>
   );
+}
+
+/** Из черновика «Привет! Подскажи, пожалуйста: <вопрос> Я поискал…» — только сам вопрос. */
+export function questionOnly(draft: string): string {
+  const match = draft.match(/Подскажи, пожалуйста:\s*([\s\S]+?)\s*Я поискал/);
+  return (match ? match[1] : draft).trim();
 }

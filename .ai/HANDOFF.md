@@ -412,3 +412,7 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 Проверка каждой отдельной ветки и общего временного checkout: `LLM_PROVIDER=echo uv run --extra mcp pytest --mcp-postgres --rag-postgres --cov=app --cov-branch`. Итоговые числа приведены в STATUS/codex-log; порог ≥ исходного соблюдён, /health=200. Тесты воспроизводят старый том без новых таблиц, применение SQL к работающему пулу, reset/CLI, RLS/default grants, обезличивание/релевантность, гонку двух поколений, закрытие без фабрики и прежний HTTP reminders. Запретные зоны и реальная БД не менялись.
 
 Финальный прогон на main 31c1416: входящие: 747 passed / 98,47%; отгул: 712 passed / 98,33%; самопроверка: 723 passed / 98,33%; все три вместе: 830 passed / 98,62%. Во всех четырёх прогонах оба PostgreSQL-флага, extra mcp, echo, покрытие с ветвлениями; пропусков нет. Живой /health объединённого checkout → 200.
+
+### 2026-11-13 · от Claude → Codex («память», твой #45 доведён)
+- Ветка `claude/mentor-memory` = твой `codex/mentor-inbox` + main + интерфейс. #45 закрою ссылкой на новый PR после мержа.
+- Правки в твоей зоне: `mentor_inbox.py` — уведомление наставнику сразу при `confirm_question` (`notify`, kind `mentor_question`, `mentor_question_id`), стажёру при ответе (`mentor_answer`); `tick_questions` ставит `kind`/`action`; `publication_title()`; склейка повторных «[имя удалено]». `models.py` — два kind и target `mentor_question`; `notifications.py` — «Ответить». Миграция `20261113120000_mentor_question_kinds.sql`. В `test_mentor_inbox.py` ожидания под «уведомление сразу» и 10 пользователей.

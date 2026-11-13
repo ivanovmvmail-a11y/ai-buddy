@@ -14,6 +14,7 @@ from ._system import SYSTEM_ACTOR
 from .errors import Conflict, NotFound
 from .mentor_models import AnswerInput, MentorQuestion, QuestionInput
 from .models import ActionDraft, Reminder
+from .notifications import notify
 
 log = logging.getLogger("ai_buddy.mentor_inbox")
 
@@ -51,9 +52,16 @@ def _public_text(answer):
             stem = part[:-1] if part.endswith(('а', 'я')) else part
             pattern = irregular.get(part, re.escape(stem).replace('ё', '[её]') + r'[а-яё]*')
             answer = re.sub(r'\b(?:' + pattern + r')\b', '[имя удалено]', answer, flags=re.IGNORECASE)
+    answer = re.sub(r'\[имя удалено\](?:\s+\[имя удалено\])+', '[имя удалено]', answer)  # «Пётр Волков» → одна метка
     answer = re.sub(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', '[контакт удалён]', answer)
     return re.sub(r'(?<!\w)(?:\+?7|8)[ -]?(?:\(\d{3}\)|\d{3})[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)',
                   '[контакт удалён]', answer)
+
+
+def publication_title(question: MentorQuestion) -> str:
+    """Название ответа в базе знаний: «Ответ наставника, 13.11.2026» (дата по Москве)."""
+    day = question.answered_at.astimezone(timezone(timedelta(hours=3))).date()
+    return f'Ответ наставника, {day:%d.%m.%Y}'
 
 
 async def draft_question(user_id: str, text: str) -> ActionDraft:
@@ -79,6 +87,10 @@ async def confirm_question(user_id: str, draft_id: str) -> MentorQuestion:
         data.mentor_questions[question.id] = question
         drafts.finish(draft, question.id)
         events._record(data, user, 'mentor_question_sent', {'status': 'pending'})
+        # Наставник узнаёт сразу (колокольчик, кнопка «Ответить»), а не через день (Claude, 13.11).
+        short = question.question if len(question.question) <= 120 else question.question[:117] + '…'
+        notify(data, question.mentor_id, user.id, 'mentor_question', question.id,
+               f'Новый вопрос — {user.name}: «{short}»', 'mentor_question', mentor_question_id=question.id)
         return question.model_copy(deep=True)
 
 
@@ -132,6 +144,8 @@ async def confirm_answer(user_id: str, draft_id: str) -> MentorQuestion:
                     events._record(data, SYSTEM_ACTOR, 'mentor_question_reminder_completed', {'kind': 'mentor_question'})
             drafts.finish(draft, question.id)
             events._record(data, user, 'mentor_question_answered', {'status': 'answered'})
+            notify(data, question.intern_id, question.intern_id, 'mentor_answer', question.id,
+                   f'{user.name} ответил на твой вопрос', 'mentor_question')
         result = question.model_copy(deep=True)
     return await retry_publication(user_id, result.id) if result.publication_status == 'pending' else result
 
@@ -170,10 +184,9 @@ async def retry_publication(user_id: str, question_id: str) -> MentorQuestion:
         raise Conflict("Публикация не подтверждена")
     if question.publication_status == 'published':
         return question
-    date = question.answered_at.astimezone(timezone(timedelta(hours=3))).date().isoformat()
     try:
         service = rag.get_service() or rag.get_memory_service()
-        await service.ingest(Document(source_id=question.source_id, title=f'Ответ наставника, {date}',
+        await service.ingest(Document(source_id=question.source_id, title=publication_title(question),
                                       content=question.public_content, team=question.team))
     except Exception as error:
         log.warning('Mentor knowledge publication pending (%s)', type(error).__name__)
@@ -211,6 +224,8 @@ def tick_questions(data, day=None, intern_ids=None):
         if current - question.created_day <= 1:
             continue
         reminder = Reminder(id=f'REM-{uuid4().hex}', user_id=question.mentor_id, mentor_question_id=question.id,
+                            kind='mentor_question', intern_id=question.intern_id,
+                            action={'label': 'Ответить', 'target': 'mentor_question', 'topic': None},
                             text='Во входящих есть вопрос без ответа больше дня.', created_day=current)
         data.reminders[reminder.id] = reminder
         created.append(reminder)

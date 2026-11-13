@@ -20,6 +20,7 @@ export const keys = {
   catalog: (u: string, intern: string) => ["catalog", u, intern] as const,
   absenceFacts: (u: string, intern: string) => ["absence-facts", u, intern] as const,
   document: (u: string, title: string) => ["document", u, title] as const,
+  mentorQuestions: (u: string) => ["mentor-questions", u] as const,
 };
 
 /** Документ из «Источник»: грузится только когда окно открыто; текст не меняется — кэш на 10 минут. */
@@ -140,6 +141,15 @@ export const useAbsenceRequests = (actor: DemoUser) =>
     retry: false,
   });
 
+/** «Память»: стажёру — свои вопросы наставнику, наставнику — вопросы его стажёров. */
+export const useMentorQuestions = (actor: DemoUser) =>
+  useQuery({
+    queryKey: keys.mentorQuestions(actor.id),
+    queryFn: () => orEmpty(async () => (await api.mentorQuestions(actor.id)).questions, []),
+    enabled: actor.role === "intern" || actor.role === "mentor",
+    retry: false,
+  });
+
 /** Наставнику — только даты отсутствия своего стажёра. */
 export const useAbsenceFacts = (actor: DemoUser, internId: string) =>
   useQuery({
@@ -154,7 +164,7 @@ export function useRefresh() {
   const client = useQueryClient();
   return () =>
     Promise.all(
-      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts", "catalog"].map((k) =>
+      ["plan", "requests", "reminders", "profile", "summary", "metrics", "suggestions", "compare", "absence", "absence-facts", "catalog", "mentor-questions"].map((k) =>
         client.invalidateQueries({ queryKey: [k] }),
       ),
     );

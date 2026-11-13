@@ -114,9 +114,10 @@ export type SkillProfile = z.infer<typeof SkillProfile>;
 export const ReminderKind = z.enum([
   "plan_item", "access_request", "skill_changed", "personal_item_added", "skill_suggestion",
   "absence_pending", "absence_decided", "absence_today", "absence_new", "absence_fact",
+  "mentor_question", "mentor_answer",
 ]);
 export type ReminderKind = z.infer<typeof ReminderKind>;
-export const ReminderTarget = z.enum(["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern"]);
+export const ReminderTarget = z.enum(["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern", "mentor_question"]);
 export type ReminderTarget = z.infer<typeof ReminderTarget>;
 
 export const Reminder = z.object({
@@ -288,3 +289,19 @@ export const PracticeResult = z.object({
   source: z.object({ title: z.string(), url: z.string().nullable() }).nullable(),
 });
 export type PracticeResult = z.infer<typeof PracticeResult>;
+
+/** «Память»: вопрос стажёра наставнику → ответ → (по выбору наставника) база знаний команды. docs/API.md. */
+export const MentorQuestion = z.object({
+  id: z.string(),
+  intern_id: z.string(),
+  intern_name: z.string(),
+  mentor_id: z.string(),
+  question: z.string(),
+  created_day: z.number(),
+  status: z.enum(["pending", "answered"]),
+  answer: z.string().nullable(),
+  publication_status: z.enum(["not_requested", "pending", "published"]),
+  public_content: z.string().nullable(),
+});
+export type MentorQuestion = z.infer<typeof MentorQuestion>;
+export const MentorQuestionsResponse = z.object({ questions: z.array(MentorQuestion) });

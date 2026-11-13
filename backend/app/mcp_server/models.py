@@ -149,13 +149,13 @@ class SkillSuggestion(Model):
 
 ReminderKind = Literal["plan_item", "access_request", "skill_changed", "personal_item_added",
                        "skill_suggestion", "absence_pending", "absence_decided", "absence_today",
-                       "absence_new", "absence_fact"]
+                       "absence_new", "absence_fact", "mentor_question", "mentor_answer"]
 
 
 class ReminderAction(Model):
     topic: str | None = Field(default=None, exclude_if=lambda value: value is None)
     label: str
-    target: Literal["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern"]
+    target: Literal["plan", "plan_item", "access_request", "skill_suggestion", "absence_request", "intern", "mentor_question"]
 
 
 class Reminder(Model):

@@ -10,7 +10,7 @@ export function targetOf(r: Reminder): ReminderTarget {
 }
 
 /** Сообщают факт и ничего не ждут: после «Открыть» уходят из колокольчика, «Напомнить завтра» им не нужно. */
-const INFO: ReadonlySet<ReminderKind> = new Set(["skill_changed", "personal_item_added", "absence_decided", "absence_today", "absence_fact"]);
+const INFO: ReadonlySet<ReminderKind> = new Set(["skill_changed", "personal_item_added", "absence_decided", "absence_today", "absence_fact", "mentor_answer"]);
 export const isInfo = (r: Reminder) => INFO.has(kindOf(r));
 
 export function actionLabel(r: Reminder): string {
@@ -24,6 +24,7 @@ export function sectionFor(r: Reminder): string | null {
     case "skill_suggestion": return "Предложения бота";
     case "absence_request": return kindOf(r) === "absence_pending" ? null : "Заявки на отгул";
     case "intern": return "Мои стажёры";
+    case "mentor_question": return "Вопросы наставнику";
     case "plan": return "Этапы стажировки";
     default: return null;
   }

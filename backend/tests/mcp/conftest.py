@@ -18,7 +18,7 @@ def apply_onboarding_migrations(connection):
     """Сервисные SQL по времени, без отдельных RAG/Grafana-миграций."""
     connection.execute(MIGRATION.read_text(encoding="utf-8"))
     suffixes = ("_service_drafts.sql", "_mentor_inbox.sql", "_absence.sql", "_self_check.sql",
-                "_personal_plan.sql", "_reminder_kinds.sql", "_skill_suggestions.sql", "_notification_links.sql", "_access_training_resources.sql")
+                "_personal_plan.sql", "_reminder_kinds.sql", "_skill_suggestions.sql", "_notification_links.sql", "_access_training_resources.sql", "_mentor_question_kinds.sql")
     for path in sorted(MIGRATION.parent.glob("*.sql")):
         if path.name.endswith(suffixes):
             connection.execute(path.read_text(encoding="utf-8"))
