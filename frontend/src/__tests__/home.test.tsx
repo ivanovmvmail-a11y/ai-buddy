@@ -65,6 +65,8 @@ describe("«Главная» стажёра", () => {
 
 describe("переключатель темы", () => {
   it("переключает и запоминает тему", async () => {
+    const data = new Map<string, string>(); // Node 24 подставляет пустой localStorage — честное хранилище в памяти
+    vi.stubGlobal("localStorage", { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) });
     open();
     const btn = await screen.findByRole("button", { name: /тема$/ });
     const before = btn.getAttribute("aria-label");
