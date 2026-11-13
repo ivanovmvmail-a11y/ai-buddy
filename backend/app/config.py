@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     mcp_url: str = ""
     mcp_service_token: str = ""
 
+    # Эксперимент 14.11 (app/agent/intent.py): намерение стажёра определяет модель — "model"; пусто — по словам, как раньше.
+    intent_router: str = ""
+
     # Код-слово для демо-кнопок «Сброс» и «Следующий день» (заголовок X-Demo-Key).
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.
     demo_key: str = ""
