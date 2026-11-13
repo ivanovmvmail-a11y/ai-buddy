@@ -83,3 +83,27 @@ def test_item_without_check_and_validation(client):
     item = item_with(client, "intern-anya", GIT)
     assert submit(client, "intern-anya", item["id"], "").status_code == 422
     assert submit(client, "intern-anya", item["id"], "x" * 2001).status_code == 422
+
+
+def suggestions(client, mentor="mentor-petr"):
+    return client.get("/skills/suggestions", headers=as_user(mentor)).get_json()["suggestions"]
+
+
+def test_passed_task_becomes_basis_for_mentor(client):
+    """Проверка 13.11: наставник видит засчитанное задание основанием поднять уровень — что именно засчитано."""
+    item = item_with(client, "intern-anya", GIT)
+    assert not [s for s in suggestions(client) if s["topic"] == item["topic"]]
+    assert submit(client, "intern-anya", item["id"], "сделала ветку").get_json()["passed"] is False
+    assert not [s for s in suggestions(client) if s["topic"] == item["topic"]]  # не засчитано — повода нет
+
+    answer = "создала ветку git checkout -b, сделала коммит, git push и открыла pull request"
+    assert submit(client, "intern-anya", item["id"], answer).get_json()["passed"] is True
+    [sug] = [s for s in suggestions(client) if s["topic"] == item["topic"]]
+    assert sug["basis"].startswith("сдано практическое задание") and "коммит" in sug["basis"]
+    assert sug["from_level"] == "novice" and sug["to_level"] == "familiar"
+    # повторная сдача не плодит предложения; стажёр предложение не видит; чужой наставник — тоже
+    submit(client, "intern-anya", item["id"], answer)
+    assert len([s for s in suggestions(client) if s["topic"] == item["topic"]]) == 1
+    assert not [s for s in suggestions(client, "mentor-maria") if s["intern_id"] == "intern-anya"]
+    kinds = [e.type for e in async_runner.run(events.list_events(SYSTEM_ACTOR, "intern-anya"))]
+    assert "practice_passed" in kinds
