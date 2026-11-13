@@ -120,7 +120,8 @@ export default function Home() {
     for (let i = 0; i < past.length; i++) {
       const m = past[i];
       const answer = m.role === "user" ? past[i + 1] : m;
-      const topic: Topic = guessTopic(answer?.content ?? m.content);
+      const question = m.role === "user" ? m : past[i - 1]?.role === "user" ? past[i - 1] : undefined;
+      const topic: Topic = guessTopic(answer?.content ?? m.content, question?.content);
       say({
         id: msgId(), role: m.role, kind: "text", content: m.content, scripted: m.scripted || undefined, topic,
         sources: m.sources.length ? m.sources : undefined, answerId: m.answer_id ?? undefined,
@@ -359,7 +360,8 @@ export default function Home() {
 
   const mobileTabs: Array<{ id: Section | "chat"; label: string }> = [
     ...(actor.role === "intern" ? (["home", "plan", "profile"] as Section[]) : (["plan"] as Section[]))
-      .map((id) => ({ id, label: actor.role === "intern" ? SECTIONS[id] : "План" })),
+      // На телефоне коротко: «Мой профиль» сдвигал «Чат» за правый край 375 px (финальная проверка 13.11).
+      .map((id) => ({ id, label: actor.role === "intern" ? (id === "profile" ? "Профиль" : SECTIONS[id]) : "План" })),
     { id: "chat", label: "Чат" },
   ];
 

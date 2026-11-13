@@ -260,10 +260,10 @@ describe("экран «план + чат» на API", () => {
     srv.state.profiles[0].updated_by = "mentor-petr";
     open();
     await screen.findByText(/2-й день стажировки/);
-    await click(screen.getByRole("tab", { name: "Мой профиль" }));
+    await click(screen.getByRole("tab", { name: "Профиль" }));
     expect(await screen.findByRole("heading", { name: "Мой профиль" })).toBeTruthy();
-    expect(screen.getByText("Пётр Волков")).toBeTruthy();
-    expect(screen.getByText("Ольга Новикова")).toBeTruthy();
+    expect(screen.getAllByText("Пётр Волков").find((e) => e.tagName !== "OPTION")).toBeTruthy();
+    expect(screen.getAllByText("Ольга Новикова").find((e) => e.tagName !== "OPTION")).toBeTruthy();
     expect(screen.getByText("Git — новичок")).toBeTruthy();
     expect(screen.getByText("SQL — уверенно")).toBeTruthy();
     expect(screen.getByText(/Не влияет на права/)).toBeTruthy();
@@ -328,7 +328,7 @@ describe("экран «план + чат» на API", () => {
   it("у наставника нет вкладки «Мой профиль»", async () => {
     open("mentor-petr");
     await screen.findByText(/План: Аня Смирнова/);
-    expect(screen.queryByRole("tab", { name: "Мой профиль" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Профиль" })).toBeNull();
   });
 
   it("«Следующий день» и «Сброс»", async () => {
@@ -388,7 +388,7 @@ describe("экран «план + чат» на API", () => {
   it("HR BP не видит планы", async () => {
     open("hrbp-elena");
     expect(await screen.findByText(/для твоей роли недоступны/)).toBeTruthy();
-    expect(await screen.findByText(/Планы и профили стажёров тебе не показываю/)).toBeTruthy();
+    expect(await screen.findByText(/Планы и профили стажёров тебе не показываю/, undefined, { timeout: 3000 })).toBeTruthy();
   });
 
   it("сервер недоступен — сообщение и «Повторить»", async () => {

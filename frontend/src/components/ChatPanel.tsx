@@ -50,11 +50,14 @@ export async function askBot(actor: DemoUser, text: string) {
     if (res.mode === "practice" && item) chat.setPractice({ itemId: item.id, title: item.title });
     const actions = item ? itemActions(item, actor, res.mode === "practice" ? ["practice"] : []) : [];
     const where = actor.role === "intern" ? res.topic : undefined;
+    // Первый черновик — карточкой в том же ответе: отдельное «Черновик — проверь и подтверди» повторяло ответ
+    // (финальная проверка 13.11).
+    const [first, ...more] = res.actions;
     chat.push({
       id: msgId(), role: "assistant", kind: "text", content: res.reply, sources: res.sources, topic: where,
-      answerId: res.answer_id ?? undefined, actions: actions.length ? actions : undefined,
+      answerId: res.answer_id ?? undefined, actions: actions.length ? actions : undefined, draft: first,
     });
-    for (const action of res.actions) {
+    for (const action of more) {
       chat.push({ id: msgId(), role: "assistant", kind: "draft", content: "Черновик — проверь и подтверди.", draft: action, topic: where });
     }
   } catch (err) {
@@ -246,8 +249,10 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
               <button
                 key={a.label}
                 onClick={() => onAction(a)}
+                // Первая кнопка — контурная: главная (залитая синяя) на экране одна — в карточке «Следующий шаг»
+                // (финальная проверка 13.11: рядом были две главные «Сделать за меня»).
                 className={i === 0 && a.kind !== "snooze"
-                  ? "rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background hover:opacity-85"
+                  ? "rounded-full border border-foreground/30 px-4 py-1.5 text-sm font-semibold hover:bg-foreground/5"
                   : "rounded-full px-2 py-1.5 text-sm font-medium text-accent-ink underline-offset-4 hover:underline"}
               >
                 {a.label}
@@ -282,7 +287,7 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
         {m.answerId && <Feedback m={m} actor={actor} />}
         {/* Подпись — откуда ответ (проверка 13.11: с ключом приветствие было «сценарным», а у ответов модели подписи не было). */}
         {m.kind === "text" && (m.scripted || m.answerId) && (
-          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/35 dark:text-white/35">
+          <div className="mt-1.5 text-[11px] uppercase tracking-wide text-black/60 dark:text-white/60">
             {m.scripted ? (m.label ?? "из данных плана") : "ответ ИИ · сверяй с источником"}
           </div>
         )}

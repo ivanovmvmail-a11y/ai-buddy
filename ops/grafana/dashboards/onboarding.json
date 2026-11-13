@@ -164,14 +164,15 @@
             "type": "grafana-postgresql-datasource",
             "uid": "ai-buddy-postgres"
           },
-          "rawSql": "SELECT coalesce(avg(useful::int),0) AS value FROM public.grafana_feedback WHERE $__timeFilter(ts)",
+          "rawSql": "SELECT avg(useful::int) AS value FROM public.grafana_feedback WHERE $__timeFilter(ts)",
           "format": "table",
           "rawQuery": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "noValue": "оценок пока нет"
         },
         "overrides": []
       },

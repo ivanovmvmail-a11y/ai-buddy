@@ -103,7 +103,7 @@ export function PlanPanel({ actor, onExplain, onDo, onPractice }: Props) {
         if (!items.length) return null;
         return (
           <section key={stage} aria-label={STAGE_TITLES[stage]}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-black/60 dark:text-white/60">
               {STAGE_TITLES[stage]} {!isWorking(stage) && "· впереди"}
             </h3>
             <ul className="space-y-2">

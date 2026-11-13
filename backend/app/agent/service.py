@@ -289,6 +289,12 @@ class Agent:
         (проверка 12.11: модель отвечала «вызови инструмент…», путала дату отгула, не знала частых тем):
         отгул с разбором даты, обзор своих стажёров без рейтинга, частые темы вопросов."""
         q = question.lower()
+        # «Кому писать про отгул?» — вопрос, а не просьба: правило без черновика (финальная проверка 13.11: бот сразу
+        # готовил заявление на завтра). «Как отпроситься», «мне завтра к врачу» — по-прежнему черновик (SPEC 3.8).
+        if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
+                and re.match(r"\s*(а\s+)?(кому|к кому|куда)(?![а-яё])", q) and not re.search(r"завтра|сегодня|\d", q)):
+            return AgentResult(reply=absence_rule(system) + "Если нужен отгул — напиши, на какой день (например, "
+                               "«отгул на завтра»), подготовлю черновик заявления.")
         if ("create_absence_request" in available and any(w in q for w in ABSENCE_WORDS)
                 and not any(w in q for w in HR_ONLY) and not is_reminder_request(question) and (today := _today(system))):
             day, note = absence_plan(q, today)

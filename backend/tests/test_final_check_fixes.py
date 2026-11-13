@@ -71,7 +71,7 @@ def test_names_all_order():
 
 
 def test_absence_question_without_doctor_does_not_mention_doctor(demo_docs):
-    assert "врача" not in ask(demo_docs, "кому писать про отгул?")["reply"].split("Подготовил черновик")[1]
+    assert "врача" not in ask(demo_docs, "хочу отгул на завтра")["reply"].split("Подготовил черновик")[1]
     assert "Подробности вроде врача" in ask(demo_docs, "мне завтра к врачу")["reply"]
 
 

@@ -155,11 +155,21 @@ SWAGGER_HTML = """<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI-buddy API</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css">
+<style>html, body { background: #fff; color: #3b4151; margin: 0; } .offline { font: 16px/1.5 sans-serif; padding: 24px; }</style>
 </head><body>
 <div id="ui"></div>
 <noscript>Описание API в формате OpenAPI: <a href="openapi.json">openapi.json</a></noscript>
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
-<script>window.ui = SwaggerUIBundle({ url: "openapi.json", dom_id: "#ui", persistAuthorization: true });</script>
+<script>
+// Финальная проверка 13.11: без интернета страница была пустой, в тёмной теме браузера — тёмный текст на тёмном.
+if (window.SwaggerUIBundle) {
+  window.ui = SwaggerUIBundle({ url: "openapi.json", dom_id: "#ui", persistAuthorization: true });
+} else {
+  document.getElementById("ui").innerHTML = '<div class="offline">Страница Swagger UI грузится с cdn.jsdelivr.net — '
+    + 'сейчас он недоступен. Описание API целиком: <a href="openapi.json">openapi.json</a> (откроется в Postman, '
+    + 'Insomnia или любом клиенте OpenAPI).</div>';
+}
+</script>
 </body></html>"""
 
 
