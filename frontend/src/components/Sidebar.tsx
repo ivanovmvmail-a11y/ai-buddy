@@ -1,6 +1,6 @@
 "use client";
 
-// Левая колонка (редизайн 13.11, по мотивам онбординга Т-Банка): тёмная навигация — карточка профиля с прогрессом,
+// Левая колонка (редизайн 13.11, по мотивам онбординга Т-Банка; светлая, как career.avito.com: тёмная давала слишком резкий контраст): навигация — карточка профиля с прогрессом,
 // разделы, внизу — демо-панель («Войти как», «Следующий день», «Сброс»), чтобы она не мешала самому продукту.
 import { usePlan } from "@/lib/queries";
 import { DEMO_USERS, ROLE_TITLES } from "@/lib/users";
@@ -54,7 +54,7 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
   const sections: Section[] = intern ? ["home", "plan", "profile"] : ["plan"];
 
   return (
-    <aside aria-label="Навигация" className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain bg-sidebar p-4 text-white">
+    <aside aria-label="Навигация" className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain border-r border-line bg-sidebar p-4 text-foreground">
       <div className="flex items-center gap-2 px-1">
         <span className="grid size-8 place-items-center rounded-full bg-accent text-sm font-bold text-black">AI</span>
         <span className="text-lg font-bold tracking-tight">AI-buddy</span>
@@ -87,7 +87,7 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
             aria-current={section === s ? "page" : undefined}
             onClick={() => onSection(s)}
             className={`rounded-xl px-3 py-2.5 text-left text-[15px] font-medium transition-colors ${
-              section === s ? "bg-white/12 text-white" : "text-white/65 hover:bg-white/8 hover:text-white"
+              section === s ? "bg-foreground text-background" : "text-[var(--muted)] hover:bg-surface-2 hover:text-foreground"
             }`}
           >
             {intern ? SECTIONS[s] : "План стажёров"}
@@ -96,19 +96,19 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
       </nav>
 
       {/* Демо-панель: инструмент показа, не часть продукта — внизу и приглушённо. */}
-      <section aria-label="Демо-панель" className="mt-auto space-y-2 rounded-2xl border border-dashed border-white/20 p-3 text-sm">
+      <section aria-label="Демо-панель" className="mt-auto space-y-2 rounded-2xl border border-dashed border-line p-3 text-sm">
         <div
-          className="text-xs text-white/50"
+          className="text-xs text-[var(--muted)]"
           title="В демо свой календарь: «сегодня» после «Сброс» — среда 11.11.2026, «Следующий день» сдвигает его."
         >
           Демо-панель · календарь с 11.11{scriptedMode && " · сценарный режим (без ключа модели)"}
         </div>
         <label className="block">
-          <span className="text-xs text-white/50">Войти как</span>
+          <span className="text-xs text-[var(--muted)]">Войти как</span>
           <select
             value={actor.id}
             onChange={(e) => onUser(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-white/20 bg-black px-2 py-1.5 text-white"
+            className="mt-1 block w-full rounded-lg border border-line bg-surface px-2 py-1.5"
           >
             {DEMO_USERS.map((u) => (
               <option key={u.id} value={u.id}>{u.name} — {ROLE_TITLES[u.role]}</option>
@@ -116,10 +116,10 @@ export function Sidebar({ actor, section, onSection, onUser, onNextDay, onReset,
           </select>
         </label>
         <div className="flex gap-2 text-xs">
-          <button onClick={onNextDay} className="flex-1 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 hover:bg-white/15">Следующий день</button>
-          <button onClick={onReset} className="rounded-full px-3 py-1.5 text-white/70 hover:bg-white/10 hover:text-white">Сброс</button>
+          <button onClick={onNextDay} className="flex-1 whitespace-nowrap rounded-full bg-surface-2 px-3 py-1.5 hover:bg-line">Следующий день</button>
+          <button onClick={onReset} className="rounded-full px-3 py-1.5 text-[var(--muted)] hover:bg-surface-2 hover:text-foreground">Сброс</button>
         </div>
-        {demoError && <p role="alert" className="text-xs text-red-300">{demoError}</p>}
+        {demoError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{demoError}</p>}
       </section>
     </aside>
   );
