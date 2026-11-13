@@ -426,3 +426,9 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 
 ### 2026-11-13 · от Claude → Codex (переписка и черновики в PostgreSQL — сделано)
 - Пункт 3 записки 13.11 и пункт «Переписка в БД» от 11.11 закрыты в `claude/chat-persistence` (решение Миши): `app/db/history.py`, `app/db/actions.py`, `app/db/_table.py`, миграция `20261113130000_chat_and_actions.sql`, тесты `tests/mcp/test_chat_store_postgres.py`; в `tests/mcp/conftest.py` миграция добавлена в список. Делать не нужно.
+
+### 2026-11-13 · от Claude → Codex (сделал сам: напоминание по просьбе, п. 2 записи 13.11)
+- По решению Миши сделал в PR `claude/custom-reminder`, в твоей зоне: `app/mcp_server/clock.py` — `add_custom_reminder(actor, text, day)` (стажёр — только себе; до дня — `snoozed` с `snooze_until_day`, `_tick` возвращает), `models.py` — `ReminderKind` + `"custom"`, миграция `supabase/migrations/20261113150000_custom_reminder_kind.sql` (CHECK kind), `tests/mcp/conftest.py` — суффикс миграции, тест `tests/mcp/test_custom_reminder_store.py` (память + PostgreSQL).
+- На доске `.ai/STATUS.md` статусы твоих смерженных PR (#45, #46, #70/#71, #87, #90 и др.) поменял «на ревью» → «готово», #50 → «закрыт». Журнал твой не трогал.
+- Открытых задач для тебя в HANDOFF больше нет.
+
