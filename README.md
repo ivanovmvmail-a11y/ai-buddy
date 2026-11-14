@@ -98,6 +98,7 @@ docker compose up --build
 - backend — http://localhost:8000/health
 - Grafana — http://localhost:3002, [готовая панель и настройки входа](ops/grafana/README.md)
 - Redis — внутри Docker, хранит feature flags, переключённые на ходу (порт наружу не открыт)
+- Apache Kafka — внутри Docker, принимает события продукта (порт наружу не открыт); первый запуск из-за неё скачивает на ~400 МБ больше
 - база PostgreSQL + pgvector — внутри Docker (порт наружу не открыт, чтобы не мешать установленному у вас PostgreSQL); консоль: `docker compose exec db psql -U buddy -d ai_buddy` (тестовые учётные данные `buddy` / `buddy`)
 
 **Без ключей** всё запускается в **сценарном режиме** (`LLM_PROVIDER=scenario`, спека [003](docs/specs/003-scenario-mode/spec.md)): весь маршрут демо проходится — следующий шаг по плану, черновик заявки на доступ с подтверждением, отказ на чужие данные, ответ по документам с источником, «в базе нет» с черновиком вопроса наставнику. Ответы собираются из данных сервисов и документов, без нейросети; в интерфейсе это подписано.
@@ -222,7 +223,7 @@ cd backend && uv run --extra mcp python -m app.mcp_server.server --user intern-a
 | Имитации сервисов в `app/mcp_server/` — одна служба MCP по Streamable HTTP с ключом службы | Настоящие MCP-серверы сервисов Авито (MCP Hub), меняется `MCP_URL`; пользователь — из SSO |
 | GigaChat / сценарный режим (`LLM_PROVIDER`) | A-Vibe или другая модель — одна переменная |
 | Кнопка «Следующий день» | ИИ-крон по расписанию |
-| Таблица событий → Grafana | Clickstream / Kafka |
+| Таблица событий → Grafana; те же события — в Apache Kafka (служба `kafka`, топик `ai-buddy.events`) | Clickstream поверх Kafka Авито: меняется адрес брокера |
 | Feature flags в Redis (`GET` / `POST /features`, `FEATURE_FLAGS`) | Система feature flags Авито |
 
 **Feature flags работают на деле** ([спека 006](docs/specs/006-feature-flags/spec.md)): четыре функции включаются и выключаются без правки кода — при запуске (`FEATURE_FLAGS="quick_access=off"`) и на ходу, без перезапуска; значение на ходу лежит в **Redis** (в Docker — служба `redis`; Redis недоступен — backend работает по значениям запуска). Проверить: откройте http://localhost:8000/docs → `POST /features` или выполните
@@ -231,7 +232,15 @@ cd backend && uv run --extra mcp python -m app.mcp_server.server --user intern-a
 curl -X POST http://localhost:8000/features -H "X-User-Id: mentor-petr" -H "Content-Type: application/json" -d "{\"name\":\"quick_access\",\"enabled\":false}"
 ```
 
-После этого «Сделать за меня» у «Запросить базовые доступы» готовит черновик с «Подтвердить» вместо выдачи в один клик. «Сброс» в демо-панели возвращает флаги к начальным. Kafka в прототипе нет намеренно: события пишутся в таблицу в формате Clickstream одной функцией — при внедрении меняется только она.
+После этого «Сделать за меня» у «Запросить базовые доступы» готовит черновик с «Подтвердить» вместо выдачи в один клик. «Сброс» в демо-панели возвращает флаги к начальным.
+
+**События уходят в Apache Kafka** ([спека 304](docs/specs/304-event-stream/spec.md)): каждое событие продукта (вопрос задан, заявка создана, пункт закрыт, задание сдано) после записи в таблицу дублируется в топик `ai-buddy.events` — так его в Авито забрал бы Clickstream. Текстов вопросов и ответов в событиях нет. Kafka не может помешать работе: отправка идёт в фоне, от службы `kafka` никто не зависит. Посмотреть события (сначала сделайте пару действий на сайте):
+
+```bash
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ai-buddy.events --from-beginning --timeout-ms 5000
+```
+
+Счётчики отправки — http://localhost:8000/docs → `GET /events/stream`.
 
 **Полная карта «что заменить → в каком файле» и входы для систем Авито — [docs/INTEGRATION.md](docs/INTEGRATION.md).** Коротко:
 - **API описан в OpenAPI 3.1**: http://localhost:8000/docs (Swagger UI) и `/openapi.json`. Описание собирается из кода и не расходится с ним.
@@ -283,6 +292,7 @@ curl -X POST http://localhost:8000/features -H "X-User-Id: mentor-petr" -H "Cont
 | Next.js · React · TypeScript · Tailwind | 15.5.28 · 19.1.10 · 5 · 4 (точные версии — `frontend/package-lock.json`) |
 | PostgreSQL + pgvector | 17 (образ `pgvector/pgvector:pg17`) |
 | Redis | 7 (образ `redis:7-alpine`), клиент `redis` 6.4.0 |
+| Apache Kafka | 3.9.0 (образ `apache/kafka:3.9.0`, режим KRaft), клиент `kafka-python` 2.3.3 |
 | Grafana | 12.3.1 |
 
 ## Проверка

@@ -48,6 +48,11 @@
 - На контракт остальных адресов флаги не влияют: при `quick_access=off` `POST /actions` с `quick: true` возвращает
   обычный черновик (`pending`) — интерфейс его уже умеет показывать.
 
+## Поток событий в Kafka (14.11, спека 304)
+- `GET /events/stream` → `{"enabled": bool, "topic": str | null, "connected": bool, "queued": int, "sent": int, "dropped": int}` —
+  счётчики отправки событий в Apache Kafka этим процессом backend. Любая вошедшая роль; данных пользователей нет.
+  На остальные адреса поток не влияет.
+
 ## POST /chat
 Запрос:
 ```json

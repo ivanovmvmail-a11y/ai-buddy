@@ -14,7 +14,7 @@
 | Имитации сервисов: план, доступы, найм, отсутствия, напоминания | MCP-серверы сервисов Авито за MCP Hub | Агент уже ходит к ним **по протоколу MCP по сети**. Указать адрес и ключ: `MCP_URL`, `MCP_SERVICE_TOKEN`. Имена и поля инструментов — контракт | `app/agent/services.py` (шлюз), `app/mcp_server/` (контракт, спека 005) |
 | GigaChat | A-Vibe или другая внутренняя модель | `LLM_PROVIDER` + ключ; для OpenAI-совместимого API — `OPENAI_BASE_URL`. Новый провайдер — один класс | `app/llm/base.py::LLMProvider` |
 | Демо-документы + поиск по словам | Confluence + корпоративный поиск / эмбеддинги | Загрузчик документов из Confluence; эмбеддинги — `EMBEDDINGS_PROVIDER`. Правило «свой документ или общий» уже в поиске | `app/rag/` (`DocumentStore`, `Embedder`) |
-| Таблица событий → Grafana | Clickstream / Kafka → ClickHouse | Отправка события — одна функция; события без текстов вопросов | `app/agent/analytics.py`, `grafana/` |
+| Таблица событий → Grafana; те же события — в Apache Kafka, топик `ai-buddy.events` (служба `kafka` в Docker) | Clickstream / Kafka → ClickHouse | Адрес брокера `KAFKA_BOOTSTRAP` и имя топика `KAFKA_TOPIC`; формат сообщения — одна функция `to_message`. События без текстов вопросов | `app/event_stream.py`, `app/agent/analytics.py`, спека 304 |
 | Feature flags: `app/features.py`, значения на ходу в Redis | Система feature flags Авито (compile-time и runtime) | Одна функция `features.enabled(name)`; места проверки в коде не меняются | `app/features.py`, спека 006 |
 | PostgreSQL в Docker / Supabase | PostgreSQL PaaS Авито | `DATABASE_URL`; схема — SQL-миграции | `supabase/migrations/` |
 | Веб-чат | Mattermost | Уже есть вход для бота (ниже) | `app/integrations.py` |
