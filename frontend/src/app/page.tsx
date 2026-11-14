@@ -228,18 +228,25 @@ export default function Home() {
    *  доступ к коду команды и всё, что согласует человек, — черновик с «Подтвердить». */
   async function onDo(item: PlanItem) {
     openChat("requests");
-    say({ id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}` });
+    // Место для ответа — сразу под вопросом и во вкладке «Заявки» (Миша, Railway 14.11: нажал «Сделать за меня» у двух
+    // пунктов подряд — ответ на первый, более долгий, уехал ниже черновика второго и казался потерянным).
+    const slot = msgId();
+    say(
+      { id: msgId(), role: "user", kind: "text", content: `Сделай за меня: ${item.title}`, topic: "requests" },
+      { id: slot, role: "assistant", kind: "text", content: "Оформляю заявку…", topic: "requests" },
+    );
+    const answer = (patch: Partial<Msg>) => useChat.getState().update(slot, patch);
     try {
       const action = await api.quickDraft(actor.id, "create_access_request", accessDraftParams(item, actor));
       if (action.status === "pending") {
-        say({
-          id: msgId(), role: "assistant", kind: "draft", draft: action,
+        answer({
+          kind: "draft", draft: action,
           content: "Это доступ к рабочему пространству команды — такие заявки я не отправляю без тебя. Проверь черновик и подтверди.",
         });
         return;
       }
       if (action.status === "failed") {
-        say({ id: msgId(), role: "assistant", kind: "error", content: `Не получилось: ${action.error}` });
+        answer({ kind: "error", content: `Не получилось: ${action.error}` });
         return;
       }
       const req = (action.result as { request?: AccessRequest } | null)?.request;
@@ -248,21 +255,24 @@ export default function Home() {
       await refresh();
       await sayNext(req?.status === "granted"
         ? `Готово: заявка ${req.id} — доступ к «${title}» на чтение выдан. Подтверждать не нужно: это учебный сервис только на чтение. Пункт плана закрыт.`
-        : `Заявка ${req?.id ?? ""} отправлена: ${findUser(req?.approver_id)?.name ?? "согласующий"} получит её на согласование. Я напомню, если затянется.`);
+        : `Заявка ${req?.id ?? ""} отправлена: ${findUser(req?.approver_id)?.name ?? "согласующий"} получит её на согласование. Я напомню, если затянется.`,
+      slot);
     } catch (err) {
-      say({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
+      answer({ kind: "error", content: (err as Error).message });
     }
   }
 
-  /** Сообщение бота + следующий шаг плана с его кнопками. */
-  async function sayNext(text: string) {
+  /** Сообщение бота + следующий шаг плана с его кнопками. С `slot` — заполняет уже показанное место для ответа. */
+  async function sayNext(text: string, slot?: string) {
     const plan = await loadPlan(actor.id);
     const next = plan?.next_step.item;
     const buttons = next ? itemActions(next, actor) : [];
-    say({
-      id: msgId(), role: "assistant", kind: "text", scripted: true, actions: buttons.length ? buttons : undefined,
+    const msg = {
+      role: "assistant" as const, kind: "text" as const, scripted: true, actions: buttons.length ? buttons : undefined,
       content: text + (next ? `\n\nСледующий шаг — «${next.title}».` : ""),
-    });
+    };
+    if (slot) useChat.getState().update(slot, msg);
+    else say({ id: msgId(), ...msg });
   }
 
   /** «Сдать задание» — в чате (чекпоинт 2): бот даёт задание, следующее сообщение стажёра уходит на проверку. */
