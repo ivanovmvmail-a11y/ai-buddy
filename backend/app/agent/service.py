@@ -38,6 +38,18 @@ MAX_TOOL_STEPS = 5
 # Сколько фрагментов документов класть в контекст. Документов ~22: при 6 поиск без ключа (по словам) вытеснял нужный абзац соседними темами.
 RAG_TOP_K = 8
 MAX_SOURCES = 2
+# Вопрос о своей команде: «чем занимается команда», «как устроена команда», «расскажи про команду».
+ABOUT_TEAM = re.compile(r"(чем\s+(она\s+)?занима|как\s+устроен|что\s+делает)[^.?!]*команд"
+                        r"|команд[^.?!]*(чем\s+(она\s+)?занима|как\s+устроен|что\s+делает)"
+                        r"|расскажи\s+(про|о)\s+(мо[юе]й?\s+|наш[уе]й?\s+)?команд[уе](?![а-яё])\s*[.?!]?\s*$")
+
+
+def readable_marks(text: str) -> str:
+    """Метки обезличивания из опубликованного ответа наставника — человеческими словами."""
+    text = re.sub(r"\s*\[контакт удал[её]н\]", " — контакт подскажет наставник", text)
+    return re.sub(r"\[имя удалено\]", "ответственный коллега", text)
+
+
 STEP_LIMIT_REPLY ="Не получилось довести запрос до конца. Попробуй переформулировать или спроси наставника."
 
 
@@ -222,6 +234,10 @@ class Agent:
         if (rules and user.role.value == "intern" and asks_access and _resource_named(low)
                 and {"list_access_resources", "create_access_request"} <= available):
             llm = ScenarioProvider()
+        # «Как устроена команда и чем она занимается?» — абзац документа «о команде» отдаёт сервер (проверка 14.11 с
+        # ключом: модель описала «техническую платформу Авито» своими словами, источник — документ про песочницу).
+        if rules and user.role.value == "intern" and ABOUT_TEAM.search(low) and not named_intern_plan(question, system):
+            llm = ScenarioProvider()
 
         # «Что у Ани зависло?» от наставника: план стажёра загружаем сами (с проверкой прав) и кладём в контекст —
         # модель только пересказывает. Не «поддельным» вызовом инструмента: GigaChat требует свой functions_state_id.
@@ -272,8 +288,12 @@ class Agent:
                     by_model = False
                 if getattr(llm, "name", "") != "scenario":
                     # Модель назвала внутренний инструмент или выдумала документ (прогон на Railway 12.11) — убираем.
-                    text = scrub_reply(text, set(self.registry.tools), {d["title"] for d in docs})
+                    text = scrub_reply(text, set(self.registry.tools), {d["title"] for d in docs},
+                                       context=system if by_model else None)
                     text = scrub_invented(text, system)
+                    # Ответ наставника из «памяти» обезличен метками; в пересказе стажёру они читаются грубо («обновляет
+                    # [имя удалено], его почта [контакт удалён]» — проверка 14.11). В самом документе метки остаются.
+                    text = readable_marks(text)
                     if levelled and not used and not created and not says_not_found(text):
                         text = f"{level_opening(*levelled)}\n\n{text}"
                 if second and "Вторую просьбу" not in text and f"«{second}»" not in text:
