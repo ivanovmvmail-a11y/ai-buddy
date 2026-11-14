@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     feature_flags: str = ""
     redis_url: str = ""
 
+    # Поток событий в Apache Kafka (app/event_stream.py, спека 304). Пусто — события только в таблице events.
+    # В Docker задан сам: kafka:9092. Kafka недоступна — работа не останавливается.
+    kafka_bootstrap: str = ""
+    kafka_topic: str = "ai-buddy.events"
+
     # Код-слово для демо-кнопок «Сброс» и «Следующий день» (заголовок X-Demo-Key).
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.
     demo_key: str = ""

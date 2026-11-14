@@ -16,7 +16,7 @@ from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, StrictBool, ValidationError
 from pydantic_core import to_jsonable_python
 
-from app import async_runner, features
+from app import async_runner, event_stream, features
 from app.config import settings
 from app.http_body import json_body
 from app.agent import analytics, explain, history, practice, service
@@ -432,6 +432,14 @@ def reset():
     async_runner.run(history.history.clear())  # черновики старого прогона ссылались бы на сброшенные данные
     features.reset()  # флаги, переключённые на ходу, — к значениям запуска
     return {"status": "reset"}
+
+
+@bp.get("/events/stream")
+def event_stream_status():
+    """Поток событий в Apache Kafka (спека 304): включён ли, топик, сколько событий отправлено и пропущено.
+
+    Счётчики — этого процесса backend; данных пользователей в ответе нет. События всегда остаются и в таблице `events`."""
+    return event_stream.status()
 
 
 # --- Feature flags (спека 006): включить или выключить функцию без правки кода ---------------------------

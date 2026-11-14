@@ -7,11 +7,22 @@ from functools import cache
 import logging
 from typing import Protocol
 
+from app import event_stream
 from app.config import settings
 
 from .models import OnboardingData
 
 log = logging.getLogger("ai_buddy.onboarding")
+
+
+def _new_events(data, start: int) -> list:
+    """События, добавленные этой операцией, — копии для потока в Kafka (спека 304). Пусто, если поток выключен."""
+    if not event_stream.enabled():
+        return []
+    try:
+        return [event.model_copy(deep=True) for event in list(data.events)[start:]]
+    except Exception:  # noqa: BLE001 — поток событий не должен мешать записи
+        return []
 
 
 class _ReadMap(Mapping):
@@ -171,13 +182,19 @@ class DemoStore:
     async def transaction(self, *, include_events=True, copy_on_commit=True):
         backend = await self._backend()
         async with backend.transaction(include_events=include_events, copy_on_commit=copy_on_commit) as data:
+            start = len(data.events)
             yield data
+            fresh = _new_events(data, start)
+        event_stream.publish(fresh)  # только после успешной записи: событие отменённой операции в Kafka не уходит
 
     @asynccontextmanager
     async def read(self, *, include_events=False):
         backend = await self._backend()
         async with backend.read(include_events=include_events) as data:
+            start = len(data.events)
             yield data
+            fresh = _new_events(data, start)
+        event_stream.publish(fresh)
 
     async def seed_for_schema(self, data):
         return await (await self._backend()).seed_for_schema(data)

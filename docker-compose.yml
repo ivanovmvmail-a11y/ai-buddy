@@ -47,6 +47,9 @@ services:
       # Feature flags, переключённые на ходу (POST /features), лежат в Redis — спека 006. Redis недоступен — не ошибка:
       # backend работает по значениям запуска (FEATURE_FLAGS).
       REDIS_URL: redis://redis:6379/0
+      # События продукта дублируются в Apache Kafka (спека 304). Backend от Kafka не зависит: брокер недоступен —
+      # события остаются в таблице events, запросы пользователей не ждут.
+      KAFKA_BOOTSTRAP: kafka:9092
     ports:
       - "8000:8000"
     depends_on:
@@ -54,6 +57,34 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  # Apache Kafka (стек Авито), один узел в режиме KRaft, без ZooKeeper. Сюда уходят события продукта — в Авито их
+  # забирал бы Clickstream. Порт наружу не открыт. От Kafka никто не зависит: остальные службы стартуют и без неё.
+  # Посмотреть события:
+  #   docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 \
+  #     --topic ai-buddy.events --from-beginning --timeout-ms 5000
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: -Xmx256m -Xms128m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
 
   # Redis (стек Авито): хранит runtime feature flags. Порт наружу не открыт. Данные не важны — без тома.
   redis:
@@ -75,6 +106,7 @@ services:
       DATABASE_URL: postgresql://buddy:buddy@db:5432/ai_buddy
       MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-local-docker-demo}
       MCP_PORT: "8001"
+      KAFKA_BOOTSTRAP: kafka:9092  # события сервисов (заявка создана, пункт закрыт) — тоже в Kafka
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)"]
       interval: 5s
