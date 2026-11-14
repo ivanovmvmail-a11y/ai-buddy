@@ -44,6 +44,36 @@ def test_phrase_to_date_and_text(phrase, shift, text):
     assert day == (date(2026, 11, 13) if shift is None else friday_before + timedelta(days=shift))
 
 
+@pytest.mark.parametrize("phrase, wanted", [
+    # 14.11 (Миша, Railway): существительное без глагола уходило модели
+    ("напоминание на сдачу дедлайна", True),
+    ("напоминание", True),
+    ("Напоминалку на пятницу: созвон", True),
+    ("напоминание завтра про ретро", True),
+    ("напоминания не приходят", False),
+    ("напоминание о встрече пришло?", False),
+    ("напомни моему наставнику про ревью", False),
+])
+def test_noun_form_is_request(phrase, wanted):
+    from app.llm.scenario_provider import is_reminder_request
+    assert is_reminder_request(phrase) is wanted
+
+
+def test_noun_form_text_and_date():
+    thursday = date(2026, 11, 12)
+    assert reminder_plan("напоминание на сдачу дедлайна", thursday) == (thursday + timedelta(days=1), "про сдачу дедлайна")
+    assert reminder_plan("напоминалку на пятницу: созвон", thursday) == (date(2026, 11, 13), "созвон")
+    day, reply = reminder_plan("напоминание", thursday)
+    assert day is None and "О чём напомнить" in reply
+
+
+def test_noun_form_full_answer(scenario):
+    res = ask(scenario, "напоминание на сдачу дедлайна")
+    assert "Подготовил напоминание" in res["reply"] and "про сдачу дедлайна" in res["reply"]
+    assert [a["tool"] for a in res["actions"]] == ["create_reminder"]
+    assert "О чём напомнить" in ask(scenario, "напоминание")["reply"]
+
+
 def test_without_subject_asks_what_to_remind():
     day, reply = reminder_plan("напомни мне завтра", date(2026, 11, 12))
     assert day is None and "О чём напомнить" in reply

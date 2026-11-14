@@ -536,7 +536,12 @@ def _absence_day(q: str, today: date) -> date:
 
 
 REMINDER_START = re.compile(r"^\s*(?:пожалуйста,?\s+|можешь\s+|а\s+)?(?:напомни(?:те)?|(?:поставь|создай|сделай)\s+"
-                            r"напомина(?:ни|лк)\w*)(?:\s+мне)?\b", re.IGNORECASE)  # 14.11: «поставь напоминалку»
+                            r"напомина(?:ни|лк)\w*"
+                            # 14.11 (Миша, Railway): просто «напоминание» / «напоминание на сдачу дедлайна» уходило модели —
+                            # она просила дату или отвечала «в документах нет». Существительное без глагола — тоже просьба,
+                            # если дальше ничего или «на/про/завтра/дата…» («напоминания не приходят» — не просьба).
+                            r"|(?:напоминани[ея]|напоминалк[ау])(?=\s*$|\s*[:—-]|\s+(?:на|про|о|об|в|во|через|завтра|"
+                            r"сегодня|послезавтра|\d)\b))(?:\s+мне)?\b", re.IGNORECASE)  # 14.11: «поставь напоминалку»
 _REMINDER_WHEN = re.compile(
     r"\b(?:послезавтра|завтра|сегодня)\b|\bчерез\s+(?:\d+|два|две|три|четыре|пять)?\s*(?:дн\w*|день|недел\w*)\b|"
     r"\b(?:в|во|на)\s+(?:следующ\w+\s+)?(?:%s)\b|\bна\s+следующ\w+\s+недел\w*\b|\b(?:на|к)\s+\d{1,2}\.\d{1,2}\b|"
@@ -546,7 +551,12 @@ _REMINDER_WHEN = re.compile(
 
 def is_reminder_request(q: str) -> bool:
     """Вся просьба — напоминание себе («напомни в пятницу про 1:1»), а не «напомни наставнику»."""
-    return bool(REMINDER_START.match(q)) and not re.search(r"напомни\s+(моему\s+)?наставник", q, re.IGNORECASE)
+    found = REMINDER_START.match(q)
+    # «напоминание о встрече пришло?» — вопрос о напоминаниях, а не просьба (у глагола «напомни…?» — просьба).
+    if found and not re.match(r"\s*(?:пожалуйста,?\s+|можешь\s+|а\s+)?(?:напомни|поставь|создай|сделай)", q, re.IGNORECASE) \
+            and "?" in q:
+        return False
+    return bool(found) and not re.search(r"напомни\s+(моему\s+)?наставник", q, re.IGNORECASE)
 
 
 def reminder_plan(question: str, today: date) -> tuple[date | None, str]:
@@ -561,6 +571,8 @@ def reminder_plan(question: str, today: date) -> tuple[date | None, str]:
         day = _absence_day(q, today)
     text = _REMINDER_WHEN.sub(" ", REMINDER_START.sub("", question, count=1))
     text = re.sub(r"\s+", " ", text).strip(" ,.:;!?—-")
+    # «напоминание на сдачу дедлайна» → «про сдачу дедлайна» (дата «на пятницу» уже вырезана выше)
+    text = re.sub(r"^на\s+", "про ", text, flags=re.IGNORECASE)
     if not text or re.fullmatch(r"(?:про|о|об|что|насч[её]т|чтобы)", text, re.IGNORECASE):
         return None, ("О чём напомнить? Напиши одним сообщением, например: «напомни в пятницу про 1:1 с наставником».")
     return day, text[:300]  # «про 1:1 с наставником», «оформить пропуск» — как сказал стажёр
