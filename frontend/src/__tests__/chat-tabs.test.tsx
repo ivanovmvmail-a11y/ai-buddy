@@ -70,6 +70,18 @@ describe("вкладки чата стажёра", () => {
     expect(last.messages.map((m) => m.content)).toEqual(["где почитать про ревью?"]);
   });
 
+  it("объяснение пункта остаётся в переписке для модели (Миша 14.11: «что за задание на практике»)", async () => {
+    srv.chatReplies.push({ reply: "Про задание.", topic: "study" });
+    open();
+    const item = (await screen.findByText("Завести конспект встреч с наставником")).closest("li")!;
+    await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Объяснить" })));
+    await screen.findByText("по документу пункта · глубина по карте навыков");
+    await ask("что за задание на практике");
+    const last = srv.calls.filter((c) => c.path === "/chat").at(-1)!.body as { messages: Array<{ role: string; content: string }> };
+    expect(last.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(last.messages[0].content).toMatch(/^Объясни пункт «Завести конспект/);
+  });
+
   it("новое в другой вкладке — точка на вкладке", async () => {
     open("intern-ivan"); // у Ивана при входе напоминание о зависшей заявке
     await screen.findByText(/8-й день стажировки/);

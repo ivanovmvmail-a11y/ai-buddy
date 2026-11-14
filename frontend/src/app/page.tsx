@@ -261,7 +261,9 @@ export default function Home() {
       // с GigaChat «Объяснить» давало пустые шаги, 5–7 источников и не учитывало уровень). Пишется в события.
       const res = await api.explained(actor.id, item.id, item.intern_id, kind);
       say(asked, {
-        id: msgId(), role: "assistant", kind: "text", scripted: true, label: EXPLAIN_LABEL, content: res.text, answerId: res.answer_id,
+        // server, а не scripted: объяснение остаётся в переписке для модели (Миша 14.11: на «что за задание на практике»
+        // после «Объяснить» модель не видела карточку и придумала другое задание).
+        id: msgId(), role: "assistant", kind: "text", server: true, label: EXPLAIN_LABEL, content: res.text, answerId: res.answer_id,
         sources: res.source ? [res.source] : undefined, followups: followupsFor(item, res.chips),
         // Под объяснением — остальные кнопки пункта: сделать, сдать задание, «Готово» (чекпоинт 2: всё и из чата).
         actions: kind === "explain" && itemActions(item, actor, ["explain"]).length ? itemActions(item, actor, ["explain"]) : undefined,
@@ -335,7 +337,7 @@ export default function Home() {
     say(
       { id: msgId(), role: "user", kind: "text", content: `Сдать задание: ${item.title}` },
       {
-        id: msgId(), role: "assistant", kind: "text", scripted: true, label: "задание пункта плана",
+        id: msgId(), role: "assistant", kind: "text", server: true, label: "задание пункта плана",
         content: `Задание: ${item.practice}\n\nНапиши ответ следующим сообщением: своими словами — что и как сделано. `
           + "Я сверю его с учебным документом пункта и подскажу, чего не хватает. Уровень по-прежнему решает наставник.",
       },
