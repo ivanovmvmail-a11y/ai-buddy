@@ -44,11 +44,26 @@ services:
       # Входы для систем Авито (docs/INTEGRATION.md): найм и Mattermost. Демо-значения, как пароль базы; на стенде — свои.
       INTEGRATION_TOKEN: ${INTEGRATION_TOKEN:-local-docker-demo}
       MATTERMOST_TOKEN: ${MATTERMOST_TOKEN:-local-docker-demo}
+      # Feature flags, переключённые на ходу (POST /features), лежат в Redis — спека 006. Redis недоступен — не ошибка:
+      # backend работает по значениям запуска (FEATURE_FLAGS).
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Redis (стек Авито): хранит runtime feature flags. Порт наружу не открыт. Данные не важны — без тома.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # MCP-сервер имитаций корпоративных сервисов (план, доступы, найм, отгулы) — отдельный процесс в сети Docker,
   # как MCP-серверы сервисов Авито за MCP Hub. Наружу порт не открыт: вызывать его может только backend

@@ -15,6 +15,7 @@
 | GigaChat | A-Vibe или другая внутренняя модель | `LLM_PROVIDER` + ключ; для OpenAI-совместимого API — `OPENAI_BASE_URL`. Новый провайдер — один класс | `app/llm/base.py::LLMProvider` |
 | Демо-документы + поиск по словам | Confluence + корпоративный поиск / эмбеддинги | Загрузчик документов из Confluence; эмбеддинги — `EMBEDDINGS_PROVIDER`. Правило «свой документ или общий» уже в поиске | `app/rag/` (`DocumentStore`, `Embedder`) |
 | Таблица событий → Grafana | Clickstream / Kafka → ClickHouse | Отправка события — одна функция; события без текстов вопросов | `app/agent/analytics.py`, `grafana/` |
+| Feature flags: `app/features.py`, значения на ходу в Redis | Система feature flags Авито (compile-time и runtime) | Одна функция `features.enabled(name)`; места проверки в коде не меняются | `app/features.py`, спека 006 |
 | PostgreSQL в Docker / Supabase | PostgreSQL PaaS Авито | `DATABASE_URL`; схема — SQL-миграции | `supabase/migrations/` |
 | Веб-чат | Mattermost | Уже есть вход для бота (ниже) | `app/integrations.py` |
 | Карта навыков в seed | Система найма | Уже есть вход для события «стажёр нанят» (ниже) | `app/integrations.py` |

@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # Эксперимент 14.11 (app/agent/intent.py): намерение стажёра определяет модель — "model"; пусто — по словам, как раньше.
     intent_router: str = ""
 
+    # Feature flags (app/features.py, спека 006). FEATURE_FLAGS — значения при запуске: "quick_access=off,memory_recall=on".
+    # REDIS_URL — где лежат значения, переключённые на ходу (в Docker — служба redis); пусто — в памяти процесса.
+    feature_flags: str = ""
+    redis_url: str = ""
+
     # Код-слово для демо-кнопок «Сброс» и «Следующий день» (заголовок X-Demo-Key).
     # Пусто — кнопки без пароля (локально и в Docker у эксперта). На публичном сайте — задать.
     demo_key: str = ""

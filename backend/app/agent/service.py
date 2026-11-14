@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from pydantic import ValidationError
 
+from app import features
 from app.config import settings
 from app.llm import Message, get_llm
 from app.llm.base import ToolCall
@@ -24,6 +25,7 @@ from .actions import Action, ActionStore, InMemoryActionStore
 from .chat_items import item_reply, one_click_allowed
 from .demo_tools import register_demo_tools
 from .intent import route
+from .recall import recall
 from .levels import hint as level_hint
 from .levels import level_for
 from .levels import opening as level_opening
@@ -46,8 +48,12 @@ ABOUT_TEAM = re.compile(r"(чем\s+(она\s+)?занима|как\s+устро
 
 def readable_marks(text: str) -> str:
     """Метки обезличивания из опубликованного ответа наставника — человеческими словами."""
-    text = re.sub(r"\s*\[контакт удал[её]н\]", " — контакт подскажет наставник", text)
-    return re.sub(r"\[имя удалено\]", "ответственный коллега", text)
+    # «…, её почта [контакт удалён]» → «… (контакт спроси у наставника)»; модель иногда пишет метку по-своему
+    # («[удалённый контакт]») — ловим любую метку в скобках со словами «контакт»/«имя» и «удал».
+    contact = r"\[[^\]]*(?:контакт[^\]]*удал|удал[^\]]*контакт)[^\]]*\]"
+    text = re.sub(r"(?:,?\s*(?:(?:его|её|ее|их)\s+)?(?:почта|e-?mail|телефон|контакты?)\s*[—:-]?)?\s*" + contact,
+                  " (контакт спроси у наставника)", text, flags=re.I)
+    return re.sub(r"\[[^\]]*(?:имя[^\]]*удал|удал[^\]]*имя)[^\]]*\]", "ответственный коллега", text, flags=re.I)
 
 
 STEP_LIMIT_REPLY ="Не получилось довести запрос до конца. Попробуй переформулировать или спроси наставника."
@@ -289,13 +295,19 @@ class Agent:
                 if getattr(llm, "name", "") != "scenario":
                     # Модель назвала внутренний инструмент или выдумала документ (прогон на Railway 12.11) — убираем.
                     text = scrub_reply(text, set(self.registry.tools), {d["title"] for d in docs},
-                                       context=system if by_model else None)
+                                       context=system if by_model and features.enabled("example_guard") else None)
                     text = scrub_invented(text, system)
                     # Ответ наставника из «памяти» обезличен метками; в пересказе стажёру они читаются грубо («обновляет
                     # [имя удалено], его почта [контакт удалён]» — проверка 14.11). В самом документе метки остаются.
                     text = readable_marks(text)
                     if levelled and not used and not created and not says_not_found(text):
                         text = f"{level_opening(*levelled)}\n\n{text}"
+                # «Память» и перефразировка (проверка 14.11): в документах не нашлось — сверяем вопрос с уже отвеченными
+                # вопросами команды; ответ — опубликованный текст наставника, модель называет только номер.
+                if (not used and not created and says_not_found(text)
+                        and (remembered := await recall(first, user, get_llm())) is not None):
+                    reply_text = readable_marks(remembered["reply"]) + (second_note(second) if second else "")
+                    return AgentResult(reply=reply_text, sources=[remembered["source"]], by_model=False)
                 if second and "Вторую просьбу" not in text and f"«{second}»" not in text:
                     text += second_note(second)
                 sources = cited_sources(text, docs, question, short=not used)
@@ -497,7 +509,8 @@ class Agent:
         """«Сделать за меня» по кнопке (чекпоинт 2): простой доступ — сразу, без второго подтверждения; остальное —
         черновик, как раньше. Нажатие кнопки — согласие стажёра; насколько доступ простой, решает сервер."""
         action = await self.draft(user, tool_name, params)
-        if tool_name == "create_access_request" and await one_click_allowed(user, action.params):
+        if (tool_name == "create_access_request" and features.enabled("quick_access")
+                and await one_click_allowed(user, action.params)):
             return await self.confirm(user, action.id)
         return action
 

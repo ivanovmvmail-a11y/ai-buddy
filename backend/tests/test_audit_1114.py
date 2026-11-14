@@ -71,7 +71,10 @@ def test_model_reply_loses_invented_parts(agent, use_llm):
 
 def test_readable_marks():
     text = readable_marks("Меню обновляет [имя удалено], его почта [контакт удалён].")
-    assert text == "Меню обновляет ответственный коллега, его почта — контакт подскажет наставник."
+    assert text == "Меню обновляет ответственный коллега (контакт спроси у наставника)."
+    assert readable_marks("Оно обновляется [удалённый контакт].") == "Оно обновляется (контакт спроси у наставника)."
+    assert readable_marks("Пиши [имя удалено] или на [контакт удалён]") == \
+        "Пиши ответственный коллега или на (контакт спроси у наставника)"
 
 
 def test_about_team_is_answered_by_server_from_document(agent, use_llm):

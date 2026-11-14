@@ -16,7 +16,7 @@ from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, StrictBool, ValidationError
 from pydantic_core import to_jsonable_python
 
-from app import async_runner
+from app import async_runner, features
 from app.config import settings
 from app.http_body import json_body
 from app.agent import analytics, explain, history, practice, service
@@ -430,7 +430,39 @@ def reset():
     async_runner.run(clock.reset_demo(g.user))
     async_runner.run(service.agent.store.clear())
     async_runner.run(history.history.clear())  # черновики старого прогона ссылались бы на сброшенные данные
+    features.reset()  # флаги, переключённые на ходу, — к значениям запуска
     return {"status": "reset"}
+
+
+# --- Feature flags (спека 006): включить или выключить функцию без правки кода ---------------------------
+
+class FeatureIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    enabled: StrictBool
+
+
+@bp.get("/features")
+def list_features():
+    """Feature flags: какие функции включены и откуда взято значение (по умолчанию, из FEATURE_FLAGS или переключено на ходу).
+
+    Список одинаков для всех ролей и не содержит данных пользователей."""
+    return features.all_flags()
+
+
+@bp.post("/features")
+def switch_feature():
+    """Переключить feature flag на ходу, без перезапуска (значение — в Redis, без него — в памяти процесса).
+
+    Как у демо-кнопок: если задано код-слово `DEMO_KEY`, нужен заголовок `X-Demo-Key`. Неизвестный флаг — 404."""
+    if (denied := _demo_key_error()) is not None:
+        return denied
+    body = _body(FeatureIn)
+    try:
+        features.set_flag(body.name, body.enabled)
+    except KeyError:
+        return jsonify(detail="Не найдено"), 404
+    log.info("feature flag user=%s %s=%s", g.user.id, body.name, body.enabled)
+    return features.all_flags()
 
 
 # --- «Память»: вопрос наставнику → ответ → база знаний команды (PR #45 Codex + Claude 13.11) ------------

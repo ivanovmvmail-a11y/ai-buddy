@@ -835,6 +835,22 @@ def _invented_command(sentence: str, context: str) -> bool:
     return False
 
 
+_EXAMPLE = re.compile(r"\s*(пример|например)\s*[:—-]", re.I)
+
+
+def _example_from_docs(sentence: str, context: str) -> bool:
+    """«Пример: …» в ответе модели оставляем, если он взят из документов: это команда (её проверяет
+    `_invented_command`) или больше половины его значимых слов есть в документах. Иначе пример сочинён
+    («Пример: зайди в Mattermost и посмотри статус PR», «ошибка Missing required field» — проверка 14.11)."""
+    if _COMMAND.search(sentence):
+        return True
+    words = _words(_EXAMPLE.sub("", sentence, count=1))
+    if not words:
+        return False
+    known = _words(context)
+    return sum(1 for w in words if any(_same(w, k) for k in known)) * 10 >= len(words) * 6
+
+
 _GIT_COMMANDS = {"clone", "pull", "push", "fetch", "checkout", "switch", "branch", "add", "commit", "status", "log",
                  "diff", "merge", "rebase", "stash", "restore", "init", "remote"}
 
@@ -851,6 +867,8 @@ def scrub_reply(text: str, tool_names: set[str], doc_titles: set[str], context: 
             return True
         if context is not None:
             if _AVITO_CLAIM.search(low) or _invented_command(sentence, context):
+                return True
+            if _EXAMPLE.match(sentence) and not _example_from_docs(sentence, context):
                 return True
         if "документ" in low:
             return any(t not in doc_titles for t in _QUOTED.findall(sentence))
