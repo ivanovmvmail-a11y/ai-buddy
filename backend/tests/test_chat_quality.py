@@ -49,6 +49,24 @@ def test_scrub_removes_tool_names_and_fake_documents():
     assert "укажи дату" in cleaned and "«Отгул на один день»" in cleaned
 
 
+def test_scrub_drops_whole_list_item_and_renumbers():
+    # Миша 14.11: от выдуманного документа в шаге оставались пустые «1.» и «3.».
+    text = ("Вот что конкретно сделать:\n"
+            "1. Открыть документ «Список ресурсов» в базе знаний.\n"
+            "2. Выбрать ресурсы, необходимые для твоей учебной задачи.\n"
+            "3. Заполнить форму из документа «Заявка на доступ».\n"
+            "4. Дождаться ответа наставника.")
+    cleaned = scrub_reply(text, set(), {"Доступ к пространству команды"})
+    assert cleaned == ("Вот что конкретно сделать:\n"
+                       "1. Выбрать ресурсы, необходимые для твоей учебной задачи.\n"
+                       "2. Дождаться ответа наставника.")
+
+
+def test_scrub_keeps_numbering_when_nothing_dropped():
+    text = "1. Первый шаг.\nПояснение к шагу.\n2. Второй шаг.\n- пункт «Ревью»"
+    assert scrub_reply(text, set(), set()) == text
+
+
 def test_scrub_keeps_reply_if_everything_would_go():
     assert scrub_reply("Вызови get_plan.", {"get_plan"}, set()) == "Вызови get_plan."
 

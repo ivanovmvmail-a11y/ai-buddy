@@ -806,12 +806,39 @@ def scrub_reply(text: str, tool_names: set[str], doc_titles: set[str]) -> str:
         if "документ" in low:
             return any(t not in doc_titles for t in _QUOTED.findall(sentence))
         return False
-    lines = []
+    lines: list[str] = []
+    dropped = False
     for line in text.split("\n"):
-        kept = "".join(s for s in _SENTENCE.findall(line) if s and not bad(s))
-        lines.append(kept.rstrip() if kept.strip() else ("" if line.strip() else line))
-    cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+        # Номер пункта списка — не предложение: иначе от «1. Открой документ «…»» оставалось пустое «1.» (Миша 14.11).
+        marker = _LIST_MARK.match(line)
+        head, body = (marker.group(0), line[marker.end():]) if marker else ("", line)
+        kept = "".join(s for s in _SENTENCE.findall(body) if s and not bad(s))
+        if kept.strip():
+            lines.append(head + kept.strip() if head else kept.rstrip())
+        elif not head:
+            lines.append("" if line.strip() else line)
+        else:
+            dropped = True  # пункт списка без текста — убираем строку целиком
+    cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(_renumber(lines) if dropped else lines)).strip()
     return cleaned or text
+
+
+_LIST_MARK = re.compile(r"\s*(?:\d+[.)]|[-*•])\s+|\s*\d+[.)]\s*$")
+_NUMBERED = re.compile(r"(\s*)(\d+)([.)])(\s+|$)")
+
+
+def _renumber(lines: list[str]) -> list[str]:
+    """После удаления пунктов нумерация идёт подряд: 2. → 1., а не «2.» одиноко."""
+    out, n = [], 0
+    for line in lines:
+        m = _NUMBERED.match(line)
+        if m:
+            n += 1
+            out.append(f"{m.group(1)}{n}{m.group(3)}{m.group(4)}{line[m.end():]}")
+        else:
+            n = 0 if line.strip() else n
+            out.append(line)
+    return out
 
 
 _ITEM_ID = re.compile(r"\s*\(?\bid\s+[a-z]+\.[a-z0-9.\-]+\)?|\b[a-z]+\.(?:w\d+|m\d+|p|after\d+m)\.[a-z0-9\-]+\b")
