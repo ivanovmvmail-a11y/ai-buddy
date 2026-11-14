@@ -65,21 +65,41 @@ describe("«память»: вопрос наставнику", () => {
         created_day: 1, status: "answered", answer: "Песочница", publication_status: "not_requested", public_content: null },
     );
     open("mentor-petr");
-    const inbox = await screen.findByRole("region", { name: "Вопросы наставнику" });
-    expect(within(inbox).getByText("Вопросы стажёров")).toBeTruthy();
-    const send = within(inbox).getByRole("button", { name: "Ответить" }) as HTMLButtonElement;
-    expect(send.disabled).toBe(true);
-    const publish = within(inbox).getByRole("checkbox") as HTMLInputElement;
+    // 14.11: вопрос — карточкой в чате, ответ — обычным сообщением; в плане блока больше нет
+    const card = await screen.findByRole("group", { name: "Вопрос: Аня Смирнова" });
+    expect(screen.queryByRole("region", { name: "Вопросы наставнику" })).toBeNull();
+    expect(within(card).getByText("Аня Смирнова: «Где пароль?»")).toBeTruthy();
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ответить" })));
+    const publish = within(card).getByRole("checkbox") as HTMLInputElement;
     expect(publish.checked).toBe(true);
-    fireEvent.change(within(inbox).getByRole("textbox", { name: "Ответ стажёру" }), { target: { value: "У наставника в канале" } });
-    await act(async () => fireEvent.click(send));
+    expect(screen.getByText(/Ответ на вопрос «Где пароль\?» \(Аня Смирнова\)/)).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Ответ стажёру" }), { target: { value: "У наставника в канале" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Отправить" })));
     const answered = srv.calls.find((c) => c.path === "/mentor/questions/MQ-1/answer");
     expect(answered?.body).toEqual({ text: "У наставника в канале", publish: true, topic: "Где пароль?" });
+    expect(await screen.findByText(/Ответ отправлен: Аня Смирнова получит/)).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Сообщение" })).toBeTruthy(); // режим ответа снят
 
-    const later = within(inbox).getAllByRole("textbox", { name: /Тема в базе знаний/ });
-    fireEvent.change(later[later.length - 1], { target: { value: "Как называется чат стажёров" } });
-    await act(async () => fireEvent.click(within(inbox).getByRole("button", { name: "Добавить ответ в базу знаний" })));
+    const later = await screen.findByRole("group", { name: "Вопрос: Кирилл Егоров" });
+    fireEvent.change(within(later).getByRole("textbox", { name: /Тема в базе знаний/ }), { target: { value: "Как называется чат стажёров" } });
+    await act(async () => fireEvent.click(within(later).getByRole("button", { name: "Добавить ответ в базу знаний" })));
     expect(srv.calls.find((c) => c.path === "/mentor/questions/MQ-2/publish")?.body).toEqual({ topic: "Как называется чат стажёров" });
+  });
+
+  it("уведомление «Аня спрашивает» → чат, карточка вопроса подсвечена (Миша, 14.11)", async () => {
+    srv.mentorQuestions.push({ id: "MQ-1", intern_id: "intern-anya", intern_name: "Аня Смирнова", mentor_id: "mentor-petr",
+      question: "Где пароль?", created_day: 2, status: "pending", answer: null, publication_status: "not_requested", public_content: null });
+    srv.state.notifications.push({ id: "R-Q", user_id: "mentor-petr", kind: "mentor_question", action: { label: "Ответить", target: "mentor_question" },
+      intern_id: "intern-anya", absence_request_id: null, suggestion_id: null, plan_item_id: null, request_id: null,
+      text: "Аня задала вопрос", status: "active", created_day: 2, snooze_until_day: null });
+    open("mentor-petr");
+    await screen.findByRole("group", { name: "Вопрос: Аня Смирнова" });
+    await act(async () => fireEvent.click(await screen.findByRole("button", { name: /Напоминания: \d/ })));
+    const dialog = screen.getByRole("dialog", { name: "Напоминания" });
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Ответить" })));
+    const flashed = useChat.getState().flash;
+    expect(flashed).toBeTruthy();
+    expect(useChat.getState().messages.find((m) => m.id === flashed)?.decision).toEqual({ kind: "question", id: "MQ-1" });
   });
 
   it("стажёр видит ответ; у лида блока нет; уведомление ведёт в блок", async () => {

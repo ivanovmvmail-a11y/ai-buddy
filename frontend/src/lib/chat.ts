@@ -6,7 +6,7 @@ import { create } from "zustand";
 import { findUser } from "./users";
 import { canMarkDone, canRequestAccess, isWorking, waitedFor } from "./plan-logic";
 import type {
-  AccessRequest, AccessResource, Action, DemoUser, DocSource, ExplainKind, Plan, PlanItem, Reminder, SkillLevel, SkillProfile,
+  AccessResource, Action, DemoUser, DocSource, ExplainKind, Plan, PlanItem, Reminder, SkillLevel, SkillProfile,
   WeeklySummary,
 } from "./types";
 
@@ -25,8 +25,17 @@ export const TOPICS: Array<{ id: Topic; title: string }> = [
   { id: "requests", title: "Заявки" },
 ];
 
+/** Решение наставника или руководителя — карточкой в чате (Миша, 14.11, по словам эксперта на чекпоинте: «всё в
+ *  чате, а какие-то вещи почему-то посреди плана»). Карточка читает живые данные по id: решено — показывает итог. */
+export type Decision = { kind: "access" | "question" | "publish" | "suggestion" | "absence"; id: string };
+export const decisionKey = (d: Decision) => `${d.kind}:${d.id}`;
+
+/** Ответ на вопрос стажёра обычным сообщением чата: следующее сообщение наставника уходит стажёру. */
+export type ReplyMode = { questionId: string; internName: string; question: string; publish: boolean; topic: string };
+
 export type Msg = {
   id: string;
+  decision?: Decision;
   topic?: Topic; // вкладка; по умолчанию — та, что открыта
   role: "user" | "assistant";
   kind: "text" | "draft" | "error";
@@ -56,6 +65,11 @@ type ChatStore = {
   seenReminders: string[];
   practice: PracticeMode | null;
   setPractice: (p: PracticeMode | null) => void;
+  reply: ReplyMode | null;
+  setReply: (r: ReplyMode | null) => void;
+  /** Сообщение, к которому привело уведомление: прокрутить и подсветить. */
+  flash: string | null;
+  setFlash: (id: string | null) => void;
   tab: Topic;
   unread: Topic[];
   setTab: (t: Topic) => void;
@@ -72,10 +86,14 @@ export const useChat = create<ChatStore>((set) => ({
   seenReminders: [],
   practice: null,
   setPractice: (practice) => set({ practice }),
+  reply: null,
+  setReply: (reply) => set({ reply }),
+  flash: null,
+  setFlash: (flash) => set({ flash }),
   tab: "assistant",
   unread: [],
   setTab: (tab) => set((s) => ({ tab, unread: s.unread.filter((t) => t !== tab) })),
-  reset: (first) => set({ messages: first, busy: false, seenReminders: [], practice: null, tab: "assistant", unread: [] }),
+  reset: (first) => set({ messages: first, busy: false, seenReminders: [], practice: null, reply: null, flash: null, tab: "assistant", unread: [] }),
   // Сообщение без вкладки попадает в открытую; в другую — отмечаем её точкой «есть новое».
   push: (...m) => set((s) => {
     const tagged = m.map((x) => ({ ...x, topic: x.topic ?? s.tab }));
@@ -116,7 +134,7 @@ const scripted = (content: string, extra: Partial<Msg> = {}): Msg => ({
 const withTopic = (topic: Topic, content: string, extra: Partial<Msg> = {}): Msg => scripted(content, { ...extra, topic });
 
 /** Бот пишет первым (SPEC 3.3). */
-export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: AccessRequest[]): Msg {
+export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: readonly unknown[]): Msg {
   const name = actor.name.split(" ")[0];
   if (actor.role === "intern" && plan) {
     const work = plan.items.filter((i) => i.stage === "week1" || i.stage === "week2");
@@ -132,11 +150,15 @@ export function greeting(actor: DemoUser, plan: Plan | null, pendingApprovals: A
     return scripted(lines.join("\n"), { actions: buttons.length ? buttons : undefined, topic: "assistant" });
   }
   if (actor.role === "mentor") {
+    // Решения — карточками здесь же, ниже приветствия (14.11): заявки, вопросы стажёров, предложения уровня.
     return scripted(
       pendingApprovals.length
-        ? `Привет, ${name}! Ждут твоего одобрения заявок: ${pendingApprovals.length}. Они слева, над планом стажёра.`
-        : `Привет, ${name}! Заявок на одобрение нет. Слева — план твоего стажёра и твои пункты в нём.`,
+        ? `Привет, ${name}! Ждут твоего решения: ${pendingApprovals.length}. Они ниже — решай прямо в чате.`
+        : `Привет, ${name}! Решений от тебя сейчас не ждут. Слева — план твоего стажёра и твои пункты в нём.`,
     );
+  }
+  if (actor.role === "lead" && pendingApprovals.length) {
+    return scripted(`Привет, ${name}! Ждут твоего решения: ${pendingApprovals.length}. Они ниже — решай прямо в чате.`);
   }
   if (actor.role === "hrbp") {
     return scripted(`Привет, ${name}! Я отвечаю по общим документам. Планы и профили стажёров тебе не показываю — так настроены права.`);

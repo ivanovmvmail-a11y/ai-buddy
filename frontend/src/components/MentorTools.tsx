@@ -1,59 +1,10 @@
 "use client";
 
-// Экран наставника, правка 11.11 (SPEC 4, 5): предложения бота поднять уровень и сравнение двух планов.
-// Бот только предлагает — решает наставник. Сравнение показывает, как план подстраивается под человека,
-// а не кто лучше: без процентов, баллов и сортировки по успехам.
-import { useMutation } from "@tanstack/react-query";
+// Экран наставника (SPEC 5): сравнение двух планов. Предложения поднять уровень — карточками в чате (14.11, DecisionCard).
+// Сравнение показывает, как план подстраивается под человека, а не кто лучше: без процентов, баллов и сортировки.
 import { useState } from "react";
-import { api } from "@/lib/api";
-import { useCompare, useInterns, useRefresh, useSuggestions } from "@/lib/queries";
-import { levelTitle } from "@/lib/skills";
+import { useCompare, useInterns } from "@/lib/queries";
 import type { DemoUser, ItemStatus, PlanCompare } from "@/lib/types";
-
-export function SkillSuggestions({ actor }: { actor: DemoUser }) {
-  const suggestions = useSuggestions(actor);
-  const refresh = useRefresh();
-  const decide = useMutation({
-    mutationFn: (v: { id: string; accept: boolean }) => api.decideSuggestion(actor.id, v.id, v.accept),
-    onSuccess: refresh,
-  });
-  const pending = (suggestions.data ?? []).filter((s) => s.status === "pending");
-  if (!pending.length) return null;
-
-  return (
-    <section aria-label="Предложения бота" className="card p-4 sm:p-5 shadow-[inset_4px_0_0_var(--brand-violet),0_0_0_1px_var(--line)]">
-      <h3 className="text-sm font-semibold">Бот предлагает поднять уровень</h3>
-      <p className="mb-2 text-xs text-black/50 dark:text-white/50">Решаешь ты. Стажёр увидит только результат, отказ ему не показывается.</p>
-      {decide.isError && <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">{decide.error.message}</p>}
-      <ul className="space-y-2">
-        {pending.map((s) => (
-          <li key={s.id} className="text-sm">
-            <div>
-              <b>{s.intern_name}</b>, {s.topic_title}: {levelTitle(s.from_level)} → {levelTitle(s.to_level)}
-            </div>
-            <div className="text-black/55 dark:text-white/55">Основание: {s.basis}</div>
-            <div className="mt-1.5 flex gap-2">
-              <button
-                disabled={decide.isPending}
-                onClick={() => decide.mutate({ id: s.id, accept: true })}
-                className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50"
-              >
-                Поднять уровень
-              </button>
-              <button
-                disabled={decide.isPending}
-                onClick={() => decide.mutate({ id: s.id, accept: false })}
-                className="rounded-full border border-line px-3 py-1 disabled:opacity-50 dark:border-white/20"
-              >
-                Оставить
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 const STATUS_SHORT: Record<ItemStatus, string> = {
   not_started: "не начат", in_progress: "в работе", waiting: "ждёт", done: "сделано",

@@ -13,7 +13,7 @@ import { api, ApiError, DEMO_KEY_REQUIRED } from "@/lib/api";
 import {
   absenceNudgeMsg, accessDraftParams, explainScripted, finishedWeek, followupsFor, greeting, itemActions, msgId, reminderMsg,
   nudgeMsg, useChat, weeklySummaryMsg,
-  guessTopic, reminderTopic, TOPICS, type BotAction, type Msg, type Topic,
+  guessTopic, reminderTopic, TOPICS, decisionKey, type BotAction, type Decision, type Msg, type Topic,
 } from "@/lib/chat";
 import { doneOnOpen, kindOf, sectionFor, targetOf } from "@/lib/notifications";
 import { keys, useHealth, useRefresh } from "@/lib/queries";
@@ -95,7 +95,10 @@ export default function Home() {
       const { reminders } = await api.reminders(who.id);
       const fresh = reminders.filter((r) => !useChat.getState().seenReminders.includes(r.id));
       useChat.getState().markSeen(fresh.map((r) => r.id));
-      for (const r of fresh) say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));
+      // У решения наставника и руководителя уже есть своя карточка в чате (14.11) — «🔔 …» о нём был бы дублем.
+      const own = fresh.filter((r) => !(who.role === "mentor" && ["mentor_question", "skill_suggestion", "access_request"].includes(targetOf(r)))
+        && !(who.role === "lead" && targetOf(r) === "absence_request"));
+      for (const r of own) say(reminderMsg(r, plan?.items.find((i) => i.id === r.plan_item_id)));
       // У стажёра напоминания лежат во вкладках своих тем — в открытой вкладке говорим, где новое.
       const elsewhere = who.role === "intern" ? fresh.filter((r) => reminderTopic(r) !== useChat.getState().tab) : [];
       if (elsewhere.length) {
@@ -143,20 +146,71 @@ export default function Home() {
     useChat.getState().reset([]);
     await restoreChat(who, stale);
     const plan = who.role === "intern" ? await loadPlan(who.id) : null;
-    let approvals: AccessRequest[] = [];
-    if (who.role === "mentor") {
-      approvals = await api.requests(who.id).then((r) => r.requests.filter((x) => x.status === "pending_approval" && x.approver_id === who.id)).catch(() => []);
-    }
+    const decisions = await pendingDecisions(who);
     if (stale()) return; // запущено новое приветствие или вошли под другим пользователем
     useChat.getState().setTab("assistant");
     if (who.role === "intern" && !plan) {
       say({ id: msgId(), role: "assistant", kind: "error", content: "Не получилось загрузить план. Проверь, что сервер запущен, и нажми «Сброс» или обнови страницу." });
       return;
     }
-    say(greeting(who, plan, approvals));
+    say(greeting(who, plan, decisions.filter((d) => d.kind !== "publish")));
+    postDecisions(decisions);
     if (plan) await showWeekly(who, plan.current_day, stale);
     if (stale()) return;
     await showReminders(who, plan);
+  }
+
+  /** Что ждёт решения наставника или руководителя (14.11: карточками в чате, а не блоками в плане). Сбой — пусто. */
+  async function pendingDecisions(who: DemoUser): Promise<Array<Decision & { text: string }>> {
+    const out: Array<Decision & { text: string }> = [];
+    const first = (name: string) => name.split(" ")[0];
+    if (who.role === "mentor") {
+      const [requests, questions, suggestions] = await Promise.all([
+        api.requests(who.id).then((r) => r.requests).catch(() => []),
+        api.mentorQuestions(who.id).then((r) => r.questions).catch(() => []),
+        api.suggestions(who.id).then((r) => r.suggestions).catch(() => []),
+      ]);
+      for (const r of requests.filter((x) => x.status === "pending_approval" && x.approver_id === who.id)) {
+        out.push({ kind: "access", id: r.id, text: `${first(findUser(r.intern_id)?.name ?? "Стажёр")} просит доступ — нужно твоё одобрение.` });
+      }
+      for (const q of questions.filter((x) => x.status === "pending")) {
+        out.push({ kind: "question", id: q.id, text: `${first(q.intern_name)} спрашивает то, чего нет в документах.` });
+      }
+      for (const s of suggestions.filter((x) => x.status === "pending")) {
+        out.push({ kind: "suggestion", id: s.id, text: `Похоже, ${first(s.intern_name)} уже знает тему «${s.topic_title}». Поднять уровень?` });
+      }
+      for (const q of questions.filter((x) => x.status === "answered" && x.publication_status === "not_requested").slice(0, 3)) {
+        out.push({ kind: "publish", id: q.id, text: `${first(q.intern_name)}: ответ ты уже дал, но в базе знаний его нет.` });
+      }
+    }
+    if (who.role === "lead") {
+      const absences = await api.absenceRequests(who.id).then((r) => r.requests).catch(() => []);
+      for (const a of absences.filter((x) => x.status === "pending")) {
+        out.push({ kind: "absence", id: a.id, text: `${first(a.intern_name)} просит отгул — нужно твоё решение.` });
+      }
+    }
+    return out;
+  }
+
+  /** Карточки решений в чат — только те, которых в ленте ещё нет. Возвращает id сообщений по ключу решения. */
+  function postDecisions(list: Array<Decision & { text: string }>): Map<string, string> {
+    const shown = new Map(useChat.getState().messages.filter((m) => m.decision).map((m) => [decisionKey(m.decision!), m.id]));
+    for (const { text, ...d } of list) {
+      if (shown.has(decisionKey(d))) continue;
+      const id = msgId();
+      say({ id, role: "assistant", kind: "text", scripted: true, label: d.kind === "publish" ? "по желанию" : "ждёт твоего решения", content: text, decision: d });
+      shown.set(decisionKey(d), id);
+    }
+    return shown;
+  }
+
+  /** Уведомление о решении → чат, к его карточке (Миша, 14.11: раньше «Ответить» вело к уже открытой форме). */
+  async function focusDecision(want: Decision | "question") {
+    setTab("chat");
+    const shown = postDecisions(await pendingDecisions(actor));
+    const key = want === "question" ? [...shown.keys()].find((k) => k.startsWith("question:")) : decisionKey(want);
+    const id = key ? shown.get(key) : undefined;
+    if (id) useChat.getState().setFlash(id);
   }
 
   /** Начало новой недели — бот сам присылает итоги прошедшей (SPEC 3.2). Сбой сводки остальному не мешает. */
@@ -331,6 +385,12 @@ export default function Home() {
   async function openReminder(r: Reminder) {
     // Факт прочитан — из колокольчика уходит, куда бы ни вела кнопка (кнопки «Готово» больше нет).
     if (doneOnOpen(r)) void api.doneReminder(actor.id, r.id).then(refresh, () => undefined);
+    // Решения наставника и руководителя — карточками в чате (14.11)
+    const target = targetOf(r);
+    if (actor.role === "mentor" && target === "mentor_question") return focusDecision("question");
+    if (actor.role === "mentor" && target === "skill_suggestion" && r.suggestion_id) return focusDecision({ kind: "suggestion", id: r.suggestion_id });
+    if (actor.role === "mentor" && target === "access_request" && r.request_id) return focusDecision({ kind: "access", id: r.request_id });
+    if (actor.role === "lead" && target === "absence_request" && r.absence_request_id) return focusDecision({ kind: "absence", id: r.absence_request_id });
     const section = sectionFor(r);
     if (section) {
       setTab("plan");
@@ -356,6 +416,7 @@ export default function Home() {
       await refresh();
       const plan = actor.role === "intern" ? await loadPlan(actor.id) : null;
       if (plan) await showWeekly(actor, plan.current_day);
+      postDecisions(await pendingDecisions(actor));
       const shown = await showReminders(actor, plan);
       const today = (await api.calendar(actor.id).catch(() => null))?.today;
       const when = today ? `Новый день в демо: ${demoDate(today)} — у всех стажёров сразу.` : "Новый день.";
@@ -457,7 +518,7 @@ export default function Home() {
             ) : section === "profile" ? (
               <ProfilePanel actor={actor} />
             ) : (
-              <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} onPractice={onPractice} />
+              <PlanPanel actor={actor} onExplain={onExplain} onDo={onDo} onPractice={onPractice} onOpenChat={() => setTab("chat")} />
             )}
           </div>
           {/* Чат — отдельной карточкой справа: сердце продукта. */}

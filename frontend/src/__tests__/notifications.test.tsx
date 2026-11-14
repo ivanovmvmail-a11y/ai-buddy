@@ -99,7 +99,7 @@ describe("колокольчик и сообщения бота (SPEC 3.6)", () 
     await waitFor(() => expect(srv.calls.some((c) => c.path === "/reminders/REM-p/done")).toBe(true));
   });
 
-  it("наставник: «Бот предлагает…» — «Решить» ведёт к блоку предложений и не закрывает уведомление", async () => {
+  it("наставник: «Бот предлагает…» — «Решить» ведёт к карточке в чате и не закрывает уведомление", async () => {
     srv.state.suggestions.push({
       id: "sug_1", intern_id: "intern-anya", intern_name: "Аня Смирнова", topic: "git", topic_title: "Git",
       from_level: "novice", to_level: "familiar", basis: "закрыто 2 пункта по теме Git", created_day: 4,
@@ -115,7 +115,11 @@ describe("колокольчик и сообщения бота (SPEC 3.6)", () 
     expect(within(item).getByRole("button", { name: "Напомнить завтра" })).toBeTruthy();
     expect(within(item).queryByRole("button", { name: "Готово" })).toBeNull();
     await act(async () => fireEvent.click(within(item).getByRole("button", { name: "Решить" })));
-    expect(await screen.findByRole("region", { name: "Предложения бота" })).toBeTruthy();
+    // 14.11: решения — карточками в чате; уведомление подсвечивает нужную
+    expect(await screen.findByRole("group", { name: "Предложение: Аня Смирнова, Git" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Предложения бота" })).toBeNull();
+    const flashed = useChat.getState().flash;
+    expect(useChat.getState().messages.find((m) => m.id === flashed)?.decision).toEqual({ kind: "suggestion", id: "sug_1" });
     expect(srv.calls.some((c) => c.path === "/reminders/REM-s/done")).toBe(false);
   });
 
