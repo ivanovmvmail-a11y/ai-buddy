@@ -34,5 +34,7 @@
   {"id": "fr-33", "category": "live", "user": "intern-anya", "question": "что такое бэклог простыми словами", "expect": {"source": "Глоссарий стажировки"}},
   {"id": "fr-34", "category": "live", "user": "intern-ivan", "question": "Что мне сделать с SQL по плану?", "expect": {"contains_any": ["SQL"]}},
   {"id": "fr-35", "category": "live", "user": "intern-anya", "question": "че по пайплайну делать если он красный, а я ничего не трогала", "expect": {"source": "Что делать, если пайплайн красный"}},
-  {"id": "fr-36", "category": "live", "user": "intern-kirill", "question": "что мне делать по git", "expect": {"source": "Учебный репозиторий — клонирование и ветки", "absent": ["Следующий шаг —"]}}
+  {"id": "fr-36", "category": "live", "user": "intern-kirill", "question": "что мне делать по git", "expect": {"source": "Учебный репозиторий — клонирование и ветки", "absent": ["Следующий шаг —"]}},
+  {"id": "fr-37", "category": "actions", "user": "intern-anya", "question": "напоминание на сдачу дедлайна", "expect": {"draft": {"tool": "create_reminder"}}},
+  {"id": "fr-38", "category": "actions", "user": "intern-anya", "question": "напоминание", "expect": {"contains_any": ["О чём напомнить"]}}
 ]
