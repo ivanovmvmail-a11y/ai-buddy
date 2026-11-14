@@ -318,6 +318,19 @@ describe("экран «план + чат» на API", () => {
     expect(order.indexOf("Buddy — наставник.")).toBeLessThan(order.findIndex((c) => c.startsWith("Привет, Иван")));
   });
 
+  it("быстрое переключение туда-обратно — одно приветствие, а не несколько (Railway, 14.11)", async () => {
+    open();
+    // Сервер ещё не ответил на первое приветствие Ани, а уже вошли под Иваном и вернулись к Ане.
+    await act(async () => {
+      login("intern-ivan");
+      login("intern-anya");
+    });
+    await screen.findByText(/2-й день стажировки/);
+    await act(async () => new Promise((r) => setTimeout(r, 50))); // дать отставшим запускам дойти до конца
+    expect(useChat.getState().messages.filter((m) => m.content.startsWith("Привет, Аня"))).toHaveLength(1);
+    expect(useChat.getState().messages.some((m) => m.content.startsWith("Привет, Иван"))).toBe(false);
+  });
+
   it("выбор пользователя запоминается", async () => {
     open();
     await screen.findByText(/2-й день стажировки/);

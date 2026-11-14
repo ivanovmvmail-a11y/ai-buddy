@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { PlanPanel } from "@/components/PlanPanel";
 import { HomePanel } from "@/components/HomePanel";
@@ -110,12 +110,12 @@ export default function Home() {
   }
 
   /** Прошлая переписка и неподтверждённые черновики — с сервера (SPEC 9, аудит D7). Сбой — начинаем с чистого чата. */
-  async function restoreChat(who: DemoUser) {
+  async function restoreChat(who: DemoUser, stale: () => boolean) {
     const [past, drafts] = await Promise.all([
       api.history(who.id).then((h) => h.messages).catch(() => []),
       api.actions(who.id).then((a) => a.actions.filter((x) => x.status === "pending")).catch(() => []),
     ]);
-    if (useSession.getState().userId !== who.id) return;
+    if (stale()) return;
     // Вкладку сервер не хранит: вопрос кладём туда же, куда ответ (по словам ответа видно тему лучше).
     for (let i = 0; i < past.length; i++) {
       const m = past[i];
@@ -132,28 +132,35 @@ export default function Home() {
     }
   }
 
+  // Номер последнего запуска приветствия. Запуски не отменяются сами: на Railway (медленный ответ) переключение
+  // туда-обратно, «Сброс» или повтор эффекта давали 2–3 одинаковых приветствия (Миша, 14.11). Дописывает только последний.
+  const welcomeRun = useRef(0);
+
   async function welcome() {
     const who = actor;
+    const run = ++welcomeRun.current;
+    const stale = () => run !== welcomeRun.current || useSession.getState().userId !== who.id;
     useChat.getState().reset([]);
-    await restoreChat(who);
+    await restoreChat(who, stale);
     const plan = who.role === "intern" ? await loadPlan(who.id) : null;
     let approvals: AccessRequest[] = [];
     if (who.role === "mentor") {
       approvals = await api.requests(who.id).then((r) => r.requests.filter((x) => x.status === "pending_approval" && x.approver_id === who.id)).catch(() => []);
     }
-    if (useSession.getState().userId !== who.id) return; // успели войти под другим пользователем
+    if (stale()) return; // запущено новое приветствие или вошли под другим пользователем
     useChat.getState().setTab("assistant");
     if (who.role === "intern" && !plan) {
       say({ id: msgId(), role: "assistant", kind: "error", content: "Не получилось загрузить план. Проверь, что сервер запущен, и нажми «Сброс» или обнови страницу." });
       return;
     }
     say(greeting(who, plan, approvals));
-    if (plan) await showWeekly(who, plan.current_day);
+    if (plan) await showWeekly(who, plan.current_day, stale);
+    if (stale()) return;
     await showReminders(who, plan);
   }
 
   /** Начало новой недели — бот сам присылает итоги прошедшей (SPEC 3.2). Сбой сводки остальному не мешает. */
-  async function showWeekly(who: DemoUser, day: number) {
+  async function showWeekly(who: DemoUser, day: number, stale: () => boolean = () => false) {
     const week = finishedWeek(day);
     if (week === null) return;
     try {
@@ -161,6 +168,7 @@ export default function Home() {
         api.summary(who.id, who.id, week),
         api.resources(who.id).then((r) => r.resources).catch(() => []),
       ]);
+      if (stale()) return;
       say(weeklySummaryMsg(summary, Object.fromEntries(resources.map((r) => [r.id, r.title]))));
     } catch {
       /* сводка — дополнение к приветствию */
