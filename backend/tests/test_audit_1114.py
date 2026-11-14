@@ -113,3 +113,16 @@ def test_decisions_point_to_chat_cards(agent, use_llm, user, text, expected):
 ])
 def test_topics_less_other(question, topic):
     assert topic_of(question) == topic
+
+
+def test_definition_question_always_cites_glossary():
+    from app.agent.service import cited_sources
+    docs = [{"title": "Review", "content": "CI must be green before review.", "url": None},
+            {"title": "Glossary", "content": "# Terms\n- **PR** \u2014 pull request.\n- **CI, \u043f\u0430\u0439\u043f\u043b\u0430\u0439\u043d** \u2014 automatic checks.", "url": None}]
+    robot = "CI is a robot tester that watches your code."
+    assert cited_sources(robot, docs, "\u0447\u0442\u043e \u0442\u0430\u043a\u043e\u0435 CI \u0438 \u0437\u0430\u0447\u0435\u043c \u043e\u043d \u043c\u043d\u0435")[0]["title"] == "Glossary"
+    assert cited_sources(robot, docs, "\u043e\u0431\u044a\u044f\u0441\u043d\u0438 \u0447\u0442\u043e \u0442\u0430\u043a\u043e\u0435 \u043f\u0430\u0439\u043f\u043b\u0430\u0439\u043d")[0]["title"] == "Glossary"
+    assert cited_sources(robot, docs, "\u0447\u0442\u043e \u0442\u0430\u043a\u043e\u0435 kubernetes") == []
+    assert cited_sources(robot, docs, "\u043f\u043e\u0447\u0435\u043c\u0443 \u0443\u043f\u0430\u043b CI") == []
+    missing = "\u0412 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0445 \u044d\u0442\u043e\u0433\u043e \u043d\u0435\u0442."
+    assert cited_sources(missing, docs, "\u0447\u0442\u043e \u0442\u0430\u043a\u043e\u0435 CI") == []
