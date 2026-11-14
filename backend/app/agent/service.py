@@ -112,6 +112,7 @@ def cited_sources(reply: str, docs: list[dict], question: str = "", short: bool 
             if doc["title"] in titled and not any(c["title"] == doc["title"] for c in cited):
                 cited.append({"title": doc["title"], "url": doc.get("url")})
         return cited
+    defined = [] if missing else _definition_source(docs, question)
     asked = set(_WORD.findall(question.lower().replace("ё", "е")))
     words = set(_WORD.findall(reply.lower().replace("ё", "е"))) - asked
     scores: dict[str, tuple[int, dict]] = {}
@@ -122,6 +123,10 @@ def cited_sources(reply: str, docs: list[dict], question: str = "", short: bool 
         # Тогда источник — только при сильном совпадении с документом.
         if score >= (6 if missing else 4) and score > scores.get(doc["title"], (0, doc))[0]:
             scores[doc["title"]] = (score, doc)
+    if defined:  # документ с определением — первым; к нему не больше одного самого близкого к ответу
+        ranked = sorted((pair for pair in scores.values() if pair[1]["title"] != defined[0]["title"]),
+                        key=lambda pair: -pair[0])
+        return (defined + [{"title": d["title"], "url": d.get("url")} for _, d in ranked])[:MAX_SOURCES]
     if not scores:
         # short=False — ответ про действие сервиса (черновик заявки): короткий текст не пересказывает документ.
         return [] if missing or not short else _short_answer_source(reply, docs, question)
@@ -130,6 +135,27 @@ def cited_sources(reply: str, docs: list[dict], question: str = "", short: bool 
     best = max(s for s, _ in scores.values())
     ranked = sorted(scores.values(), key=lambda pair: -pair[0])
     return [{"title": d["title"], "url": d.get("url")} for s, d in ranked if s * 2 >= best][:MAX_SOURCES]
+
+
+_DEFINING = re.compile(r"(что|кто) так(ое|ой|ая|ие)|что значит|что это|что означает")
+_DEFINITION = re.compile(r"^\s*[-*]?\s*\*\*([^*]+)\*\*\s*—", re.M)
+
+
+def _definition_source(docs: list[dict], question: str) -> list[dict]:
+    """«Что такое CI?» — источник тот документ, где термин определён («- **CI, пайплайн** — …» в глоссарии).
+
+    Прогоны GigaChat 14.11: на вопрос-определение модель отвечала верно, но своими словами («CI — это робот-тестер»),
+    четырёх общих слов с глоссарием не набиралось — и ответ оставался без источника (то «что такое CI», то «что такое
+    пайплайн»). Термин ищем в вопросе целым словом, без учёта регистра."""
+    q = question.lower().replace("ё", "е")
+    if not _DEFINING.search(q):
+        return []
+    for doc in docs:
+        for terms in _DEFINITION.findall(doc["content"]):
+            for term in (t.strip().lower().replace("ё", "е") for t in terms.split(",")):
+                if len(term) >= 2 and re.search(rf"(?<![a-zа-я0-9]){re.escape(term)}(?![a-z0-9])", q):
+                    return [{"title": doc["title"], "url": doc.get("url")}]
+    return []
 
 
 def _short_answer_source(reply: str, docs: list[dict], question: str) -> list[dict]:
