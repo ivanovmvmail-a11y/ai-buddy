@@ -7,6 +7,7 @@ import { approverText, itemActions, msgId, TOPICS, useChat, type BotAction, type
 import { usePlan, useRefresh, useResources } from "@/lib/queries";
 import { findUser } from "@/lib/users";
 import { dayText } from "./AbsencePanel";
+import { DecisionCard } from "./DecisionCard";
 import { RichText } from "./RichText";
 import { SourceLink } from "./SourceViewer";
 import type { AccessRequest, DemoUser, PlanItem } from "@/lib/types";
@@ -93,6 +94,30 @@ export async function submitPractice(actor: DemoUser, text: string, onDone?: () 
   }
 }
 
+/** Ответ наставника на вопрос стажёра — обычным сообщением чата (14.11: раньше — форма посреди плана). */
+export async function submitReply(actor: DemoUser, text: string, onDone?: () => Promise<unknown>) {
+  const chat = useChat.getState();
+  const mode = chat.reply;
+  if (!mode || !text.trim() || chat.busy) return;
+  chat.push({ id: msgId(), role: "user", kind: "text", content: text.trim() });
+  chat.setBusy(true);
+  try {
+    const topic = mode.topic.trim() || mode.question;
+    await api.answerMentor(actor.id, mode.questionId, text.trim(), mode.publish, mode.publish ? topic : undefined);
+    chat.setReply(null);
+    chat.push({
+      id: msgId(), role: "assistant", kind: "text", scripted: true, label: "из данных сервиса",
+      content: `Ответ отправлен: ${mode.internName} получит его в колокольчик 🔔.`
+        + (mode.publish ? ` Добавил в базу знаний команды по теме «${topic}»: следующему стажёру отвечу сам, без имён и контактов.` : ""),
+    });
+    await onDone?.();
+  } catch (err) {
+    chat.push({ id: msgId(), role: "assistant", kind: "error", content: (err as Error).message });
+  } finally {
+    chat.setBusy(false);
+  }
+}
+
 const EMPTY: Record<string, string> = {
   assistant: "Здесь — вопросы о стажировке и документах команды.",
   study: "Здесь — объяснения пунктов плана и задания практикумов. Нажми «Объяснить» у пункта или напиши «объясни пункт про песочницу».",
@@ -116,6 +141,8 @@ export function ChatPanel({ actor, onAction }: Props) {
   const tabbed = actor.role === "intern";
   const shown = tabbed ? messages.filter((m) => (m.topic ?? "assistant") === tab) : messages;
   const practicing = practice && (!tabbed || tab === "study");
+  const reply = useChat((s) => s.reply);
+  const setReply = useChat((s) => s.setReply);
   const refresh = useRefresh();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -129,7 +156,8 @@ export function ChatPanel({ actor, onAction }: Props) {
     e.preventDefault();
     const t = input;
     setInput("");
-    if (practicing) void submitPractice(actor, t, refresh);
+    if (reply) void submitReply(actor, t, refresh);
+    else if (practicing) void submitPractice(actor, t, refresh);
     else void askBot(actor, t);
   }
 
@@ -179,12 +207,23 @@ export function ChatPanel({ actor, onAction }: Props) {
           </button>
         </div>
       )}
+      {reply && (
+        <div role="status" className="flex items-center gap-2 border-t border-accent/30 bg-accent/[0.06] px-3 py-1.5 text-sm">
+          <span className="min-w-0 flex-1 truncate">Ответ на вопрос «{reply.question}» ({reply.internName}) — следующим сообщением</span>
+          <button
+            onClick={() => setReply(null)}
+            className="rounded-md px-2 py-0.5 text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10"
+          >
+            Отменить
+          </button>
+        </div>
+      )}
       <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-line p-3">
         <input
-          aria-label={practicing ? "Ответ на задание" : "Сообщение"}
+          aria-label={reply ? "Ответ стажёру" : practicing ? "Ответ на задание" : "Сообщение"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={practicing ? "Что и как сделано — своими словами…" : PLACEHOLDER[tabbed ? tab : "assistant"]}
+          placeholder={reply ? "Ответ стажёру…" : practicing ? "Что и как сделано — своими словами…" : PLACEHOLDER[tabbed ? tab : "assistant"]}
           className="min-w-0 flex-1 rounded-full border border-transparent bg-surface-2 px-4 py-2.5 text-base outline-none focus:border-accent"
         />
         <button
@@ -218,6 +257,15 @@ function liveActions(actions: BotAction[] | undefined, items: PlanItem[] | undef
 function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Props["onAction"] }) {
   const plan = usePlan(actor, actor.role === "intern" ? actor.id : undefined);
   const actions = liveActions(m.actions, plan.data?.items);
+  // Переход из уведомления (Миша, 14.11: «нажимаешь "Ответить" — ничего не происходит»): прокрутить к карточке и
+  // подсветить её на пару секунд. Подсветка — рамкой, без движения.
+  const flashed = useChat((s) => s.flash === m.id);
+  useEffect(() => {
+    if (!flashed) return;
+    const show = setTimeout(() => document.querySelector(`[data-msg="${m.id}"]`)?.scrollIntoView?.({ block: "center" }), 60);
+    const off = setTimeout(() => useChat.getState().setFlash(null), 2200);
+    return () => { clearTimeout(show); clearTimeout(off); };
+  }, [flashed, m.id]);
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
@@ -226,12 +274,13 @@ function Bubble({ m, actor, onAction }: { m: Msg; actor: DemoUser; onAction: Pro
     );
   }
   return (
-    <div className="flex justify-start">
-      <div className={`max-w-[92%] rounded-[20px] rounded-bl-md px-4 py-3 text-[15px] leading-relaxed ${
+    <div className="flex justify-start" data-msg={m.id}>
+      <div className={`max-w-[92%] rounded-[20px] rounded-bl-md px-4 py-3 text-[15px] leading-relaxed transition-shadow duration-300 ${
         m.kind === "error" ? "bg-red-500/10 text-red-800 dark:text-red-300" : "bg-surface-2"
-      }`}>
+      } ${flashed ? "shadow-[0_0_0_2px_var(--accent)]" : ""}`}>
         <RichText text={m.content} />
         {m.draft && <DraftCard m={m} actor={actor} />}
+        {m.decision && <DecisionCard d={m.decision} actor={actor} />}
         {m.sources && m.sources.length > 0 && (
           <div className="mt-2 text-xs text-black/55 dark:text-white/55">
             Источник:{" "}

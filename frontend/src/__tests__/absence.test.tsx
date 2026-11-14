@@ -82,13 +82,17 @@ describe("отгул на один день (SPEC 3.8)", () => {
   it("руководитель согласует — стажёр видит «согласован», наставник только дату", async () => {
     srv.state.absences.push(request());
     open("lead-olga");
-    const box = await screen.findByRole("region", { name: "Заявки на отгул" });
-    expect(within(box).getByText("Аня Смирнова")).toBeTruthy();
-    expect(within(box).getByText(/12\.11 \(чт\) · личные дела/)).toBeTruthy();
+    // 14.11: заявление — карточкой в чате руководителя; в плане только счётчик
+    const box = await screen.findByRole("group", { name: "Отгул: Аня Смирнова" });
+    expect(screen.queryByRole("region", { name: "Заявки на отгул" })).toBeNull();
+    expect(await screen.findByRole("region", { name: "Ждут решения" })).toBeTruthy();
+    expect(within(box).getByText("12.11 (чт), один день")).toBeTruthy();
+    expect(within(box).getByText("личные дела")).toBeTruthy();
     await act(async () => fireEvent.click(within(box).getByRole("button", { name: "Согласовать" })));
     await waitFor(() => expect(srv.state.absences[0].status).toBe("approved"));
     expect(srv.calls.find((c) => c.path === "/absence/requests/ABS-1/decide")?.body).toEqual({ approve: true });
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Заявки на отгул" })).toBeNull());
+    expect(await within(box).findByText(/Согласовано/)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Ждут решения" })).toBeNull());
     cleanup();
 
     open("mentor-petr");
@@ -105,7 +109,7 @@ describe("отгул на один день (SPEC 3.8)", () => {
   it("руководитель отклоняет", async () => {
     srv.state.absences.push(request());
     open("lead-olga");
-    const box = await screen.findByRole("region", { name: "Заявки на отгул" });
+    const box = await screen.findByRole("group", { name: "Отгул: Аня Смирнова" });
     await act(async () => fireEvent.click(within(box).getByRole("button", { name: "Отклонить" })));
     await waitFor(() => expect(srv.state.absences[0].status).toBe("rejected"));
   });

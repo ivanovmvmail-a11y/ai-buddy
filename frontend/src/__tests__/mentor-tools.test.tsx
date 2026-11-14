@@ -33,7 +33,9 @@ describe("предложения по уровню (SPEC 4)", () => {
   it("наставник видит предложение с основанием и поднимает уровень — план пересобирается", async () => {
     srv.state.suggestions.push(gitSuggestion());
     open("mentor-petr");
-    const box = await screen.findByRole("region", { name: "Предложения бота" });
+    // 14.11: предложение — карточкой в чате, в плане блока нет
+    const box = await screen.findByRole("group", { name: "Предложение: Аня Смирнова, Git" });
+    expect(screen.queryByRole("region", { name: "Предложения бота" })).toBeNull();
     expect(within(box).getByText(/новичок → знаком/)).toBeTruthy();
     expect(within(box).getByText("Основание: закрыла 2 пункта по Git")).toBeTruthy();
     expect(await screen.findByText("Практикум: ветки и pull request")).toBeTruthy();
@@ -41,7 +43,7 @@ describe("предложения по уровню (SPEC 4)", () => {
     await act(async () => fireEvent.click(within(box).getByRole("button", { name: "Поднять уровень" })));
     await waitFor(() => expect(srv.state.suggestions[0].status).toBe("accepted"));
     expect(srv.calls.find((c) => c.path === "/skills/suggestions/sug_1/decide")?.body).toEqual({ accept: true });
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Предложения бота" })).toBeNull());
+    expect(await screen.findByText(/Уровень поднят/)).toBeTruthy();
     await waitFor(() => expect(screen.queryByText("Практикум: ветки и pull request")).toBeNull()); // незакрытый персональный снят
     expect(srv.state.profiles[0].skills.git).toBe("familiar");
   });
@@ -49,7 +51,7 @@ describe("предложения по уровню (SPEC 4)", () => {
   it("«Оставить» — уровень не меняется", async () => {
     srv.state.suggestions.push(gitSuggestion());
     open("mentor-petr");
-    const box = await screen.findByRole("region", { name: "Предложения бота" });
+    const box = await screen.findByRole("group", { name: "Предложение: Аня Смирнова, Git" });
     await act(async () => fireEvent.click(within(box).getByRole("button", { name: "Оставить" })));
     await waitFor(() => expect(srv.state.suggestions[0].status).toBe("dismissed"));
     expect(srv.state.profiles[0].skills.git).toBe("novice");

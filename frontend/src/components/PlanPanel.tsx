@@ -1,15 +1,14 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
 import { api } from "@/lib/api";
 import { canMarkDone, canRequestAccess, isWorking, STAGE_TITLES, waitedFor } from "@/lib/plan-logic";
-import { useCatalog, useInterns, usePlan, useProfile, useRefresh, useRequests } from "@/lib/queries";
+import {
+  useAbsenceRequests, useCatalog, useInterns, useMentorQuestions, usePlan, useProfile, useRefresh, useRequests, useSuggestions,
+} from "@/lib/queries";
 import { useSession } from "@/lib/store";
 import { InternCards } from "./InternCards";
-import { ComparePlans, SkillSuggestions } from "./MentorTools";
-import { AbsenceRequests } from "./AbsencePanel";
-import { MentorQuestions } from "./MentorQuestions";
+import { ComparePlans } from "./MentorTools";
 import { findUser } from "@/lib/users";
 import type { DemoUser, ItemStatus, PlanItem, SkillLevel, Stage, StageInfo } from "@/lib/types";
 
@@ -28,6 +27,7 @@ type Props = {
   onExplain: (item: PlanItem) => void;
   onDo: (item: PlanItem) => void;
   onPractice: (item: PlanItem) => void; // «Сдать задание» — в чате (чекпоинт 2)
+  onOpenChat?: () => void; // телефон: чат — отдельная вкладка
 };
 
 function Retry({ text, onRetry }: { text: string; onRetry: () => void }) {
@@ -39,7 +39,7 @@ function Retry({ text, onRetry }: { text: string; onRetry: () => void }) {
   );
 }
 
-export function PlanPanel({ actor, onExplain, onDo, onPractice }: Props) {
+export function PlanPanel({ actor, onExplain, onDo, onPractice, onOpenChat }: Props) {
   const internPick = useSession((s) => s.internPick);
   const pickIntern = useSession((s) => s.pickIntern);
   const interns = useInterns(actor);
@@ -64,15 +64,13 @@ export function PlanPanel({ actor, onExplain, onDo, onPractice }: Props) {
 
   return (
     <div className="space-y-5 p-4 sm:p-5">
-      {/* Наставнику сначала то, что ждёт решения, и сравнение планов (главная идея), потом карточки (проверка 12.11). */}
-      {actor.role === "mentor" && <Approvals actor={actor} />}
-      {actor.role === "mentor" && <MentorQuestions actor={actor} />}
-      {actor.role === "mentor" && <SkillSuggestions actor={actor} />}
+      {/* Решения (заявки, вопросы стажёров, уровень, отгулы) — карточками в чате (Миша, 14.11, по замечанию эксперта:
+          «большинство вещей в чате, а какие-то почему-то посреди плана»). Здесь — только счётчик. */}
+      <PendingDecisions actor={actor} onOpenChat={onOpenChat} />
       {actor.role === "mentor" && <ComparePlans actor={actor} />}
 
       {actor.role !== "intern" && <InternCards actor={actor} />}
       {/* Стажёру «Мои вопросы наставнику» и «Мои заявки на отгул» — на «Главной» (редизайн 13.11). */}
-      {actor.role === "lead" && <AbsenceRequests actor={actor} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
@@ -314,60 +312,27 @@ function PlanRow({
   );
 }
 
-function Approvals({ actor }: { actor: DemoUser }) {
+/** Счётчик вместо блоков решений: сами решения — карточками в чате (14.11). На телефоне — кнопка в чат. */
+function PendingDecisions({ actor, onOpenChat }: { actor: DemoUser; onOpenChat?: () => void }) {
   const requests = useRequests(actor);
-  const refresh = useRefresh();
-  const [rejecting, setRejecting] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
-  const decide = useMutation({
-    mutationFn: (v: { id: string; approve: boolean; reason?: string }) => api.decide(actor.id, v.id, v.approve, v.reason),
-    onSuccess: () => {
-      setRejecting(null);
-      setReason("");
-      return refresh();
-    },
-  });
-  const pending = (requests.data ?? []).filter((r) => r.approver_id === actor.id && r.status === "pending_approval");
-  if (!pending.length) return null;
-
+  const questions = useMentorQuestions(actor);
+  const suggestions = useSuggestions(actor);
+  const absences = useAbsenceRequests(actor);
+  const mentor = actor.role === "mentor";
+  const count = mentor
+    ? (requests.data ?? []).filter((r) => r.approver_id === actor.id && r.status === "pending_approval").length
+      + (questions.data ?? []).filter((q) => q.status === "pending").length
+      + (suggestions.data ?? []).filter((s) => s.status === "pending").length
+    : actor.role === "lead" ? (absences.data ?? []).filter((a) => a.status === "pending").length : 0;
+  if (!count) return null;
   return (
-    <section aria-label="Ждут одобрения" className="card p-4 sm:p-5 shadow-[inset_4px_0_0_rgb(245_158_11),0_0_0_1px_var(--line)]">
-      <h3 className="mb-2 text-sm font-semibold">Ждут твоего одобрения</h3>
-      {decide.isError && <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">{decide.error.message}</p>}
-      <ul className="space-y-2">
-        {pending.map((r) => (
-          <li key={r.id} className="text-sm">
-            <div>
-              <b>{r.id}</b> · {findUser(r.intern_id)?.name} · {r.resource_title ?? r.resource_id} · права: {r.level === "read" ? "чтение" : r.level}
-            </div>
-            <div className="text-black/55 dark:text-white/55">{r.justification}</div>
-            {rejecting === r.id ? (
-              <div className="mt-1.5 flex gap-2">
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Причина отказа"
-                  className="min-w-0 flex-1 rounded-lg border border-black/15 bg-transparent px-2 py-1 dark:border-white/20"
-                />
-                <button
-                  disabled={!reason.trim() || decide.isPending}
-                  onClick={() => decide.mutate({ id: r.id, approve: false, reason: reason.trim() })}
-                  className="rounded-full border border-line px-3 py-1 disabled:opacity-40 dark:border-white/20"
-                >
-                  Отклонить
-                </button>
-              </div>
-            ) : (
-              <div className="mt-1.5 flex gap-2">
-                <button disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, approve: true })} className="rounded-full bg-accent px-4 py-1 font-semibold text-black hover:bg-accent-hover disabled:opacity-50">
-                  Одобрить
-                </button>
-                <button onClick={() => setRejecting(r.id)} className="rounded-full border border-line px-3 py-1 dark:border-white/20">Отклонить…</button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+    <section aria-label="Ждут решения" className="card flex flex-wrap items-center justify-between gap-2 p-4 text-sm shadow-[inset_4px_0_0_rgb(245_158_11),0_0_0_1px_var(--line)]">
+      <span><b>Ждут твоего решения: {count}</b> <span className="text-[var(--muted)]">— они в чате, решай прямо там</span></span>
+      {onOpenChat && (
+        <button onClick={onOpenChat} className="rounded-full border border-foreground/25 px-3.5 py-1.5 font-semibold hover:bg-surface-2 md:hidden">
+          Открыть чат
+        </button>
+      )}
     </section>
   );
 }
