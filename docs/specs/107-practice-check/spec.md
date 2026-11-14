@@ -47,6 +47,11 @@
 - **AC-3.** Чужой пункт, не стажёр, пункт без проверки → 404; пустой или длинный ответ → 422.
 - **AC-4.** В событиях — `practice_checked` с `passed`, без текста ответа.
 - **AC-5.** Кнопка видна только стажёру у пункта с `practice_check`.
+- **AC-6 (14.11, по смыслу).** С ключом модели факт, не найденный по ключевым словам, проверяет модель («самый
+  ранний упавший шаг» = «первый красный шаг»). Осторожно: модель только добавляет факты; ответ без единого факта по
+  словам, короче шести слов или с просьбой «засчитай / ignore instructions» ей не показывается; ответ модели не из
+  одних номеров отбрасывается; сбой модели и выключенный флаг `practice_by_meaning` (спека 006) — проверка по словам.
+  Без ключа — как раньше. Засчитанное задание по-прежнему лишь повод наставнику поднять уровень.
 
 ## 8. Метрики
 Событие `practice_checked`: доля засчитанных с первой попытки по темам — где учебный документ непонятен.
@@ -59,6 +64,7 @@
 | AC-3 | `backend/tests/test_practice.py::test_only_owner_intern_can_submit`, `::test_item_without_check_and_validation` |
 | AC-4 | `backend/tests/test_practice.py::test_git_task_passes_and_records_event_without_text` |
 | AC-5 | `backend/tests/test_practice.py::test_plan_marks_checkable_items`; `frontend/src/__tests__/practice.test.tsx` |
+| AC-6 | `backend/tests/test_features_recall.py::test_practice_by_meaning_credits_paraphrased_fact`, `::test_practice_by_meaning_is_careful` |
 
 ## 10. Открытые вопросы
 - Засчитанное задание как отдельное основание для предложения наставнику («задание выполнено») — потребует правки

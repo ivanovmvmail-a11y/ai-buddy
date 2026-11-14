@@ -16,10 +16,12 @@ dependencies = [
     { name = "flask-cors" },
     { name = "gigachat" },
     { name = "gunicorn" },
+    { name = "kafka-python" },
     { name = "openai" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "pydantic-settings" },
+    { name = "redis" },
 ]
 
 [package.optional-dependencies]
@@ -39,11 +41,13 @@ requires-dist = [
     { name = "flask-cors", specifier = ">=6.0.5" },
     { name = "gigachat", specifier = ">=0.2.4" },
     { name = "gunicorn", specifier = ">=26.2.0" },
+    { name = "kafka-python", specifier = ">=2.2,<3" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.30,<2" },
     { name = "openai", specifier = ">=3.46.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0,<4" },
     { name = "psycopg-pool", specifier = ">=3.2.0,<4" },
     { name = "pydantic-settings", specifier = ">=2.16.2" },
+    { name = "redis", specifier = ">=5,<7" },
 ]
 provides-extras = ["mcp"]
 
@@ -682,6 +686,15 @@ wheels = [
 ]
 
 [[package]]
+name = "kafka-python"
+version = "2.3.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/a1/17a675cb1a4368a2b29070ed7386135d7db41b6ac5c8ab6f6876a4270ac6/kafka_python-2.3.3.tar.gz", hash = "sha256:c566a326161595d18e6a65069fb5cee8e389528529932b224ce57641ce49de1d", size = 358586, upload-time = "2026-10-26T17:48:40.847Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/f3/1a4a5a60bf047c8c3786adf461977958852a1528c267e2ba659396552c39/kafka_python-2.3.3-py2.py3-none-any.whl", hash = "sha256:9ab1c473f0bc72c8db82ec77137f30691de42e68807a1933c3200b8771235ce1", size = 326619, upload-time = "2026-10-26T17:48:36.768Z" },
+]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1171,6 +1184,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/61/caa39686032d2ebdd04ff0ab5cbe163126c0066d98e00c9018646e42393b/pywin32-312-cp315-cp315-win32.whl", hash = "sha256:5c1fbe4a937a73ae9297384a3da38518cbc694c68ad8a809b2e19acd350f03ed", size = 6471159, upload-time = "2026-06-04T07:49:50.035Z" },
     { url = "https://files.pythonhosted.org/packages/0f/cd/7e1de64a4a6f69c04214169657ccab0d93a670ea50e35eb8f489d7378249/pywin32-312-cp315-cp315-win_amd64.whl", hash = "sha256:c2f03a0f73f804a13c2735b99392b0cd426bb4f2c4d0178e5ac966a0f21618d5", size = 7025293, upload-time = "2026-06-04T07:49:54.857Z" },
     { url = "https://files.pythonhosted.org/packages/23/ed/4532e9388e65fa16b46776ef47ad631a64eda1631884488af707666350ed/pywin32-312-cp315-cp315-win_arm64.whl", hash = "sha256:a8597d28f267b39074aef51fa593530082b39cbe5a074226096857b1fed2dfb9", size = 6840337, upload-time = "2026-06-04T07:49:57.531Z" },
+]
+
+[[package]]
+name = "redis"
+version = "6.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/d6/e8b92798a5bd67d659d51a18170e91c16ac3b59738d91894651ee255ed49/redis-6.4.0.tar.gz", hash = "sha256:b01bc7282b8444e28ec36b261df5375183bb47a07eb9c603f284e89cbc5ef010", size = 4647399, upload-time = "2025-08-07T08:10:11.441Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/02/89e2ed7e85db6c93dfa9e8f691c5087df4e3551ab39081a4d7c6d1f90e05/redis-6.4.0-py3-none-any.whl", hash = "sha256:f0544fa9604264e9464cdf4814e7d4830f74b165d52f2a330a760a88dd248b7f", size = 279847, upload-time = "2025-08-07T08:10:09.84Z" },
 ]
 
 [[package]]

@@ -39,6 +39,20 @@
   `trigger_word`) → `{"response_type":"ephemeral","username":"AI-buddy","text":"…"}`. `401` — неверный токен, `503` — `MATTERMOST_TOKEN` не задан.
 Подробно — `docs/INTEGRATION.md`.
 
+## Feature flags (14.11, спека 006)
+- `GET /features` → `{"flags": [{"name", "enabled", "source": "default" | "env" | "runtime", "description"}], "store": "redis" | "memory"}`.
+  Любая вошедшая роль. Флаги: `quick_access`, `memory_recall`, `practice_by_meaning`, `example_guard`.
+- `POST /features` `{"name": str, "enabled": bool}` → тот же список; переключает флаг на ходу (значение в Redis, без
+  `REDIS_URL` — в памяти процесса). Неизвестный флаг — `404`, не `bool` — `422`, при заданном `DEMO_KEY` нужен
+  `X-Demo-Key` (`403`). `POST /demo/reset` возвращает флаги к значениям запуска (`FEATURE_FLAGS`).
+- На контракт остальных адресов флаги не влияют: при `quick_access=off` `POST /actions` с `quick: true` возвращает
+  обычный черновик (`pending`) — интерфейс его уже умеет показывать.
+
+## Поток событий в Kafka (14.11, спека 304)
+- `GET /events/stream` → `{"enabled": bool, "topic": str | null, "connected": bool, "queued": int, "sent": int, "dropped": int}` —
+  счётчики отправки событий в Apache Kafka этим процессом backend. Любая вошедшая роль; данных пользователей нет.
+  На остальные адреса поток не влияет.
+
 ## POST /chat
 Запрос:
 ```json

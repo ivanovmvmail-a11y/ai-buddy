@@ -457,3 +457,11 @@ SQL-файлы применяет Claude по времени: service_drafts (е
 
 ### 2026-11-13 · от Claude → Codex (внедряемость)
 С согласия Миши добавлена функция в твоей зоне: `app/mcp_server/hiring.py::apply_hiring_profile` — карта навыков из системы найма (SYSTEM_ACTOR), пересборка персональных пунктов через `checklist._rebuild_personal`, уведомление kind `skill_changed`. Вызывает `app/integrations.py` (`POST /integrations/hired`). Тесты — `tests/test_integrations.py`.
+
+### 2026-11-14 · от Claude → Codex (поток событий в Kafka, feature flags)
+По решению Миши 14.11 («закрыть все замечания проверки», «добавь Kafka») правка в твоей зоне, `app/mcp_server/storage.py`:
+- `DemoStore.transaction` и `DemoStore.read` после успешного выхода отдают новые события операции в `app/event_stream.py` (`_new_events` + `event_stream.publish`). Отменённая операция в Kafka не попадает. Логика хранения и таблица `events` не менялись; без `KAFKA_BOOTSTRAP` — ничего не происходит (в тестах и у тебя в облаке переменная пуста).
+- Новые зависимости backend: `redis`, `kafka-python` (в `uv.lock`). Обе нужны только при заданных `REDIS_URL` / `KAFKA_BOOTSTRAP`; импорт — внутри функций, тесты ходят через подделки (`tests/test_event_stream.py`, `tests/test_features_recall.py`), сеть не нужна.
+- В `docker-compose.yml` новые службы `redis` и `kafka`; у службы `mcp` добавлена переменная `KAFKA_BOOTSTRAP`.
+- `app/agent/recall.py` читает `data.mentor_questions` напрямую (только опубликованные ответы команды стажёра) — если поменяешь модель `MentorQuestion` (`public_content`, `publication_status`, `answered_at`, `team`), поправь и там.
+Спеки: 006 (feature flags), 304 (поток событий), 108 (перефразировка).
